@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   # ---------------------------------------------------
-  # 1. ANDROID BUILD (Universal + Splits)
+  # 1. ANDROID BUILD (Highly Optimized)
   # ---------------------------------------------------
   build-android:
     runs-on: ubuntu-latest
@@ -21,40 +21,40 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
       
-      # FIX: Switched to 'master' channel to ensure support for Dart SDK 3.41.1+
       - uses: subosito/flutter-action@v2
         with:
           channel: 'master'
+          cache: true # Speed up CI by caching Flutter SDK
       
       - run: flutter pub get
 
-      # 1. Build UNIVERSAL APK (Fat APK for all devices)
-      - name: Build Universal APK
-        run: flutter build apk --release
+      # 1. Build UNIVERSAL APK
+      # --obfuscate: Renames symbols to reduce size and secure code
+      # --split-debug-info: Removes debug strings from the compiled code
+      - name: Build Universal APK (Obfuscated)
+        run: flutter build apk --release --obfuscate --split-debug-info=./debug-info
       
-      # Move it immediately so the next build doesn't delete it
       - name: Rename Universal APK
         run: mv build/app/outputs/flutter-apk/app-release.apk WaterParty-Universal.apk
 
-      # 2. Build SPLIT APKs (arm64, armv7, x86_64)
-      - name: Build Split APKs
-        run: flutter build apk --release --split-per-abi
+      # 2. Build SPLIT APKs
+      # Applying the same optimization flags to the splits
+      - name: Build Split APKs (Obfuscated)
+        run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=./debug-info
 
-      # Rename the split files to readable names
       - name: Rename Split APKs
         run: |
           mv build/app/outputs/flutter-apk/app-arm64-v8a-release.apk WaterParty-Android-arm64.apk
           mv build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk WaterParty-Android-armv7.apk
           mv build/app/outputs/flutter-apk/app-x86_64-release.apk WaterParty-Android-x86.apk
 
-      # Upload ALL of them
       - uses: actions/upload-artifact@v4
         with:
           name: WaterParty-Android-All
           path: WaterParty-*.apk
 
   # ---------------------------------------------------
-  # 2. LINUX BUILD
+  # 2. LINUX BUILD (Stripped Binary)
   # ---------------------------------------------------
   build-linux:
     runs-on: ubuntu-latest
@@ -65,15 +65,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libespeak-ng-dev espeak-ng
       
-      # FIX: Switched to 'master' channel
       - uses: subosito/flutter-action@v2
         with:
           channel: 'master'
+          cache: true
           
       - run: flutter config --enable-linux-desktop
       - run: flutter pub get
-      - run: flutter build linux --release
       
+      # Build Release
+      - name: Build Linux Release
+        run: flutter build linux --release --obfuscate --split-debug-info=./debug-info
+
+      # OPTIMIZATION: Strip the binary to remove unnecessary symbol tables
+      # Note: 'water_party' must match your pubspec.yaml name exactly
+      - name: Strip Debug Symbols
+        run: strip build/linux/x64/release/bundle/water_party
+
       - name: Compress Build
         run: tar -czvf WaterParty-Linux.tar.gz -C build/linux/x64/release/bundle .
         
@@ -83,20 +91,25 @@ jobs:
           path: WaterParty-Linux.tar.gz
 
   # ---------------------------------------------------
-  # 3. WEB BUILD
+  # 3. WEB BUILD (CanvasKit Optimized)
   # ---------------------------------------------------
   build-web:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      # FIX: Switched to 'master' channel
       - uses: subosito/flutter-action@v2
         with:
           channel: 'master'
+          cache: true
           
       - run: flutter pub get
-      - run: flutter build web --release
+      
+      # OPTIMIZATION:
+      # --web-renderer canvaskit: Best for 'Glassmorphism' visual fidelity and performance
+      # --pwa-strategy offline-first: Caches resources for faster subsequent loads
+      - name: Build Optimized Web
+        run: flutter build web --release --web-renderer canvaskit --pwa-strategy=offline-first
       
       - name: Compress Build
         run: zip -r WaterParty-Web.zip build/web
