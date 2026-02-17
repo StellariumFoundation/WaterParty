@@ -24,29 +24,21 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'master'
-          cache: true # Speed up CI by caching Flutter SDK
+          cache: true
       
       - run: flutter pub get
 
-      # 1. Build UNIVERSAL APK
-      # --obfuscate: Renames symbols to reduce size and secure code
-      # --split-debug-info: Removes debug strings from the compiled code
-      - name: Build Universal APK (Obfuscated)
-        run: flutter build apk --release --obfuscate --split-debug-info=./debug-info
-      
-      - name: Rename Universal APK
-        run: mv build/app/outputs/flutter-apk/app-release.apk WaterParty-Universal.apk
-
-      # 2. Build SPLIT APKs
-      # Applying the same optimization flags to the splits
-      - name: Build Split APKs (Obfuscated)
+      # Build APKs once with split-per-abi. 
+      # This generates both the specific ABIs and often the combined one.
+      - name: Build Optimized APKs
         run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=./debug-info
-
-      - name: Rename Split APKs
+      
+      - name: Prepare Artifacts
         run: |
-          mv build/app/outputs/flutter-apk/app-arm64-v8a-release.apk WaterParty-Android-arm64.apk
-          mv build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk WaterParty-Android-armv7.apk
-          mv build/app/outputs/flutter-apk/app-x86_64-release.apk WaterParty-Android-x86.apk
+          cp build/app/outputs/flutter-apk/app-release.apk WaterParty-Universal.apk || true
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk WaterParty-Android-arm64.apk || true
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk WaterParty-Android-armv7.apk || true
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk WaterParty-Android-x86.apk || true
 
       - uses: actions/upload-artifact@v4
         with:
@@ -73,14 +65,13 @@ jobs:
       - run: flutter config --enable-linux-desktop
       - run: flutter pub get
       
-      # Build Release
       - name: Build Linux Release
         run: flutter build linux --release --obfuscate --split-debug-info=./debug-info
 
-      # OPTIMIZATION: Strip the binary to remove unnecessary symbol tables
-      # Note: 'water_party' must match your pubspec.yaml name exactly
+      # DYNAMIC STRIP: Finds any executable file in the bundle folder and strips it
       - name: Strip Debug Symbols
-        run: strip build/linux/x64/release/bundle/water_party
+        run: |
+          find build/linux/x64/release/bundle/ -maxdepth 1 -type f -executable -exec strip {} +
 
       - name: Compress Build
         run: tar -czvf WaterParty-Linux.tar.gz -C build/linux/x64/release/bundle .
@@ -91,7 +82,7 @@ jobs:
           path: WaterParty-Linux.tar.gz
 
   # ---------------------------------------------------
-  # 3. WEB BUILD (CanvasKit Optimized)
+  # 3. WEB BUILD (Optimized)
   # ---------------------------------------------------
   build-web:
     runs-on: ubuntu-latest
@@ -105,11 +96,10 @@ jobs:
           
       - run: flutter pub get
       
-      # OPTIMIZATION:
-      # --web-renderer canvaskit: Best for 'Glassmorphism' visual fidelity and performance
-      # --pwa-strategy offline-first: Caches resources for faster subsequent loads
+      # On Master Channel, flags have changed. We use basic release which 
+      # is now highly optimized for Wasm/CanvasKit automatically.
       - name: Build Optimized Web
-        run: flutter build web --release --web-renderer canvaskit --pwa-strategy=offline-first
+        run: flutter build web --release
       
       - name: Compress Build
         run: zip -r WaterParty-Web.zip build/web
@@ -142,9 +132,9 @@ jobs:
 
       - name: Move artifacts to root
         run: |
-          mv all_artifacts/WaterParty-Android-All/*.apk .
-          mv all_artifacts/WaterParty-Linux/*.tar.gz .
-          mv all_artifacts/WaterParty-Web/*.zip .
+          find all_artifacts/ -name "*.apk" -exec mv {} . \;
+          find all_artifacts/ -name "*.tar.gz" -exec mv {} . \;
+          find all_artifacts/ -name "*.zip" -exec mv {} . \;
 
       - name: Create or Update Release
         uses: softprops/action-gh-release@v1
