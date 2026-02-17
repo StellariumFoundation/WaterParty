@@ -11,10 +11,12 @@ class AppColors {
   static const Color textPink = Color(0xFFD18BFF);
   static const Color textCyan = Color(0xFF00E5FF);
   static const Color gold = Color(0xFFFFD700);
+  static const Color electricPurple = Color(0xFF7C3AED); // Added to fix party.dart error
 
-  // --- Aliases for Backward Compatibility (Fixes your Build Errors) ---
+  // --- Aliases for Backward Compatibility ---
   static const Color neonBlue = textCyan; 
   
+  // The main background gradient
   static const LinearGradient stellariumGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
@@ -26,12 +28,16 @@ class AppColors {
     stops: [0.0, 0.5, 1.0],
   );
 
-  // Alias for main.dart
+  // Alias used in main.dart
   static const LinearGradient oceanGradient = stellariumGradient;
 
-  // Added back for profile.dart
+  // Gold gradient used in profile.dart avatar ring
   static const LinearGradient goldGradient = LinearGradient(
-    colors: [Color(0xFFFDB931), Color(0xFFFFD700), Color(0xFFFDB931)],
+    colors: [
+      Color(0xFFFDB931), 
+      Color(0xFFFFD700), 
+      Color(0xFFFDB931)
+    ],
   );
 }
 
@@ -41,7 +47,7 @@ class WaterGlass extends StatelessWidget {
   final double? width;
   final double borderRadius;
   final double blur;
-  final double border; // Added back to fix party.dart
+  final double border; // Used for highlighting selected chips
   final Color? borderColor;
 
   const WaterGlass({
@@ -51,7 +57,7 @@ class WaterGlass extends StatelessWidget {
     this.width,
     this.borderRadius = 20, 
     this.blur = 15,
-    this.border = 1.5, // Default value
+    this.border = 1.5, 
     this.borderColor,
   });
 
@@ -63,7 +69,7 @@ class WaterGlass extends StatelessWidget {
       borderRadius: borderRadius,
       blur: blur,
       alignment: Alignment.center,
-      border: border, // Uses the parameter from constructor
+      border: border, 
       linearGradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
