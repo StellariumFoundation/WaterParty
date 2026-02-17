@@ -3,9 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 // Import your new modules
 import 'theme.dart';
-import 'party.dart';
+import 'match.dart';
 import 'matches.dart';
-import 'create_party.dart';
+import 'party.dart';
 import 'profile.dart';
 
 void main() {

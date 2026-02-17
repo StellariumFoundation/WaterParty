@@ -3,19 +3,24 @@ import 'package:flutter/material.dart';
 import 'package:glassmorphism/glassmorphism.dart';
 
 class AppColors {
-  static const Color deepBlue = Color(0xFF0F172A);
-  static const Color electricPurple = Color(0xFF7C3AED);
-  static const Color neonBlue = Color(0xFF3B82F6);
-  static const Color gold = Color(0xFFFFD700);
+  // Stellarium Palette
+  static const Color deepBlack = Color(0xFF000000);
+  static const Color stellariumPurple = Color(0xFF1A0B2E);
+  static const Color deepForest = Color(0xFF001A00); // Bottom green glow
   
-  static const LinearGradient oceanGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFF0F0C29), Color(0xFF302B63), Color(0xFF24243E)],
-  );
+  static const Color textPink = Color(0xFFD18BFF);
+  static const Color textCyan = Color(0xFF00E5FF);
+  static const Color gold = Color(0xFFFFD700);
 
-  static const LinearGradient goldGradient = LinearGradient(
-    colors: [Color(0xFFFDB931), Color(0xFFFFD700), Color(0xFFFDB931)],
+  static const LinearGradient stellariumGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      deepBlack,
+      stellariumPurple,
+      deepForest,
+    ],
+    stops: [0.0, 0.5, 1.0],
   );
 }
 
@@ -25,11 +30,16 @@ class WaterGlass extends StatelessWidget {
   final double? width;
   final double borderRadius;
   final double blur;
-  final double border;
+  final Color? borderColor;
 
   const WaterGlass({
-    super.key, required this.child, this.height = 100, this.width,
-    this.borderRadius = 20, this.blur = 20, this.border = 2,
+    super.key, 
+    required this.child, 
+    this.height = 100, 
+    this.width,
+    this.borderRadius = 20, 
+    this.blur = 15,
+    this.borderColor,
   });
 
   @override
@@ -40,15 +50,22 @@ class WaterGlass extends StatelessWidget {
       borderRadius: borderRadius,
       blur: blur,
       alignment: Alignment.center,
-      border: border,
+      border: 1.5,
       linearGradient: LinearGradient(
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
-          colors: [Colors.white.withOpacity(0.1), Colors.white.withOpacity(0.05)],
-          stops: const [0.1, 1],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.08),
+            Colors.white.withOpacity(0.03),
+          ],
       ),
       borderGradient: LinearGradient(
-        begin: Alignment.topLeft, end: Alignment.bottomRight,
-        colors: [Colors.white.withOpacity(0.5), Colors.white.withOpacity(0.1)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          (borderColor ?? Colors.white).withOpacity(0.2),
+          Colors.transparent,
+        ],
       ),
       child: child,
     );
