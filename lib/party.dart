@@ -26,25 +26,25 @@ class _CreatePartyScreenState extends State<CreatePartyScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- Header ---
-              Text("Mint an\nExperience", 
+              // --- Header: Replaced "Mint" with "Create" ---
+              Text("Create a\nNew Party", 
                 style: GoogleFonts.playfairDisplay(fontSize: 42, fontWeight: FontWeight.bold, height: 1.1)),
               const SizedBox(height: 10),
-              const Text("Operationalize the social liquidity.", 
+              const Text("Host a gathering and curate your crowd.", 
                 style: TextStyle(color: AppColors.textCyan, letterSpacing: 1.2, fontWeight: FontWeight.w500)),
               
               const SizedBox(height: 40),
 
               // --- Section 1: Core Identity ---
-              _sectionHeader("IDENTITY", AppColors.textPink),
-              _glassTextField("Title", "Give the vibe a name...", Icons.title),
+              _sectionHeader("THE VIBE", AppColors.textPink),
+              _glassTextField("Event Title", "e.g. Saturday Rooftop Sessions", Icons.celebration),
               const SizedBox(height: 15),
-              _glassTextField("Description", "What happens here?", Icons.notes, maxLines: 3),
+              _glassTextField("Description", "What's the plan? Set the tone for your guests.", Icons.notes, maxLines: 3),
               
               const SizedBox(height: 30),
 
               // --- Section 2: Visuals ---
-              _sectionHeader("PARTY PHOTOS", AppColors.textCyan),
+              _sectionHeader("EVENT PHOTOS", AppColors.textCyan),
               SizedBox(
                 height: 120,
                 child: ListView(
@@ -59,24 +59,24 @@ class _CreatePartyScreenState extends State<CreatePartyScreen> {
 
               const SizedBox(height: 30),
 
-              // --- Section 3: Scheduling & Location ---
-              _sectionHeader("LOGISTICS", Colors.white),
+              // --- Section 3: Logistics ---
+              _sectionHeader("TIME & PLACE", Colors.white),
               Row(
                 children: [
                   Expanded(child: _glassActionTile("Date", "${selectedDate.day}/${selectedDate.month}", Icons.calendar_today)),
                   const SizedBox(width: 15),
-                  Expanded(child: _glassActionTile("Start", selectedTime.format(context), Icons.access_time)),
+                  Expanded(child: _glassActionTile("Start Time", selectedTime.format(context), Icons.access_time)),
                 ],
               ),
               const SizedBox(height: 15),
-              _glassTextField("City", "e.g. San Francisco", Icons.location_city),
+              _glassTextField("City", "Which city is this in?", Icons.location_city),
               const SizedBox(height: 15),
-              _glassTextField("Secret Address", "Revealed only to matched guests", Icons.lock_outline),
+              _glassTextField("Secret Address", "This stays hidden until you accept a guest.", Icons.lock_outline),
 
               const SizedBox(height: 30),
 
-              // --- Section 4: Slot Mechanics ---
-              _sectionHeader("SLOT PROTOCOL", AppColors.gold),
+              // --- Section 4: Guest List Mechanics ---
+              _sectionHeader("GUEST LIST & CAPACITY", AppColors.gold),
               WaterGlass(
                 height: 140,
                 child: Padding(
@@ -86,8 +86,8 @@ class _CreatePartyScreenState extends State<CreatePartyScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text("Max Capacity", style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text("${maxCapacity.toInt()} Guests", style: const TextStyle(color: AppColors.gold)),
+                          const Text("Guest Limit", style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text("${maxCapacity.toInt()} People", style: const TextStyle(color: AppColors.gold)),
                         ],
                       ),
                       Slider(
@@ -99,7 +99,7 @@ class _CreatePartyScreenState extends State<CreatePartyScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text("Auto-Lock on Full", style: TextStyle(fontSize: 14)),
+                          const Text("Close invite when full", style: TextStyle(fontSize: 14)),
                           Switch(
                             value: autoLock,
                             activeColor: AppColors.textCyan,
@@ -114,34 +114,34 @@ class _CreatePartyScreenState extends State<CreatePartyScreen> {
 
               const SizedBox(height: 30),
 
-              // --- Section 5: The Vibe ---
-              _sectionHeader("VIBE & CURATION", AppColors.textPink),
-              _label("Vibe Tags"),
+              // --- Section 5: Curation ---
+              _sectionHeader("CURATION TAGS", AppColors.textPink),
+              _label("Vibe Style"),
               Wrap(
                 spacing: 10,
                 children: [
                   _vibeChip("#Chill", true),
-                  _vibeChip("#Rage", false),
-                  _vibeChip("#DeepTalks", false),
-                  _vibeChip("#Networking", true),
+                  _vibeChip("#Dance", false),
+                  _vibeChip("#Networking", false),
+                  _vibeChip("#DinnerParty", true),
                 ],
               ),
               const SizedBox(height: 15),
-              _glassTextField("Music Genres", "Techno, Jazz, Hip-Hop...", Icons.music_note),
+              _glassTextField("Music Genre", "e.g. House, Lo-fi, 80s", Icons.music_note),
 
               const SizedBox(height: 30),
 
-              // --- Section 6: Financials ---
-              _sectionHeader("ROTATION POOL", AppColors.textCyan),
-              _glassTextField("Pool Goal (\$)", "0.00", Icons.account_balance_wallet, keyboardType: TextInputType.number),
-              const Text("Guests will pledge this amount to join.", 
+              // --- Section 6: Financials: Replaced "Pool" terminology with "Fund" ---
+              _sectionHeader("PARTY FUND (CHIP-IN)", AppColors.textCyan),
+              _glassTextField("Group Goal for Supplies (\$)", "0.00", Icons.shopping_basket, keyboardType: TextInputType.number),
+              const Text("Guests contribute this amount to help with drinks/food.", 
                 style: TextStyle(color: Colors.white38, fontSize: 12)),
 
               const SizedBox(height: 50),
 
-              // --- Final Action ---
-              _buildMintButton(),
-              const SizedBox(height: 100), // Bottom padding
+              // --- Final Action: Celebrate ---
+              _buildCreateButton(),
+              const SizedBox(height: 100), 
             ],
           ),
         ),
@@ -236,7 +236,7 @@ class _CreatePartyScreenState extends State<CreatePartyScreen> {
     );
   }
 
-  Widget _buildMintButton() {
+  Widget _buildCreateButton() {
     return Container(
       width: double.infinity, height: 65,
       decoration: BoxDecoration(
@@ -247,9 +247,16 @@ class _CreatePartyScreenState extends State<CreatePartyScreen> {
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
         onPressed: () {
-          // Execution: This would serialize the form into the 'Party' struct
+          // Logic to save the gathering
         },
-        child: const Text("PUBLISH PARTY CARD", style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.send, color: Colors.black, size: 20),
+            SizedBox(width: 10),
+            Text("CREATE PARTY", style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+          ],
+        ),
       ),
     );
   }
