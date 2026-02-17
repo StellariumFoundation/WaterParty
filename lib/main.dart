@@ -1,19 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// Import your new modules
 import 'theme.dart';
-import 'match.dart';
-import 'matches.dart';
 import 'party.dart';
+import 'matches.dart';
+import 'create_party.dart';
 import 'profile.dart';
+import 'auth_screen.dart'; 
 
 void main() {
   runApp(const WaterPartyApp());
 }
 
-class WaterPartyApp extends StatelessWidget {
+class WaterPartyApp extends StatefulWidget {
   const WaterPartyApp({super.key});
+
+  @override
+  State<WaterPartyApp> createState() => _WaterPartyAppState();
+}
+
+class _WaterPartyAppState extends State<WaterPartyApp> {
+  bool _isAuthenticated = false; 
+
+  void _login() {
+    setState(() => _isAuthenticated = true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +37,9 @@ class WaterPartyApp extends StatelessWidget {
         useMaterial3: true,
         textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
       ),
-      home: const MainScaffold(),
+      home: _isAuthenticated 
+          ? const MainScaffold() 
+          : AuthScreen(onLoginSuccess: _login),
     );
   }
 }
@@ -54,19 +67,27 @@ class _MainScaffoldState extends State<MainScaffold> {
       decoration: const BoxDecoration(gradient: AppColors.oceanGradient),
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        // extendBody allows the content to flow behind the nav bar if needed
+        extendBody: true, 
         body: IndexedStack(index: _currentIndex, children: _screens),
-        extendBody: true,
-        bottomNavigationBar: Padding(
-          padding: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
-          child: WaterGlass(
-            height: 80, borderRadius: 40, blur: 30,
+        
+        // --- COMPACT STELLARIUM NAVIGATION BAR ---
+        bottomNavigationBar: Container(
+          height: 75, // Reduced from 90 for a sleeker profile
+          margin: const EdgeInsets.only(bottom: 0), // Flat to the bottom
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.9),
+            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08), width: 0.5)),
+          ),
+          child: SafeArea(
+            top: false, // Don't add padding for notch at top of bar
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _navItem(Icons.style, 0),
-                _navItem(Icons.forum, 1),
-                _navItem(Icons.add_circle, 2, isMain: true),
-                _navItem(Icons.person, 3),
+                _navItem(Icons.style_rounded, "Feed", 0),
+                _navItem(Icons.forum_rounded, "Chats", 1),
+                _navItem(Icons.celebration_rounded, "Host", 2), // Changed to Party Icon
+                _navItem(Icons.person_rounded, "Profile", 3),
               ],
             ),
           ),
@@ -75,18 +96,44 @@ class _MainScaffoldState extends State<MainScaffold> {
     );
   }
 
-  Widget _navItem(IconData icon, int index, {bool isMain = false}) {
+  Widget _navItem(IconData icon, String label, int index) {
     final isSelected = _currentIndex == index;
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white.withOpacity(0.1) : Colors.transparent,
-          shape: BoxShape.circle,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        width: MediaQuery.of(context).size.width / 4, // Equal spacing
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Compact "Pill" background for the active item
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white.withOpacity(0.15) : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                icon, 
+                color: isSelected ? Colors.white : Colors.white38, 
+                size: 22, // Slightly smaller icon
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label, 
+              style: TextStyle(
+                fontSize: 10, // More compact text
+                color: isSelected ? Colors.white : Colors.white30,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
         ),
-        child: Icon(icon, color: isSelected ? AppColors.gold : Colors.white54, size: isMain ? 32 : 26),
       ),
     );
   }
