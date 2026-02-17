@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:glassmorphism/glassmorphism.dart';
 
 class AppColors {
-  // Stellarium Palette
+  // --- Stellarium Palette ---
   static const Color deepBlack = Color(0xFF000000);
   static const Color stellariumPurple = Color(0xFF1A0B2E);
   static const Color deepForest = Color(0xFF001A00); // Bottom green glow
@@ -12,6 +12,9 @@ class AppColors {
   static const Color textCyan = Color(0xFF00E5FF);
   static const Color gold = Color(0xFFFFD700);
 
+  // --- Aliases for Backward Compatibility (Fixes your Build Errors) ---
+  static const Color neonBlue = textCyan; 
+  
   static const LinearGradient stellariumGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
@@ -22,6 +25,14 @@ class AppColors {
     ],
     stops: [0.0, 0.5, 1.0],
   );
+
+  // Alias for main.dart
+  static const LinearGradient oceanGradient = stellariumGradient;
+
+  // Added back for profile.dart
+  static const LinearGradient goldGradient = LinearGradient(
+    colors: [Color(0xFFFDB931), Color(0xFFFFD700), Color(0xFFFDB931)],
+  );
 }
 
 class WaterGlass extends StatelessWidget {
@@ -30,6 +41,7 @@ class WaterGlass extends StatelessWidget {
   final double? width;
   final double borderRadius;
   final double blur;
+  final double border; // Added back to fix party.dart
   final Color? borderColor;
 
   const WaterGlass({
@@ -39,6 +51,7 @@ class WaterGlass extends StatelessWidget {
     this.width,
     this.borderRadius = 20, 
     this.blur = 15,
+    this.border = 1.5, // Default value
     this.borderColor,
   });
 
@@ -50,7 +63,7 @@ class WaterGlass extends StatelessWidget {
       borderRadius: borderRadius,
       blur: blur,
       alignment: Alignment.center,
-      border: 1.5,
+      border: border, // Uses the parameter from constructor
       linearGradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
