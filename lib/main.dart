@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'theme.dart';
-import 'party.dart';
+import 'match.dart';
 import 'matches.dart';
-import 'create_party.dart';
+import 'party.dart';
 import 'profile.dart';
 import 'auth_screen.dart'; 
 
