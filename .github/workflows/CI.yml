@@ -1,4 +1,4 @@
-name: Build & Release TapTalk
+name: Build & Release Water Party
 
 on:
   push:
@@ -20,9 +20,12 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
+      
+      # FIX: Switched to 'master' channel to ensure support for Dart SDK 3.41.1+
       - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: 'master'
+      
       - run: flutter pub get
 
       # 1. Build UNIVERSAL APK (Fat APK for all devices)
@@ -31,7 +34,7 @@ jobs:
       
       # Move it immediately so the next build doesn't delete it
       - name: Rename Universal APK
-        run: mv build/app/outputs/flutter-apk/app-release.apk TapTalk-Universal.apk
+        run: mv build/app/outputs/flutter-apk/app-release.apk WaterParty-Universal.apk
 
       # 2. Build SPLIT APKs (arm64, armv7, x86_64)
       - name: Build Split APKs
@@ -40,15 +43,15 @@ jobs:
       # Rename the split files to readable names
       - name: Rename Split APKs
         run: |
-          mv build/app/outputs/flutter-apk/app-arm64-v8a-release.apk TapTalk-Android-arm64.apk
-          mv build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk TapTalk-Android-armv7.apk
-          mv build/app/outputs/flutter-apk/app-x86_64-release.apk TapTalk-Android-x86.apk
+          mv build/app/outputs/flutter-apk/app-arm64-v8a-release.apk WaterParty-Android-arm64.apk
+          mv build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk WaterParty-Android-armv7.apk
+          mv build/app/outputs/flutter-apk/app-x86_64-release.apk WaterParty-Android-x86.apk
 
       # Upload ALL of them
       - uses: actions/upload-artifact@v4
         with:
-          name: TapTalk-Android-All
-          path: TapTalk-*.apk
+          name: WaterParty-Android-All
+          path: WaterParty-*.apk
 
   # ---------------------------------------------------
   # 2. LINUX BUILD
@@ -61,20 +64,23 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libespeak-ng-dev espeak-ng
+      
+      # FIX: Switched to 'master' channel
       - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: 'master'
+          
       - run: flutter config --enable-linux-desktop
       - run: flutter pub get
       - run: flutter build linux --release
       
       - name: Compress Build
-        run: tar -czvf TapTalk-Linux.tar.gz -C build/linux/x64/release/bundle .
+        run: tar -czvf WaterParty-Linux.tar.gz -C build/linux/x64/release/bundle .
         
       - uses: actions/upload-artifact@v4
         with:
-          name: TapTalk-Linux
-          path: TapTalk-Linux.tar.gz
+          name: WaterParty-Linux
+          path: WaterParty-Linux.tar.gz
 
   # ---------------------------------------------------
   # 3. WEB BUILD
@@ -83,19 +89,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      # FIX: Switched to 'master' channel
       - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: 'master'
+          
       - run: flutter pub get
       - run: flutter build web --release
       
       - name: Compress Build
-        run: zip -r TapTalk-Web.zip build/web
+        run: zip -r WaterParty-Web.zip build/web
         
       - uses: actions/upload-artifact@v4
         with:
-          name: TapTalk-Web
-          path: TapTalk-Web.zip
+          name: WaterParty-Web
+          path: WaterParty-Web.zip
 
   # ---------------------------------------------------
   # 4. AUTOMATIC RELEASE
@@ -120,15 +129,15 @@ jobs:
 
       - name: Move artifacts to root
         run: |
-          mv all_artifacts/TapTalk-Android-All/*.apk .
-          mv all_artifacts/TapTalk-Linux/*.tar.gz .
-          mv all_artifacts/TapTalk-Web/*.zip .
+          mv all_artifacts/WaterParty-Android-All/*.apk .
+          mv all_artifacts/WaterParty-Linux/*.tar.gz .
+          mv all_artifacts/WaterParty-Web/*.zip .
 
       - name: Create or Update Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.APP_VERSION }}
-          name: Release v${{ env.APP_VERSION }}
+          name: Water Party Release v${{ env.APP_VERSION }}
           files: |
             *.apk
             *.tar.gz
