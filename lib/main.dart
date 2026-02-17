@@ -2,31 +2,32 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
+import 'package:glassmorphism/glassmorphism.dart';
 
 void main() {
   runApp(const WaterPartyApp());
 }
 
 // ==========================================
-// THEME & CONSTANTS
+// 0. THEME & CONSTANTS
 // ==========================================
 class AppColors {
   static const Color deepBlue = Color(0xFF0F172A);
   static const Color electricPurple = Color(0xFF7C3AED);
   static const Color neonBlue = Color(0xFF3B82F6);
   static const Color gold = Color(0xFFFFD700);
-  static const Color glassWhite = Color(0x1AFFFFFF);
   
-  static const LinearGradient waterGradient = LinearGradient(
+  // The background of the entire app (Deep Ocean)
+  static const LinearGradient oceanGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF0F0C29), // Deepest Midnight
+      Color(0xFF0F0C29), // Deep Midnight
       Color(0xFF302B63), // Royal Purple
-      Color(0xFF24243E), // Dark Blue
+      Color(0xFF24243E), // Dark Navy
     ],
   );
-  
+
   static const LinearGradient goldGradient = LinearGradient(
     colors: [Color(0xFFFDB931), Color(0xFFFFD700), Color(0xFFFDB931)],
   );
@@ -42,7 +43,7 @@ class WaterPartyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.transparent, 
+        scaffoldBackgroundColor: Colors.transparent, // Important for glass effect
         useMaterial3: true,
         textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
       ),
@@ -52,7 +53,60 @@ class WaterPartyApp extends StatelessWidget {
 }
 
 // ==========================================
-// MAIN SCAFFOLD (THE DOCK)
+// 1. REUSABLE GLASS COMPONENT (The Helper)
+// ==========================================
+// This widget standardizes the "Water" look across the app
+class WaterGlass extends StatelessWidget {
+  final Widget child;
+  final double height;
+  final double? width;
+  final double borderRadius;
+  final double blur;
+  final double border;
+
+  const WaterGlass({
+    super.key,
+    required this.child,
+    this.height = 100,
+    this.width,
+    this.borderRadius = 20,
+    this.blur = 20,
+    this.border = 2,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassmorphicContainer(
+      width: width ?? MediaQuery.of(context).size.width,
+      height: height,
+      borderRadius: borderRadius,
+      blur: blur,
+      alignment: Alignment.center,
+      border: border,
+      linearGradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.1),
+            Colors.white.withOpacity(0.05),
+          ],
+          stops: const [0.1, 1],
+      ),
+      borderGradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Colors.white.withOpacity(0.5),
+          Colors.white.withOpacity(0.1), // Fades out border for subtle effect
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+// ==========================================
+// 2. MAIN SCAFFOLD (THE DOCK)
 // ==========================================
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
@@ -74,42 +128,54 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(gradient: AppColors.waterGradient),
+      decoration: const BoxDecoration(gradient: AppColors.oceanGradient),
       child: Scaffold(
-        backgroundColor: Colors.transparent, // Let gradient show through
+        backgroundColor: Colors.transparent,
         body: IndexedStack(
           index: _currentIndex,
           children: _screens,
         ),
-        extendBody: true, // Allows content to go behind the glass navbar
-        bottomNavigationBar: ClipRRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              height: 90,
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
-                border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
-              ),
-              child: BottomNavigationBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                type: BottomNavigationBarType.fixed,
-                currentIndex: _currentIndex,
-                selectedItemColor: AppColors.gold,
-                unselectedItemColor: Colors.white54,
-                showUnselectedLabels: false,
-                selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-                onTap: (index) => setState(() => _currentIndex = index),
-                items: const [
-                  BottomNavigationBarItem(icon: Icon(Icons.style), label: 'Vibe'),
-                  BottomNavigationBarItem(icon: Icon(Icons.forum), label: 'Matches'),
-                  BottomNavigationBarItem(icon: Icon(Icons.add_circle, size: 40), label: 'Host'),
-                  BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-                ],
-              ),
+        // Floating Glass Navbar
+        extendBody: true,
+        bottomNavigationBar: Padding(
+          padding: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
+          child: WaterGlass(
+            height: 80,
+            borderRadius: 40,
+            blur: 30,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _navItem(Icons.style, 0),
+                _navItem(Icons.forum, 1),
+                _navItem(Icons.add_circle, 2, isMain: true),
+                _navItem(Icons.person, 3),
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(IconData icon, int index, {bool isMain = false}) {
+    final isSelected = _currentIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _currentIndex = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white.withOpacity(0.1) : Colors.transparent,
+          shape: BoxShape.circle,
+          boxShadow: isSelected && isMain 
+            ? [BoxShadow(color: AppColors.electricPurple.withOpacity(0.4), blurRadius: 20)] 
+            : []
+        ),
+        child: Icon(
+          icon, 
+          color: isSelected ? AppColors.gold : Colors.white54,
+          size: isMain ? 32 : 26,
         ),
       ),
     );
@@ -117,7 +183,7 @@ class _MainScaffoldState extends State<MainScaffold> {
 }
 
 // ==========================================
-// 1. PARTY FEED (SWIPE)
+// 3. PARTY FEED (SWIPE)
 // ==========================================
 class PartyFeedScreen extends StatelessWidget {
   const PartyFeedScreen({super.key});
@@ -141,7 +207,7 @@ class PartyFeedScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100), // Padding for navbar
           child: CardSwiper(
             cardsCount: cards.length,
             cardBuilder: (context, index, x, y) => cards[index],
@@ -155,65 +221,65 @@ class PartyFeedScreen extends StatelessWidget {
   }
 
   Widget _buildCard(String title, String host, String imgUrl, int slots, List<String> tags) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
-        image: DecorationImage(image: NetworkImage(imgUrl), fit: BoxFit.cover),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 30, spreadRadius: 5)],
-      ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(30),
       child: Stack(
+        fit: StackFit.expand,
         children: [
-          // Gradient Overlay
+          // Background Image
+          Image.network(imgUrl, fit: BoxFit.cover),
+          
+          // Overlay Gradient
           Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
               gradient: LinearGradient(
-                colors: [Colors.transparent, Colors.black.withOpacity(0.9)],
-                begin: Alignment.center, end: Alignment.bottomCenter,
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
               ),
-            ),
-          ),
-          
-          // Slots Badge
-          Positioned(
-            top: 20, right: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                gradient: AppColors.goldGradient,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(color: AppColors.gold.withOpacity(0.4), blurRadius: 10)]
-              ),
-              child: Text("$slots SPOTS", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
             ),
           ),
 
-          // Content
+          // Glass Info Panel at Bottom
           Positioned(
-            bottom: 30, left: 20, right: 20,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: tags.map((t) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Chip(
-                    label: Text(t, style: const TextStyle(fontSize: 10, color: Colors.white)),
-                    backgroundColor: Colors.white.withOpacity(0.1),
-                    visualDensity: VisualDensity.compact,
-                    side: BorderSide.none,
-                  ),
-                )).toList()),
-                Text(title, style: GoogleFonts.playfairDisplay(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white)),
-                const SizedBox(height: 5),
-                Row(
+            bottom: 20, left: 10, right: 10,
+            child: WaterGlass(
+              height: 140,
+              borderRadius: 25,
+              blur: 15,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const CircleAvatar(radius: 12, backgroundImage: NetworkImage("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde")),
-                    const SizedBox(width: 8),
-                    Text("Hosted by $host", style: const TextStyle(fontSize: 16, color: Colors.white70)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(title, style: GoogleFonts.playfairDisplay(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: AppColors.gold, borderRadius: BorderRadius.circular(10)),
+                          child: Text("$slots SPOTS", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10)),
+                        )
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(children: tags.map((t) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Text(t, style: const TextStyle(fontSize: 12, color: AppColors.neonBlue)),
+                    )).toList()),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const CircleAvatar(radius: 10, backgroundImage: NetworkImage("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde")),
+                        const SizedBox(width: 8),
+                        Text("Hosted by $host", style: const TextStyle(fontSize: 14, color: Colors.white70)),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -223,7 +289,7 @@ class PartyFeedScreen extends StatelessWidget {
 }
 
 // ==========================================
-// 2. MATCHES SCREEN
+// 4. MATCHES SCREEN
 // ==========================================
 class MatchesScreen extends StatelessWidget {
   const MatchesScreen({super.key});
@@ -239,42 +305,54 @@ class MatchesScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildGlassTile("Friday Night Run", "Locked • Location Revealed", true),
-          _buildGlassTile("Crypto & Coffee", "Host Reviewing...", false),
-          _buildGlassTile("Sunset Drinks", "Event Ended", false),
+          _buildMatchTile("Friday Night Run", "Locked • Location Revealed", true),
+          _buildMatchTile("Crypto & Coffee", "Host Reviewing...", false),
+          _buildMatchTile("Sunset Drinks", "Event Ended", false),
         ],
       ),
     );
   }
 
-  Widget _buildGlassTile(String title, String status, bool isActive) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.glassWhite,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isActive ? AppColors.gold.withOpacity(0.5) : Colors.white.withOpacity(0.05)),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isActive ? AppColors.gold.withOpacity(0.2) : Colors.white.withOpacity(0.1),
-            shape: BoxShape.circle,
+  Widget _buildMatchTile(String title, String status, bool isActive) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: WaterGlass(
+        height: 80,
+        borderRadius: 20,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isActive ? AppColors.gold.withOpacity(0.2) : Colors.white.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(isActive ? Icons.lock_open : Icons.lock, color: isActive ? AppColors.gold : Colors.white54),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(status, style: TextStyle(color: isActive ? AppColors.gold : Colors.white54, fontSize: 12)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white30),
+            ],
           ),
-          child: Icon(isActive ? Icons.lock_open : Icons.lock, color: isActive ? AppColors.gold : Colors.white54),
         ),
-        title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-        subtitle: Text(status, style: TextStyle(color: isActive ? AppColors.gold : Colors.white54)),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white30),
       ),
     );
   }
 }
 
 // ==========================================
-// 3. CREATE PARTY
+// 5. CREATE PARTY
 // ==========================================
 class CreatePartyScreen extends StatelessWidget {
   const CreatePartyScreen({super.key});
@@ -332,8 +410,9 @@ class CreatePartyScreen extends StatelessWidget {
   Widget _label(String text) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(text, style: const TextStyle(color: Colors.white70, fontSize: 16)));
   
   Widget _glassTextField(String hint, IconData icon) {
-    return Container(
-      decoration: BoxDecoration(color: AppColors.glassWhite, borderRadius: BorderRadius.circular(16)),
+    return WaterGlass(
+      height: 60,
+      borderRadius: 16,
       child: TextField(
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
@@ -348,20 +427,22 @@ class CreatePartyScreen extends StatelessWidget {
   }
 
   Widget _slotChip(String label, bool selected) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        color: selected ? AppColors.electricPurple : AppColors.glassWhite,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: selected ? Colors.transparent : Colors.white10),
+    return SizedBox(
+      width: 80,
+      child: WaterGlass(
+        height: 50,
+        borderRadius: 15,
+        border: selected ? 2 : 1,
+        child: Center(
+          child: Text(label, style: TextStyle(color: selected ? AppColors.gold : Colors.white, fontWeight: FontWeight.bold)),
+        ),
       ),
-      child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
     );
   }
 }
 
 // ==========================================
-// 4. PROFILE
+// 6. PROFILE
 // ==========================================
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -380,11 +461,11 @@ class ProfileScreen extends StatelessWidget {
                 alignment: Alignment.center,
                 children: [
                   Container(
-                    width: 130, height: 130,
+                    width: 140, height: 140,
                     decoration: BoxDecoration(shape: BoxShape.circle, gradient: AppColors.goldGradient, boxShadow: [BoxShadow(color: AppColors.gold.withOpacity(0.3), blurRadius: 30)]),
                   ),
                   const CircleAvatar(
-                    radius: 60,
+                    radius: 65,
                     backgroundImage: NetworkImage("https://images.unsplash.com/photo-1500648767791-00dcc994a43e"),
                   ),
                   Positioned(
@@ -407,9 +488,9 @@ class ProfileScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _statBox("12", "Hosted"),
-                const SizedBox(width: 20),
+                const SizedBox(width: 15),
                 _statBox("45", "Attended"),
-                const SizedBox(width: 20),
+                const SizedBox(width: 15),
                 _statBox("4.9", "Rating"),
               ],
             ),
@@ -432,24 +513,39 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _statBox(String val, String label) {
-    return Container(
-      width: 90, padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: AppColors.glassWhite, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white10)),
-      child: Column(children: [
-        Text(val, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.white54)),
-      ]),
+    return SizedBox(
+      width: 100,
+      child: WaterGlass(
+        height: 80,
+        borderRadius: 20,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(val, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(label, style: const TextStyle(fontSize: 12, color: Colors.white54)),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _optionTile(IconData icon, String title, String trailing) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(color: AppColors.glassWhite, borderRadius: BorderRadius.circular(16)),
-      child: ListTile(
-        leading: Icon(icon, color: Colors.white),
-        title: Text(title, style: const TextStyle(color: Colors.white)),
-        trailing: Text(trailing, style: const TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold)),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: WaterGlass(
+        height: 70,
+        borderRadius: 16,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white70),
+              const SizedBox(width: 16),
+              Expanded(child: Text(title, style: const TextStyle(color: Colors.white))),
+              Text(trailing, style: const TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
       ),
     );
   }
