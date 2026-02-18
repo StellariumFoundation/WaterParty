@@ -1,60 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'theme.dart';
+import 'providers.dart';
+import 'models.dart';
 
-class MatchesScreen extends StatefulWidget {
+class MatchesScreen extends ConsumerStatefulWidget {
   const MatchesScreen({super.key});
 
   @override
-  State<MatchesScreen> createState() => _MatchesScreenState();
+  ConsumerState<MatchesScreen> createState() => _MatchesScreenState();
 }
 
-class _MatchesScreenState extends State<MatchesScreen> {
-  // Toggle state: 0 for Party Chats, 1 for DMs
+class _MatchesScreenState extends ConsumerState<MatchesScreen> {
   int _selectedTab = 0;
-
-  // Mock Data: Party Chats (Group conversations)
-  final List<Map<String, dynamic>> partyChats = [
-    {
-      "title": "Rooftop Jazz & Drinks ",
-      "lastMessage": "Sarah: I'm bringing the vintage red!",
-      "time": "2m ago",
-      "unread": 3,
-      "image": "https://images.unsplash.com/photo-1514525253440-b39345208668",
-      "status": "Locked",
-    },
-    {
-      "title": "Techno Bunker ",
-      "lastMessage": "Mike: Basement entrance is open.",
-      "time": "15m ago",
-      "unread": 0,
-      "image": "https://images.unsplash.com/photo-1574155376612-bfa5f1d00d20",
-      "status": "Live",
-    },
-  ];
-
-  // Mock Data: Direct Messages (1-on-1)
-  final List<Map<String, dynamic>> directMessages = [
-    {
-      "name": "Marcus Aurelius",
-      "lastMessage": "That rooftop set was legendary.",
-      "time": "5m ago",
-      "unread": 1,
-      "image": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
-      "online": true,
-    },
-    {
-      "name": "Elena V.",
-      "lastMessage": "Are you going to the Jazz night?",
-      "time": "1h ago",
-      "unread": 0,
-      "image": "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
-      "online": false,
-    },
-  ];
 
   @override
   Widget build(BuildContext context) {
+    // Watch the global chat state
+    final allChatRooms = ref.watch(chatProvider);
+
+    // Filter based on the Go 'isGroup' flag
+    final partyChats = allChatRooms.where((room) => room.isGroup).toList();
+    final directMessages = allChatRooms.where((room) => !room.isGroup).toList();
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -67,7 +36,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- TAB TOGGLE: PARTIES VS DIRECT ---
+          // --- TAB TOGGLE ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: WaterGlass(
@@ -88,7 +57,9 @@ class _MatchesScreenState extends State<MatchesScreen> {
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
-              child: _selectedTab == 0 ? _buildPartyList() : _buildDMList(),
+              child: _selectedTab == 0 
+                ? _buildList(partyChats, true) 
+                : _buildList(directMessages, false),
             ),
           ),
         ],
@@ -96,7 +67,6 @@ class _MatchesScreenState extends State<MatchesScreen> {
     );
   }
 
-  // --- UI COMPONENT: TAB TOGGLE BUTTON ---
   Widget _toggleButton(String label, int index) {
     bool isSelected = _selectedTab == index;
     return Expanded(
@@ -122,108 +92,73 @@ class _MatchesScreenState extends State<MatchesScreen> {
     );
   }
 
-  // --- LIST: PARTY CHATS ---
-  Widget _buildPartyList() {
+  Widget _buildList(List<ChatRoom> rooms, bool isPartyTab) {
+    if (rooms.isEmpty) {
+      return Center(
+        child: Text("No connections yet", style: TextStyle(color: Colors.white24)),
+      );
+    }
+
     return ListView.builder(
-      key: const ValueKey(0),
+      key: ValueKey(_selectedTab),
       padding: const EdgeInsets.all(20),
-      itemCount: partyChats.length,
+      itemCount: rooms.length,
       itemBuilder: (context, index) {
-        final chat = partyChats[index];
-        return _buildChatTile(
-          title: chat['title'],
-          subtitle: chat['lastMessage'],
-          time: chat['time'],
-          unread: chat['unread'],
-          imageUrl: chat['image'],
-          isParty: true,
-          status: chat['status'],
-        );
+        final room = rooms[index];
+        return _buildChatTile(room);
       },
     );
   }
 
-  // --- LIST: DIRECT MESSAGES ---
-  Widget _buildDMList() {
-    return ListView.builder(
-      key: const ValueKey(1),
-      padding: const EdgeInsets.all(20),
-      itemCount: directMessages.length,
-      itemBuilder: (context, index) {
-        final dm = directMessages[index];
-        return _buildChatTile(
-          title: dm['name'],
-          subtitle: dm['lastMessage'],
-          time: dm['time'],
-          unread: dm['unread'],
-          imageUrl: dm['image'],
-          isParty: false,
-          isOnline: dm['online'],
-        );
-      },
-    );
-  }
+  Widget _buildChatTile(ChatRoom room) {
+    // Helper to format DateTime to "2m ago" style
+    String timeLabel = _formatDateTime(room.lastMessageAt);
 
-  // --- COMPONENT: UNIVERSAL CHAT TILE ---
-  Widget _buildChatTile({
-    required String title,
-    required String subtitle,
-    required String time,
-    required int unread,
-    required String imageUrl,
-    required bool isParty,
-    String? status,
-    bool? isOnline,
-  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: WaterGlass(
         height: 90,
         borderRadius: 20,
         child: ListTile(
+          onTap: () {
+            // Logic: Navigate to Chat Room
+          },
           contentPadding: const EdgeInsets.symmetric(horizontal: 15),
           leading: Stack(
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(isParty ? 12 : 30), // Square for parties, Round for DMs
-                child: Image.network(imageUrl, width: 60, height: 60, fit: BoxFit.cover),
+                borderRadius: BorderRadius.circular(room.isGroup ? 12 : 30),
+                child: Image.network(room.imageUrl, width: 60, height: 60, fit: BoxFit.cover),
               ),
-              if (isParty && status == "Locked")
+              // Show online status or locked status based on Go model data
+              if (room.isGroup && room.partyId.isNotEmpty)
                 Positioned(bottom: 0, right: 0, child: Icon(Icons.lock, color: AppColors.gold, size: 18)),
-              if (!isParty && isOnline == true)
-                Positioned(
-                  bottom: 2, right: 2, 
-                  child: Container(
-                    width: 12, height: 12, 
-                    decoration: BoxDecoration(color: Colors.greenAccent, shape: BoxShape.circle, border: Border.all(color: Colors.black, width: 2))
-                  )
-                ),
             ],
           ),
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(title, 
+                child: Text(room.title, 
                   maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white)),
               ),
-              Text(time, style: const TextStyle(color: Colors.white30, fontSize: 11)),
+              Text(timeLabel, style: const TextStyle(color: Colors.white30, fontSize: 11)),
             ],
           ),
           subtitle: Row(
             children: [
               Expanded(
-                child: Text(subtitle, 
+                child: Text(room.lastMessageContent, 
                   maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: unread > 0 ? Colors.white : Colors.white54, fontSize: 14)),
+                  style: TextStyle(color: room.unreadCount > 0 ? Colors.white : Colors.white54, fontSize: 14)),
               ),
-              if (unread > 0)
+              if (room.unreadCount > 0)
                 Container(
                   margin: const EdgeInsets.only(left: 10),
                   padding: const EdgeInsets.all(6),
                   decoration: const BoxDecoration(color: AppColors.textCyan, shape: BoxShape.circle),
-                  child: Text(unread.toString(), 
+                  child: Text(room.unreadCount.toString(), 
                     style: const TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
                 )
             ],
@@ -231,5 +166,13 @@ class _MatchesScreenState extends State<MatchesScreen> {
         ),
       ),
     );
+  }
+
+  String _formatDateTime(DateTime? dt) {
+    if (dt == null) return "";
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return "${diff.inMinutes}m ago";
+    if (diff.inHours < 24) return "${diff.inHours}h ago";
+    return "${diff.inDays}d ago";
   }
 }

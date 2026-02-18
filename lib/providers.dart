@@ -1,99 +1,130 @@
-import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import 'models.dart';
 
-// --- 1. AUTH PROVIDER ---
-// Manages: User login state and profile data
 class AuthNotifier extends Notifier<User?> {
-  @override
-  User? build() => null; // Initially null (not logged in)
+  final fb.FirebaseAuth _auth = fb.FirebaseAuth.instance;
+  String? _verificationId; // Stores the ID for SMS verification
 
-  // Simulate a login with mock data
-  void login() {
-    state = const User(
-      id: 'u1',
-      name: "John Victor",
-      handle: "@john_v",
-      bio: "Architect of the Vibe.",
-      imageUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
-      reputation: 98.4,
-      hostedCount: 12,
-      joinedCount: 45,
+  @override
+  User? build() {
+    _auth.authStateChanges().listen((fbUser) {
+      if (fbUser != null) state = _mapFirebaseUser(fbUser);
+      else state = null;
+    });
+    return null;
+  }
+
+  // --- Google ---
+  Future<void> signInWithGoogle() async {
+    final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+    if (googleUser == null) return;
+    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+    final fb.AuthCredential credential = fb.GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+    await _auth.signInWithCredential(credential);
+  }
+
+  // --- Email/Password ---
+  Future<void> authWithEmail(String email, String password, bool isLogin) async {
+    if (isLogin) {
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+    } else {
+      await _auth.createUserWithEmailAndPassword(email: email, password: password);
+    }
+  }
+
+  // --- SMS Authentication (Phone) ---
+  Future<void> sendOtp(String phoneNumber, Function(String) onCodeSent) async {
+    await _auth.verifyPhoneNumber(
+      phoneNumber: phoneNumber,
+      verificationCompleted: (fb.PhoneAuthCredential credential) async {
+        await _auth.signInWithCredential(credential);
+      },
+      verificationFailed: (fb.FirebaseException e) => throw e,
+      codeSent: (String vid, int? resendToken) {
+        _verificationId = vid;
+        onCodeSent(vid);
+      },
+      codeAutoRetrievalTimeout: (String vid) => _verificationId = vid,
     );
   }
 
-  void logout() {
-    state = null;
+  Future<void> verifyOtp(String smsCode) async {
+    if (_verificationId == null) return;
+    final credential = fb.PhoneAuthProvider.credential(
+      verificationId: _verificationId!,
+      smsCode: smsCode,
+    );
+    await _auth.signInWithCredential(credential);
   }
 
-  // Update profile locally
-  void updateUserProfile(String name, String bio, String handle) {
-    if (state != null) {
-      state = state!.copyWith(name: name, bio: bio, handle: handle);
-    }
+  void logout() async => await _auth.signOut();
+
+  User _mapFirebaseUser(fb.User fbUser) {
+    return User(
+      id: fbUser.uid,
+      username: fbUser.phoneNumber ?? fbUser.email?.split('@')[0] ?? "user_${fbUser.uid.substring(0,5)}",
+      realName: fbUser.displayName ?? "Water User",
+      email: fbUser.email ?? "",
+      phoneNumber: fbUser.phoneNumber ?? "",
+      profilePhotos: fbUser.photoURL != null ? [fbUser.photoURL!] : [],
+      trustScore: 100.0,
+    );
   }
 }
 
 final authProvider = NotifierProvider<AuthNotifier, User?>(AuthNotifier.new);
 
+// Add this to your providers.dart
 
-// --- 2. PARTY FEED PROVIDER ---
-// Manages: The list of parties visible in the swiper
-class PartyFeedNotifier extends Notifier<List<Party>> {
+class ChatNotifier extends Notifier<List<ChatRoom>> {
   @override
-  List<Party> build() {
-    // Initial Mock Data
+  List<ChatRoom> build() {
+    // Initial Mock Data using the Go-compatible Models
     return [
-      Party(
-        id: 'p1',
-        title: "Rooftop Jazz",
-        hostName: "Sarah V.",
+      ChatRoom(
+        id: "c1",
+        partyId: "p1",
+        hostId: "u2",
+        title: "Rooftop Jazz & Drinks", // Derived from Party Title
         imageUrl: "https://images.unsplash.com/photo-1514525253440-b39345208668",
-        capacity: 15,
-        tags: ["#Classy", "#Wine", "#Jazz"],
-        description: "Smooth jazz and vintage wine overlooking the skyline.",
-        date: DateTime.now(),
-        time: const TimeOfDay(hour: 20, minute: 0),
+        isGroup: true,
+        lastMessageContent: "Sarah: I'm bringing the vintage red!",
+        lastMessageAt: DateTime.now().subtract(const Duration(minutes: 2)),
+        unreadCount: 3,
       ),
-      Party(
-        id: 'p2',
-        title: "Neon Rage",
-        hostName: "Mike T.",
-        imageUrl: "https://images.unsplash.com/photo-1574155376612-bfa5f1d00d20",
-        capacity: 100,
-        tags: ["#Techno", "#Rave", "#Bass"],
-        description: "Heavy bass, high energy. The bunker opens at midnight.",
-        date: DateTime.now(),
-        time: const TimeOfDay(hour: 23, minute: 0),
+      ChatRoom(
+        id: "dm1",
+        partyId: "",
+        hostId: "u1",
+        title: "Marcus Aurelius", // Derived from User RealName
+        imageUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
+        isGroup: false,
+        lastMessageContent: "That rooftop set was legendary.",
+        lastMessageAt: DateTime.now().subtract(const Duration(minutes: 5)),
+        unreadCount: 1,
       ),
     ];
   }
 
-  void addParty(Party party) {
-    // Adds new party to the TOP of the stack
-    state = [party, ...state];
-  }
-
-  void removeParty(String id) {
-    state = state.where((p) => p.id != id).toList();
-  }
-}
-
-final partyFeedProvider = NotifierProvider<PartyFeedNotifier, List<Party>>(PartyFeedNotifier.new);
-
-
-// --- 3. NAV BAR PROVIDER (FIXED) ---
-// Converted from StateProvider to Notifier to fix build errors and match architecture
-class NavIndexNotifier extends Notifier<int> {
-  @override
-  int build() {
-    return 0; // Default to first tab (Feed)
-  }
-
-  void setIndex(int index) {
-    state = index;
+  // This will be called by your SocketService when a NEW_MESSAGE event arrives
+  void updateRoomWithNewMessage(ChatMessage msg) {
+    state = [
+      for (final room in state)
+        if (room.id == msg.chatId)
+          room.copyWith(
+            lastMessageContent: msg.content,
+            lastMessageAt: msg.createdAt,
+            // unreadCount: room.unreadCount + 1, // Logic for unread
+          )
+        else
+          room,
+    ];
   }
 }
 
-final navIndexProvider = NotifierProvider<NavIndexNotifier, int>(NavIndexNotifier.new);
+final chatProvider = NotifierProvider<ChatNotifier, List<ChatRoom>>(ChatNotifier.new);

@@ -1,17 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'theme.dart';
+import 'providers.dart';
 
-class AuthScreen extends StatefulWidget {
-  final VoidCallback onLoginSuccess;
-  const AuthScreen({super.key, required this.onLoginSuccess});
+enum AuthMode { email, phone }
+
+class AuthScreen extends ConsumerStatefulWidget {
+  const AuthScreen({super.key});
 
   @override
-  State<AuthScreen> createState() => _AuthScreenState();
+  ConsumerState<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class _AuthScreenState extends ConsumerState<AuthScreen> {
+  AuthMode _mode = AuthMode.email;
   bool isLogin = true;
+  bool isLoading = false;
+  bool otpSent = false;
+
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _otpController = TextEditingController();
+
+  Future<void> _handleAuth() async {
+    setState(() => isLoading = true);
+    try {
+      if (_mode == AuthMode.email) {
+        await ref.read(authProvider.notifier).authWithEmail(
+          _emailController.text.trim(), _passwordController.text.trim(), isLogin);
+      } else {
+        if (!otpSent) {
+          await ref.read(authProvider.notifier).sendOtp(_phoneController.text.trim(), (id) {
+            setState(() => otpSent = true);
+          });
+        } else {
+          await ref.read(authProvider.notifier).verifyOtp(_otpController.text.trim());
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,93 +59,64 @@ class _AuthScreenState extends State<AuthScreen> {
             child: Column(
               children: [
                 const SizedBox(height: 60),
-                // Title
-                Text(
-                  "WATER PARTY",
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 3,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                // Subtitle
-                const Text(
-                  "The Operating System for\nHuman Connection",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.textPink,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text("WATER PARTY", style: GoogleFonts.playfairDisplay(fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 3, color: Colors.white)),
+                const Text("HUMAN CONNECTION OS", style: TextStyle(color: AppColors.textPink, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 2)),
                 const SizedBox(height: 50),
-                
-                // Input Fields
+
+                // --- TAB TOGGLE ---
                 WaterGlass(
-                  height: 60,
-                  borderRadius: 15,
-                  child: const TextField(
-                    decoration: InputDecoration(
-                      hintText: "Email or Phone",
-                      prefixIcon: Icon(Icons.person_outline),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.all(20),
-                    ),
+                  height: 50, borderRadius: 25,
+                  child: Row(
+                    children: [
+                      _toggleTab("EMAIL", AuthMode.email),
+                      _toggleTab("PHONE", AuthMode.phone),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 15),
-                WaterGlass(
-                  height: 60,
-                  borderRadius: 15,
-                  child: const TextField(
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      hintText: "Password",
-                      prefixIcon: Icon(Icons.lock_outline),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.all(20),
-                    ),
-                  ),
-                ),
+                const SizedBox(height: 30),
+
+                // --- DYNAMIC INPUTS ---
+                if (_mode == AuthMode.email) ...[
+                  _inputField(_emailController, "Email", Icons.email_outlined),
+                  const SizedBox(height: 15),
+                  _inputField(_passwordController, "Password", Icons.lock_outline, obscure: true),
+                ] else ...[
+                  if (!otpSent) 
+                    _inputField(_phoneController, "+1 555 555 5555", Icons.phone_android_outlined)
+                  else
+                    _inputField(_otpController, "6-Digit Code", Icons.vibration_outlined),
+                ],
 
                 const SizedBox(height: 30),
 
-                // Main Action Button
+                // --- MAIN ACTION ---
                 GestureDetector(
-                  onTap: widget.onLoginSuccess,
+                  onTap: isLoading ? null : _handleAuth,
                   child: WaterGlass(
-                    height: 60,
-                    borderRadius: 30,
-                    borderColor: AppColors.textCyan,
-                    child: Text(
-                      isLogin ? "ENTER THE VIBE" : "JOIN THE COLLECTIVE",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.5,
-                        color: AppColors.textCyan,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Toggle Login/Register
-                TextButton(
-                  onPressed: () => setState(() => isLogin = !isLogin),
-                  child: Text(
-                    isLogin ? "New here? Register Account" : "Already a member? Login",
-                    style: const TextStyle(color: Colors.white54),
+                    height: 60, borderRadius: 30, borderColor: AppColors.textCyan,
+                    child: isLoading ? const CircularProgressIndicator(color: AppColors.textCyan) : 
+                    Text(otpSent ? "VERIFY CODE" : (isLogin ? "ENTER THE VIBE" : "JOIN COLLECTIVE"), 
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textCyan, letterSpacing: 1.5)),
                   ),
                 ),
 
                 const SizedBox(height: 40),
-                const Text(
-                  "By entering, you agree to the\nUniversal Standard Protocol",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white24, fontSize: 10),
+                const Text("OR", style: TextStyle(color: Colors.white24, fontSize: 10)),
+                const SizedBox(height: 20),
+
+                // --- GOOGLE ONLY ---
+                GestureDetector(
+                  onTap: () => ref.read(authProvider.notifier).signInWithGoogle(),
+                  child: WaterGlass(
+                    width: 60, height: 60, borderRadius: 30,
+                    child: const Icon(FontAwesomeIcons.google, color: Colors.white, size: 24),
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+                TextButton(
+                  onPressed: () => setState(() => isLogin = !isLogin),
+                  child: Text(isLogin ? "New here? Register" : "Have account? Login", style: const TextStyle(color: Colors.white54)),
                 ),
               ],
             ),
@@ -121,4 +126,28 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
+  Widget _toggleTab(String label, AuthMode mode) {
+    bool selected = _mode == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() { _mode = mode; otpSent = false; }),
+        child: Container(
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: selected ? Colors.white10 : Colors.transparent, borderRadius: BorderRadius.circular(25)),
+          child: Text(label, style: TextStyle(color: selected ? AppColors.textCyan : Colors.white30, fontWeight: FontWeight.bold, fontSize: 11)),
+        ),
+      ),
+    );
+  }
+
+  Widget _inputField(TextEditingController controller, String hint, IconData icon, {bool obscure = false}) {
+    return WaterGlass(
+      height: 60, borderRadius: 15,
+      child: TextField(
+        controller: controller, obscureText: obscure,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(hintText: hint, hintStyle: const TextStyle(color: Colors.white24), prefixIcon: Icon(icon, color: Colors.white70), border: InputBorder.none, contentPadding: const EdgeInsets.all(20)),
+      ),
+    );
+  }
 }
