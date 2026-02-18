@@ -10,6 +10,7 @@ import 'auth_screen.dart';
 
 
 
+
 void main() {
   runApp(const WaterPartyApp());
 }
