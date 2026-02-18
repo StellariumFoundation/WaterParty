@@ -1,4 +1,4 @@
-package models
+package main
 
 import (
 	"time"
@@ -13,237 +13,134 @@ type ApplicantStatus string
 type MessageType string
 
 const (
-	// Party Lifecycle
-	PartyStatusOpen      PartyStatus = "OPEN"      
-	PartyStatusLocked    PartyStatus = "LOCKED"    
-	PartyStatusLive      PartyStatus = "LIVE"      
-	PartyStatusCompleted PartyStatus = "COMPLETED" 
+	PartyStatusOpen      PartyStatus = "OPEN"
+	PartyStatusLocked    PartyStatus = "LOCKED"
+	PartyStatusLive      PartyStatus = "LIVE"
+	PartyStatusCompleted PartyStatus = "COMPLETED"
 	PartyStatusCancelled PartyStatus = "CANCELLED"
 
-	// Match/Swipe Lifecycle
 	ApplicantPending  ApplicantStatus = "PENDING"
 	ApplicantAccepted ApplicantStatus = "ACCEPTED"
 	ApplicantDeclined ApplicantStatus = "DECLINED"
 	ApplicantWaitlist ApplicantStatus = "WAITLIST"
 
-	// Message Classification
 	MsgText    MessageType = "TEXT"
 	MsgImage   MessageType = "IMAGE"
 	MsgVideo   MessageType = "VIDEO"
 	MsgAudio   MessageType = "AUDIO"
-	MsgSystem  MessageType = "SYSTEM"  // e.g., "The location is revealed!"
-	MsgWingman MessageType = "AI"      // AI generated icebreakers
-	MsgPayment MessageType = "PAYMENT" // Rotation pool updates
+	MsgSystem  MessageType = "SYSTEM"
+	MsgWingman MessageType = "AI"
+	MsgPayment MessageType = "PAYMENT"
 )
 
 // ==========================================
 // WEBSOCKET ENVELOPE
 // ==========================================
 
-// WSMessage is the generic container for all websocket traffic.
 type WSMessage struct {
-	Event   string      
-	Payload interface{} 
-	Token   string      
+	Event   string      `json:"Event" db:"event"`
+	Payload interface{} `json:"Payload" db:"payload"`
+	Token   string      `json:"Token,omitempty" db:"token"`
 }
 
 // ==========================================
 // CORE ENTITIES
 // ==========================================
 
-// User represents a participant in the ecosystem.
 type User struct {
-	// --- Core Identity ---
-	ID          string
-	Username    string
-	RealName    string
-	PhoneNumber string
-	Email       string 
-	
-	// --- Visuals (Binary data from Postgres) ---
-	ProfilePhotos [][]byte
-
-	// --- Demographics ---
-	Age         int
-	DateOfBirth time.Time 
-	HeightCm    int
-	Gender      string
-
-	// --- The "Vibe" & Matching ---
-	LookingFor   []string 
-	DrinkingPref string   
-	SmokingPref  string   
-	CannabisPref string   
-	
-	MusicGenres []string 
-	TopArtists  []string 
-
-	// --- Professional & Education ---
-	JobTitle string 
-	Company  string 
-	School   string 
-	Degree   string 
-	
-	// --- Social Proof ---
-	InstagramHandle string
-	TwitterHandle   string
-	LinkedinHandle  string
-	XHandle         string
-	TikTokHandle    string
-
-	// --- Safety & The Trust Protocol ---
-	IsVerified bool
-	
-	// --- Stats & Reputation ---
-	TrustScore      float64
-	EloScore        float64
-	PartiesAttended []Party // Historical references
-	PartiesHosted   int
-	FlakeCount      int 
-
-	// --- Financial ---
-	WalletAddress string 
-
-	// --- Geolocation & System ---
-	LocationLat  float64
-	LocationLon  float64
-	LastActiveAt time.Time 
-	CreatedAt    time.Time
-	
-	Bio       string
-	Interests []string
-	VibeTags  []string
+	ID              string    `json:"ID" db:"id"`
+	Username        string    `json:"Username" db:"username"`
+	RealName        string    `json:"RealName" db:"real_name"`
+	PhoneNumber     string    `json:"PhoneNumber" db:"phone_number"`
+	Email           string    `json:"Email" db:"email"`
+	ProfilePhotos   []string  `json:"ProfilePhotos" db:"profile_photos"` // Stores hashes
+	Age             int       `json:"Age" db:"age"`
+	DateOfBirth     time.Time `json:"DateOfBirth" db:"date_of_birth"`
+	HeightCm        int       `json:"HeightCm" db:"height_cm"`
+	Gender          string    `json:"Gender" db:"gender"`
+	LookingFor      []string  `json:"LookingFor" db:"looking_for"`
+	DrinkingPref    string    `json:"DrinkingPref" db:"drinking_pref"`
+	SmokingPref     string    `json:"SmokingPref" db:"smoking_pref"`
+	CannabisPref    string    `json:"CannabisPref" db:"cannabis_pref"`
+	MusicGenres     []string  `json:"MusicGenres" db:"music_genres"`
+	TopArtists      []string  `json:"TopArtists" db:"top_artists"`
+	JobTitle        string    `json:"JobTitle" db:"job_title"`
+	Company         string    `json:"Company" db:"company"`
+	School          string    `json:"School" db:"school"`
+	Degree          string    `json:"Degree" db:"degree"`
+	InstagramHandle string    `json:"InstagramHandle" db:"instagram_handle"`
+	TwitterHandle   string    `json:"TwitterHandle" db:"twitter_handle"`
+	LinkedinHandle  string    `json:"LinkedinHandle" db:"linkedin_handle"`
+	XHandle         string    `json:"XHandle" db:"x_handle"`
+	TikTokHandle    string    `json:"TikTokHandle" db:"tiktok_handle"`
+	IsVerified      bool      `json:"IsVerified" db:"is_verified"`
+	TrustScore      float64   `json:"TrustScore" db:"trust_score"`
+	EloScore        float64   `json:"EloScore" db:"elo_score"`
+	PartiesHosted   int       `json:"PartiesHosted" db:"parties_hosted"`
+	FlakeCount      int       `json:"FlakeCount" db:"flake_count"`
+	WalletAddress   string    `json:"WalletAddress" db:"wallet_address"`
+	LocationLat     float64   `json:"LocationLat" db:"location_lat"`
+	LocationLon     float64   `json:"LocationLon" db:"location_lon"`
+	LastActiveAt    time.Time `json:"LastActiveAt" db:"last_active_at"`
+	CreatedAt       time.Time `json:"CreatedAt" db:"created_at"`
+	Bio             string    `json:"Bio" db:"bio"`
+	Interests       []string  `json:"Interests" db:"interests"`
+	VibeTags        []string  `json:"VibeTags" db:"vibe_tags"`
 }
 
-// Party represents the "Micro-Organization" event.
 type Party struct {
-	// --- Core Identity ---
-	ID          string
-	HostID      string
-	Title       string
-	Description string 
-	
-	// Visuals
-	PartyPhotos [][]byte 
-	
-	// --- Logistics & Lifecycle ---
-	StartTime time.Time
-	EndTime   time.Time
-	Status    PartyStatus 
-
-	// --- Location Privacy (The "Locked" Mechanic) ---
-	IsLocationRevealed bool
-	Address            string 
-	City               string
-	GeoLat             float64
-	GeoLon             float64
-
-	// --- The "Slot" Mechanics ---
-	MaxCapacity       int
-	CurrentGuestCount int
-	SlotRequirements  map[string]int 
-	AutoLockOnFull    bool 
-
-	// --- The "Vibe" & Curation ---
-	VibeTags    []string 
-	MusicGenres []string 
-	Mood        string   
-	Rules       []string 
-	
-	// The crowd-fund for supplies
-	RotationPool *Crowdfunding
-
-	// --- Social Graph & Tech ---
-	ChatRoomID string 
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID                 string         `json:"ID" db:"id"`
+	HostID             string         `json:"HostID" db:"host_id"`
+	Title              string         `json:"Title" db:"title"`
+	Description        string         `json:"Description" db:"description"`
+	PartyPhotos        []string       `json:"PartyPhotos" db:"party_photos"` // Stores hashes
+	StartTime          time.Time      `json:"StartTime" db:"start_time"`
+	EndTime            time.Time      `json:"EndTime" db:"end_time"`
+	Status             PartyStatus    `json:"Status" db:"status"`
+	IsLocationRevealed bool           `json:"IsLocationRevealed" db:"is_location_revealed"`
+	Address            string         `json:"Address" db:"address"`
+	City               string         `json:"City" db:"city"`
+	GeoLat             float64        `json:"GeoLat" db:"geo_lat"`
+	GeoLon             float64        `json:"GeoLon" db:"geo_lon"`
+	MaxCapacity        int            `json:"MaxCapacity" db:"max_capacity"`
+	CurrentGuestCount  int            `json:"CurrentGuestCount" db:"current_guest_count"`
+	SlotRequirements   map[string]int `json:"SlotRequirements" db:"slot_requirements"` // Use JSONB in DB
+	AutoLockOnFull     bool           `json:"AutoLockOnFull" db:"auto_lock_on_full"`
+	VibeTags           []string       `json:"VibeTags" db:"vibe_tags"`
+	MusicGenres        []string       `json:"MusicGenres" db:"music_genres"`
+	Mood               string         `json:"Mood" db:"mood"`
+	Rules              []string       `json:"Rules" db:"rules"`
+	RotationPool       *Crowdfunding  `json:"RotationPool" db:"rotation_pool"` // Nested or separate table
+	ChatRoomID         string         `json:"ChatRoomID" db:"chat_room_id"`
+	CreatedAt          time.Time      `json:"CreatedAt" db:"created_at"`
+	UpdatedAt          time.Time      `json:"UpdatedAt" db:"updated_at"`
 }
 
-// PartyApplication represents the "Swipe/Request" protocol.
-type PartyApplication struct {
-	PartyID   string          
-	UserID    string          
-	Status    ApplicantStatus 
-	AppliedAt time.Time       
-	
-	// Snapshot for host review
-	UserSnapshot User 
-}
-
-// ==========================================
-// CHAT SYSTEM
-// ==========================================
-
-// ChatRoom is the real-time social hub for a party.
-type ChatRoom struct {
-	ID      string
-	PartyID string
-	HostID  string
-
-	// --- Participants ---
-	ParticipantIDs []string
-
-	// --- State ---
-	IsActive  bool
-	IsMuted   bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
-
-	// --- Message History ---
-	RecentMessages []ChatMessage
-
-	// --- Previews ---
-	LastMessageID      string
-	LastMessageContent string    
-	LastMessageType    MessageType
-	LastMessageAt      time.Time
-
-	// --- Financials ---
-	RotationPoolID string
-}
-
-// ChatMessage is the unit of communication.
 type ChatMessage struct {
-	ID       string
-	ChatID   string
-	SenderID string 
-
-	Type    MessageType 
-	Content string
-
-	// Media Handling
-	MediaURL     string 
-	ThumbnailURL string 
-	MediaData    []byte // Used only during initial upload transition
-
-	// --- Dynamic Attributes ---
-	// Flexible storage for AI context or payment details
-	Metadata map[string]interface{}
-
-	// --- Interactions ---
-	ReplyToID string 
-	
-	CreatedAt time.Time
+	ID           string                 `json:"ID" db:"id"`
+	ChatID       string                 `json:"ChatID" db:"chat_id"`
+	SenderID     string                 `json:"SenderID" db:"sender_id"`
+	Type         MessageType            `json:"Type" db:"type"`
+	Content      string                 `json:"Content" db:"content"`
+	MediaURL     string                 `json:"MediaURL" db:"media_url"` // Computed hash URL
+	ThumbnailURL string                 `json:"ThumbnailURL" db:"thumbnail_url"`
+	Metadata     map[string]interface{} `json:"Metadata" db:"metadata"` // Use JSONB in DB
+	ReplyToID    string                 `json:"ReplyToID" db:"reply_to_id"`
+	CreatedAt    time.Time              `json:"CreatedAt" db:"created_at"`
 }
 
-// ==========================================
-// FINANCIALS
-// ==========================================
-
-// Crowdfunding (Rotation Pool) manages group funds.
 type Crowdfunding struct {
-	ID            string  
-	PartyID       string  
-	TargetAmount  float64 
-	CurrentAmount float64 
-	Currency      string  
-	
-	Contributors []Contribution 
-	IsFunded     bool           
+	ID            string         `json:"ID" db:"id"`
+	PartyID       string         `json:"PartyID" db:"party_id"`
+	TargetAmount  float64        `json:"TargetAmount" db:"target_amount"`
+	CurrentAmount float64        `json:"CurrentAmount" db:"current_amount"`
+	Currency      string         `json:"Currency" db:"currency"`
+	Contributors  []Contribution `json:"Contributors" db:"contributors"` // Use JSONB array or separate table
+	IsFunded      bool           `json:"IsFunded" db:"is_funded"`
 }
 
 type Contribution struct {
-	UserID string  
-	Amount float64 
-	PaidAt time.Time 
+	UserID string    `json:"UserID" db:"user_id"`
+	Amount float64   `json:"Amount" db:"amount"`
+	PaidAt time.Time `json:"PaidAt" db:"paid_at"`
 }
