@@ -106,8 +106,7 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
-
   fonts:
     - family: Frutiger
       fonts:
-        - asset: assets/fonts/neue_frutiger_world_regular.ttf
+        - asset: assets/fonts/neuefrutiger.ttf
