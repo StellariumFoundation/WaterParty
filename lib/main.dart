@@ -8,6 +8,8 @@ import 'party.dart';
 import 'profile.dart';
 import 'auth_screen.dart'; 
 
+
+
 void main() {
   runApp(const WaterPartyApp());
 }
@@ -32,11 +34,11 @@ class _WaterPartyAppState extends State<WaterPartyApp> {
       title: 'Water Party',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.transparent,
-        useMaterial3: true,
-        textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
-      ),
+  brightness: Brightness.dark,
+  scaffoldBackgroundColor: Colors.transparent,
+  useMaterial3: true,
+  fontFamily: AppColors.fontFamily, // <--- Sets Neue Frutiger as default
+),
       home: _isAuthenticated 
           ? const MainScaffold() 
           : AuthScreen(onLoginSuccess: _login),

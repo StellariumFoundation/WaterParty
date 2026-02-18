@@ -15,9 +15,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   @override
   void initState() {
-    super.key,
+    super.initState(); // FIXED: Removed the 'super.key' error
     _tabController = TabController(length: 3, vsync: this);
-    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -95,7 +100,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.gold, width: 0.5)),
+                  decoration: BoxDecoration(
+                    color: Colors.black, 
+                    borderRadius: BorderRadius.circular(10), 
+                    border: Border.all(color: AppColors.gold, width: 0.5)
+                  ),
                   child: const Text("98.4 TRUST", style: TextStyle(color: AppColors.gold, fontSize: 8, fontWeight: FontWeight.bold)),
                 )
               ],
@@ -107,7 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("John Victor", style: GoogleFonts.playfairDisplay(fontSize: 22, fontWeight: FontWeight.bold)),
-                  const Text("Reputation Score: 2450", style: TextStyle(color: AppColors.textCyan, fontSize: 11, fontWeight: FontWeight.bold)),
+                  const Text("Reputation: 2450", style: TextStyle(color: AppColors.textCyan, fontSize: 11, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
@@ -141,7 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         children: [
           _buildPhotoStrip(),
           const SizedBox(height: 20),
-          _compactField("Bio", "Architect of the Vibe. Engineering connection.", Icons.short_text, maxLines: 2),
+          _compactField("Bio", "Architect of the Vibe.", Icons.short_text, maxLines: 2),
           Row(
             children: [
               Expanded(child: _compactField("Job", "Architect", Icons.work)),
@@ -155,7 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  // --- 3. LIFESTYLE TAB (Preferences & Demographics) ---
+  // --- 3. LIFESTYLE TAB ---
   Widget _buildLifestyleTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -177,7 +186,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  // --- 4. SOCIALS TAB (Links & Account) ---
+  // --- 4. SOCIALS TAB ---
   Widget _buildSocialsTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -187,7 +196,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           _compactField("X (Twitter)", "@john_v", Icons.close),
           _compactField("LinkedIn", "john-victor", Icons.link),
           const SizedBox(height: 10),
-          _compactInfoTile("Wallet ID", "0x71C...39B4", Icons.account_balance_wallet),
+          _compactInfoTile("Location", "San Francisco, CA", Icons.location_on),
         ],
       ),
     );
@@ -260,6 +269,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           _miniPhoto("https://images.unsplash.com/photo-1506794778202-cad84cf45f1d"),
           if (isEditing) 
             GestureDetector(
+              onTap: () {},
               child: WaterGlass(width: 80, height: 80, borderRadius: 15, child: const Icon(Icons.add_a_photo, size: 20, color: AppColors.textPink)),
             ),
         ],
@@ -271,13 +281,16 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     return Container(
       width: 80, height: 80,
       margin: const EdgeInsets.only(right: 10),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), image: DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15), 
+        image: DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
+      ),
     );
   }
 
   Widget _compactInfoTile(String label, String value, IconData icon) {
     return WaterGlass(
-      height: 50,
+      height: 55,
       child: ListTile(
         visualDensity: VisualDensity.compact,
         leading: Icon(icon, color: Colors.white38, size: 18),

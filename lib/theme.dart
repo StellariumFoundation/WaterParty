@@ -1,43 +1,76 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:glassmorphism/glassmorphism.dart';
+import 'package:flutter_svg/flutter_svg.dart'; // Required for custom SVG icons
 
 class AppColors {
   // --- Stellarium Palette ---
   static const Color deepBlack = Color(0xFF000000);
   static const Color stellariumPurple = Color(0xFF1A0B2E);
-  static const Color deepForest = Color(0xFF001A00); // Bottom green glow
+  static const Color deepForest = Color(0xFF001A00); 
   
   static const Color textPink = Color(0xFFD18BFF);
   static const Color textCyan = Color(0xFF00E5FF);
   static const Color gold = Color(0xFFFFD700);
-  static const Color electricPurple = Color(0xFF7C3AED); // Added to fix party.dart error
+  static const Color electricPurple = Color(0xFF7C3AED);
 
-  // --- Aliases for Backward Compatibility ---
+  // --- Aliases ---
   static const Color neonBlue = textCyan; 
-  
-  // The main background gradient
+  static const String fontFamily = 'FrutigerWorld'; // Custom Font Family
+
+  // --- Main Background Gradient ---
   static const LinearGradient stellariumGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [
-      deepBlack,
-      stellariumPurple,
-      deepForest,
-    ],
+    colors: [deepBlack, stellariumPurple, deepForest],
     stops: [0.0, 0.5, 1.0],
   );
 
-  // Alias used in main.dart
   static const LinearGradient oceanGradient = stellariumGradient;
 
-  // Gold gradient used in profile.dart avatar ring
   static const LinearGradient goldGradient = LinearGradient(
-    colors: [
-      Color(0xFFFDB931), 
-      Color(0xFFFFD700), 
-      Color(0xFFFDB931)
-    ],
+    colors: [Color(0xFFFDB931), Color(0xFFFFD700), Color(0xFFFDB931)],
+  );
+}
+
+// --- Custom Icon Utility ---
+class WaterIcon extends StatelessWidget {
+  final String name;
+  final Color? color;
+  final double size;
+
+  const WaterIcon({
+    super.key, 
+    required this.name, 
+    this.color, 
+    this.size = 24
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Looks for .svg files in your assets/icons/ folder
+    return SvgPicture.asset(
+      'assets/icons/$name.svg',
+      height: size,
+      width: size,
+      colorFilter: color != null 
+          ? ColorFilter.mode(color!, BlendMode.srcIn) 
+          : null,
+    );
+  }
+}
+
+// --- Premium Typography Styles ---
+class AppTypography {
+  static const TextStyle heading = TextStyle(
+    fontFamily: AppColors.fontFamily,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 1.5,
+  );
+
+  static const TextStyle body = TextStyle(
+    fontFamily: AppColors.fontFamily,
+    fontWeight: FontWeight.normal,
   );
 }
 
@@ -47,7 +80,7 @@ class WaterGlass extends StatelessWidget {
   final double? width;
   final double borderRadius;
   final double blur;
-  final double border; // Used for highlighting selected chips
+  final double border; 
   final Color? borderColor;
 
   const WaterGlass({
