@@ -108,6 +108,6 @@ flutter:
   # see https://flutter.dev/to/font-from-package
 
   fonts:
-    - family: Frutiger # This is the name you will use in code
+    - family: Frutiger
       fonts:
-        - asset: assets/fonts/neue-frutiger-world-regular.ttf
+        - asset: assets/fonts/neue_frutiger_world_regular.ttf
