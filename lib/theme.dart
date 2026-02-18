@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:glassmorphism/glassmorphism.dart';
-import 'package:flutter_svg/flutter_svg.dart'; // Required for custom SVG icons
 
 class AppColors {
   // --- Stellarium Palette ---
@@ -31,33 +30,6 @@ class AppColors {
   static const LinearGradient goldGradient = LinearGradient(
     colors: [Color(0xFFFDB931), Color(0xFFFFD700), Color(0xFFFDB931)],
   );
-}
-
-// --- Custom Icon Utility ---
-class WaterIcon extends StatelessWidget {
-  final String name;
-  final Color? color;
-  final double size;
-
-  const WaterIcon({
-    super.key, 
-    required this.name, 
-    this.color, 
-    this.size = 24
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // Looks for .svg files in your assets/icons/ folder
-    return SvgPicture.asset(
-      'assets/icons/$name.svg',
-      height: size,
-      width: size,
-      colorFilter: color != null 
-          ? ColorFilter.mode(color!, BlendMode.srcIn) 
-          : null,
-    );
-  }
 }
 
 // --- Premium Typography Styles ---
