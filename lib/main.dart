@@ -91,7 +91,7 @@ class MainScaffold extends ConsumerWidget {
 
     return Expanded(
       child: GestureDetector(
-        onTap: () => ref.read(navIndexProvider.notifier).state = index,
+        onTap: () => ref.read(navIndexProvider.notifier).setIndex(index),
         behavior: HitTestBehavior.opaque,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -129,3 +129,4 @@ class MainScaffold extends ConsumerWidget {
     );
   }
 }
+
