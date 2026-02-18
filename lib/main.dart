@@ -1,95 +1,82 @@
+// main.dart
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'theme.dart';
-import 'match.dart';
-import 'matches.dart';
-import 'party.dart';
-import 'profile.dart';
-import 'auth_screen.dart'; 
-
-
+import 'providers.dart';
+import 'match.dart'; // Feed
+import 'matches.dart'; // Chat
+import 'party.dart'; // Create
+import 'profile.dart'; // Profile
+import 'auth.dart'; // Auth Screen (ensure file name matches)
 
 void main() {
-  runApp(const WaterPartyApp());
+  runApp(
+    const ProviderScope(child: WaterPartyApp()),
+  );
 }
 
-class WaterPartyApp extends StatefulWidget {
+class WaterPartyApp extends ConsumerWidget {
   const WaterPartyApp({super.key});
 
   @override
-  State<WaterPartyApp> createState() => _WaterPartyAppState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watch the auth provider. If user is null, show AuthScreen.
+    final user = ref.watch(authProvider);
 
-class _WaterPartyAppState extends State<WaterPartyApp> {
-  bool _isAuthenticated = false; 
-
-  void _login() {
-    setState(() => _isAuthenticated = true);
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Water Party',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-  brightness: Brightness.dark,
-  scaffoldBackgroundColor: Colors.transparent,
-  useMaterial3: true,
-  fontFamily: AppColors.fontFamily, // <--- Sets Neue Frutiger as default
-),
-      home: _isAuthenticated 
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: Colors.transparent,
+        useMaterial3: true,
+        fontFamily: AppColors.fontFamily,
+      ),
+      home: user != null 
           ? const MainScaffold() 
-          : AuthScreen(onLoginSuccess: _login),
+          : AuthScreen(onLoginSuccess: () {
+              ref.read(authProvider.notifier).login();
+            }),
     );
   }
 }
 
-class MainScaffold extends StatefulWidget {
+class MainScaffold extends ConsumerWidget {
   const MainScaffold({super.key});
 
   @override
-  State<MainScaffold> createState() => _MainScaffoldState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentIndex = ref.watch(navIndexProvider);
 
-class _MainScaffoldState extends State<MainScaffold> {
-  int _currentIndex = 0;
+    final List<Widget> screens = [
+      const PartyFeedScreen(), 
+      const MatchesScreen(),   
+      const CreatePartyScreen(), 
+      const ProfileScreen(),   
+    ];
 
-  final List<Widget> _screens = [
-    const PartyFeedScreen(), 
-    const MatchesScreen(),   
-    const CreatePartyScreen(), 
-    const ProfileScreen(),   
-  ];
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(gradient: AppColors.oceanGradient),
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        // extendBody allows the content to flow behind the nav bar if needed
         extendBody: true, 
-        body: IndexedStack(index: _currentIndex, children: _screens),
+        body: IndexedStack(index: currentIndex, children: screens),
         
-        // --- COMPACT STELLARIUM NAVIGATION BAR ---
         bottomNavigationBar: Container(
-          height: 75, // Reduced from 90 for a sleeker profile
-          margin: const EdgeInsets.only(bottom: 0), // Flat to the bottom
+          height: 75,
           decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.9),
             border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08), width: 0.5)),
           ),
           child: SafeArea(
-            top: false, // Don't add padding for notch at top of bar
+            top: false,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _navItem(Icons.style_rounded, "Feed", 0),
-                _navItem(Icons.forum_rounded, "Chats", 1),
-                _navItem(Icons.celebration_rounded, "Host", 2), // Changed to Party Icon
-                _navItem(Icons.person_rounded, "Profile", 3),
+                _navItem(context, ref, Icons.style_rounded, "Feed", 0),
+                _navItem(context, ref, Icons.forum_rounded, "Chats", 1),
+                _navItem(context, ref, Icons.celebration_rounded, "Host", 2),
+                _navItem(context, ref, Icons.person_rounded, "Profile", 3),
               ],
             ),
           ),
@@ -98,42 +85,44 @@ class _MainScaffoldState extends State<MainScaffold> {
     );
   }
 
-  Widget _navItem(IconData icon, String label, int index) {
-    final isSelected = _currentIndex == index;
-    return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        width: MediaQuery.of(context).size.width / 4, // Equal spacing
+  Widget _navItem(BuildContext context, WidgetRef ref, IconData icon, String label, int index) {
+    final currentIndex = ref.watch(navIndexProvider);
+    final isSelected = currentIndex == index;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => ref.read(navIndexProvider.notifier).state = index,
+        behavior: HitTestBehavior.opaque,
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Compact "Pill" background for the active item
             AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
               decoration: BoxDecoration(
                 color: isSelected ? Colors.white.withOpacity(0.15) : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
               ),
               child: Icon(
                 icon, 
                 color: isSelected ? Colors.white : Colors.white38, 
-                size: 22, // Slightly smaller icon
+                size: 22, 
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              label, 
-              style: TextStyle(
-                fontSize: 10, // More compact text
-                color: isSelected ? Colors.white : Colors.white30,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                letterSpacing: 0.5,
+            if (isSelected) ...[
+              const SizedBox(height: 4),
+              Text(
+                label, 
+                style: const TextStyle(
+                  fontSize: 10, 
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
               ),
-            ),
+            ]
           ],
         ),
       ),

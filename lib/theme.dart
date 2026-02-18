@@ -15,7 +15,7 @@ class AppColors {
 
   // --- Aliases ---
   static const Color neonBlue = textCyan; 
-  static const String fontFamily = 'FrutigerWorld'; // Custom Font Family
+  static const String fontFamily = 'Frutiger'; // Custom Font Family
 
   // --- Main Background Gradient ---
   static const LinearGradient stellariumGradient = LinearGradient(
