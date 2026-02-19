@@ -1,7 +1,6 @@
 // main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'match.dart'; // Feed
@@ -11,27 +10,15 @@ import 'profile.dart'; // Profile
 import 'auth.dart'; // Auth Screen
 import 'websocket.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  String? initError;
-  try {
-    await Firebase.initializeApp();
-  } catch (e) {
-    initError = e.toString();
-    debugPrint("Firebase Initialization Error: $e");
-  }
-
   runApp(
-    ProviderScope(
-      child: WaterPartyApp(error: initError),
-    ),
+    const ProviderScope(child: WaterPartyApp()),
   );
 }
 
 class WaterPartyApp extends ConsumerWidget {
-  final String? error;
-  const WaterPartyApp({this.error, super.key});
+  const WaterPartyApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,11 +31,11 @@ class WaterPartyApp extends ConsumerWidget {
         brightness: Brightness.dark,
         scaffoldBackgroundColor: Colors.black,
         useMaterial3: true,
-        fontFamily: AppColors.fontFamily,
+        fontFamily: 'Frutiger',
       ),
       home: user != null 
           ? const MainScaffold() 
-          : AuthScreen(initError: error),
+          : const AuthScreen(),
     );
   }
 }
@@ -64,7 +51,6 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   @override
   void initState() {
     super.initState();
-    // Initialize Socket when user logs in
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(authProvider);
       if (user != null) {

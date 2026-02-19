@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS users (
     real_name TEXT,
     phone_number TEXT,
     email TEXT UNIQUE,
+    password_hash TEXT,
     
     -- Visuals: Stores an array of hashes referencing the assets table
     profile_photos TEXT[] DEFAULT '{}', 
@@ -113,6 +114,14 @@ CREATE TABLE IF NOT EXISTS users (
     last_active_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Ensure password_hash column exists
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='password_hash') THEN
+        ALTER TABLE users ADD COLUMN password_hash TEXT;
+    END IF;
+END $$;
 
 -- ==========================================
 -- PARTIES TABLE
@@ -311,6 +320,28 @@ func GetUser(id string) (User, error) {
 	return u, err
 }
 
+func GetUserByEmail(email string) (User, string, error) {
+	var u User
+	var passwordHash string
+	query := `SELECT id, username, real_name, phone_number, email, password_hash, profile_photos, age, 
+		date_of_birth, height_cm, gender, looking_for, drinking_pref, smoking_pref, cannabis_pref, 
+		music_genres, top_artists, job_title, company, school, degree, instagram_handle, 
+		twitter_handle, linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, 
+		elo_score, parties_hosted, flake_count, wallet_address, location_lat, location_lon, 
+		last_active_at, created_at, bio, interests, vibe_tags 
+		FROM users WHERE email = $1`
+
+	err := db.QueryRow(context.Background(), query, email).Scan(
+		&u.ID, &u.Username, &u.RealName, &u.PhoneNumber, &u.Email, &passwordHash, &u.ProfilePhotos, &u.Age,
+		&u.DateOfBirth, &u.HeightCm, &u.Gender, &u.LookingFor, &u.DrinkingPref, &u.SmokingPref, &u.CannabisPref,
+		&u.MusicGenres, &u.TopArtists, &u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle,
+		&u.TwitterHandle, &u.LinkedinHandle, &u.XHandle, &u.TikTokHandle, &u.IsVerified, &u.TrustScore,
+		&u.EloScore, &u.PartiesHosted, &u.FlakeCount, &u.WalletAddress, &u.LocationLat, &u.LocationLon,
+		&u.LastActiveAt, &u.CreatedAt, &u.Bio, &u.Interests, &u.VibeTags,
+	)
+	return u, passwordHash, err
+}
+
 func UpdateUser(u User) error {
 	query := `UPDATE users SET 
 		real_name=$1, phone_number=$2, profile_photos=$3, bio=$4, 
@@ -337,16 +368,25 @@ func CreateParty(p Party) (string, error) {
 	query := `INSERT INTO parties (
 		host_id, title, description, party_photos, start_time, end_time, status,
 		is_location_revealed, address, city, geo_lat, geo_lon, max_capacity,
-		slot_requirements, vibe_tags, music_genres, mood, rules
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
+		slot_requirements, vibe_tags, music_genres, mood, rules, chat_room_id
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
 	RETURNING id`
 
 	var id string
 	err := db.QueryRow(context.Background(), query,
 		p.HostID, p.Title, p.Description, p.PartyPhotos, p.StartTime, p.EndTime, p.Status,
 		p.IsLocationRevealed, p.Address, p.City, p.GeoLat, p.GeoLon, p.MaxCapacity,
-		slotReq, p.VibeTags, p.MusicGenres, p.Mood, p.Rules,
+		slotReq, p.VibeTags, p.MusicGenres, p.Mood, p.Rules, p.ChatRoomID,
 	).Scan(&id)
+
+	if err == nil && p.RotationPool != nil {
+		p.RotationPool.PartyID = id
+		_, poolErr := CreateRotationPool(*p.RotationPool)
+		if poolErr != nil {
+			log.Printf("Warning: Failed to create rotation pool for party: %v", poolErr)
+		}
+	}
+
 	return id, err
 }
 

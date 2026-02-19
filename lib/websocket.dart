@@ -41,6 +41,11 @@ class SocketService {
         final party = Party.fromMap(payload);
         ref.read(partyFeedProvider.notifier).addParty(party);
         break;
+      case 'FEED_UPDATE':
+        final List<dynamic> partiesRaw = payload;
+        final parties = partiesRaw.map((p) => Party.fromMap(p)).toList();
+        ref.read(partyFeedProvider.notifier).setParties(parties);
+        break;
       case 'PARTY_LOCKED':
         // Logic for party locked
         break;

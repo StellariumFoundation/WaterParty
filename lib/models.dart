@@ -190,6 +190,47 @@ class User {
       vibeTags: vibeTags,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'ID': id,
+      'Username': username,
+      'RealName': realName,
+      'PhoneNumber': phoneNumber,
+      'Email': email,
+      'ProfilePhotos': profilePhotos,
+      'Age': age,
+      'DateOfBirth': dateOfBirth?.toIso8601String(),
+      'HeightCm': heightCm,
+      'Gender': gender,
+      'LookingFor': lookingFor,
+      'DrinkingPref': drinkingPref,
+      'SmokingPref': smokingPref,
+      'CannabisPref': cannabisPref,
+      'MusicGenres': musicGenres,
+      'TopArtists': topArtists,
+      'JobTitle': jobTitle,
+      'Company': company,
+      'School': school,
+      'Degree': degree,
+      'InstagramHandle': instagramHandle,
+      'TwitterHandle': twitterHandle,
+      'LinkedinHandle': linkedinHandle,
+      'XHandle': xHandle,
+      'TikTokHandle': tiktokHandle,
+      'IsVerified': isVerified,
+      'TrustScore': trustScore,
+      'EloScore': eloScore,
+      'PartiesHosted': partiesHosted,
+      'FlakeCount': flakeCount,
+      'WalletAddress': walletAddress,
+      'LocationLat': locationLat,
+      'LocationLon': locationLon,
+      'Bio': bio,
+      'Interests': interests,
+      'VibeTags': vibeTags,
+    };
+  }
 }
 
 @immutable
@@ -277,6 +318,34 @@ class Party {
       updatedAt: map['UpdatedAt'] != null ? DateTime.parse(map['UpdatedAt']) : null,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'ID': id,
+      'HostID': hostId,
+      'Title': title,
+      'Description': description,
+      'PartyPhotos': partyPhotos,
+      'StartTime': startTime.toIso8601String(),
+      'EndTime': endTime.toIso8601String(),
+      'Status': status.toString().split('.').last,
+      'IsLocationRevealed': isLocationRevealed,
+      'Address': address,
+      'City': city,
+      'GeoLat': geoLat,
+      'GeoLon': geoLon,
+      'MaxCapacity': maxCapacity,
+      'CurrentGuestCount': currentGuestCount,
+      'SlotRequirements': slotRequirements,
+      'AutoLockOnFull': autoLockOnFull,
+      'VibeTags': vibeTags,
+      'MusicGenres': musicGenres,
+      'Mood': mood,
+      'Rules': rules,
+      'RotationPool': rotationPool?.toMap(),
+      'ChatRoomID': chatRoomId,
+    };
+  }
 }
 
 class ChatRoom {
@@ -312,6 +381,7 @@ class ChatRoom {
     String? lastMessageContent,
     DateTime? lastMessageAt,
     int? unreadCount,
+    List<ChatMessage>? recentMessages,
   }) {
     return ChatRoom(
       id: id,
@@ -322,7 +392,7 @@ class ChatRoom {
       isGroup: isGroup,
       participantIds: participantIds,
       isActive: isActive,
-      recentMessages: recentMessages,
+      recentMessages: recentMessages ?? this.recentMessages,
       lastMessageContent: lastMessageContent ?? this.lastMessageContent,
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
       unreadCount: unreadCount ?? this.unreadCount,
@@ -417,6 +487,17 @@ class Crowdfunding {
       contributors: (map['Contributors'] as List? ?? []).map((c) => Contribution.fromMap(c)).toList(),
       isFunded: map['IsFunded'] ?? false,
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'ID': id,
+      'PartyID': partyId,
+      'TargetAmount': targetAmount,
+      'CurrentAmount': currentAmount,
+      'Currency': currency,
+      'IsFunded': isFunded,
+    };
   }
 }
 

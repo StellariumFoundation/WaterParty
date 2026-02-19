@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'theme.dart';
 import 'providers.dart';
@@ -20,6 +20,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   final _cityController = TextEditingController();
   final _addressController = TextEditingController();
   final _poolAmountController = TextEditingController();
+  final _ruleController = TextEditingController();
 
   // --- State Variables ---
   double _capacity = 10;
@@ -28,10 +29,15 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   DateTime _date = DateTime.now();
   TimeOfDay _time = const TimeOfDay(hour: 22, minute: 0);
   
-  // Vibe Selection
+  // Selection Lists
   final List<String> _selectedTags = [];
-  final List<String> _availableTags = ["#Chill", "#Rave", "#Network", "#Dinner", "#Art", "#Tech"];
-  String _selectedMood = "Chill";
+  final List<String> _availableTags = ["#CHILL", "#RAVE", "#NETWORK", "#DINNER", "#ART", "#TECH"];
+  
+  final List<String> _selectedMusic = [];
+  final List<String> _availableMusic = ["TECHNO", "HOUSE", "HIPHOP", "JAZZ", "ROCK", "AMBIENT"];
+  
+  final List<String> _rules = [];
+  String _selectedMood = "CHILL";
 
   void _handleCreateParty() {
     final user = ref.read(authProvider);
@@ -42,7 +48,6 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       _date.year, _date.month, _date.day, _time.hour, _time.minute
     );
 
-    // 1. Construct Optional Crowdfunding Logic
     Crowdfunding? pool;
     if (_hasPool && _poolAmountController.text.isNotEmpty) {
       pool = Crowdfunding(
@@ -56,40 +61,39 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       );
     }
 
-    // 2. Construct The Party (Matching Go Struct)
     final newParty = Party(
       id: partyId,
       hostId: user.id,
-      title: _titleController.text.isEmpty ? "Untitled Vibe" : _titleController.text,
+      title: _titleController.text.isEmpty ? "UNTITLED VIBE" : _titleController.text.toUpperCase(),
       description: _descController.text,
-      // In real app, upload image -> get string URL. Using placeholder for now.
       partyPhotos: ["https://images.unsplash.com/photo-1516450360452-9312f5e86fc7"], 
       startTime: startDateTime,
-      endTime: startDateTime.add(const Duration(hours: 6)), // Default duration
+      endTime: startDateTime.add(const Duration(hours: 6)),
       status: PartyStatus.OPEN,
       isLocationRevealed: false,
       address: _addressController.text,
       city: _cityController.text,
-      geoLat: 0.0, // Should use Geocoding API
+      geoLat: 0.0,
       geoLon: 0.0,
       maxCapacity: _capacity.toInt(),
       currentGuestCount: 0,
       slotRequirements: {},
       autoLockOnFull: _autoLock,
       vibeTags: _selectedTags,
-      musicGenres: [], // Add UI for this if needed
+      musicGenres: _selectedMusic,
       mood: _selectedMood,
-      rules: [],
+      rules: _rules,
       rotationPool: pool,
-      chatRoomId: const Uuid().v4(), // Internal generation
+      chatRoomId: const Uuid().v4(),
     );
 
-    // 3. Send to Riverpod / WebSocket
-    // ref.read(socketServiceProvider).sendMessage('CREATE_PARTY', newParty.toMap());
-    ref.read(partyFeedProvider.notifier).addParty(newParty);
-
-    // 4. Reset & Nav
-    ref.read(navIndexProvider.notifier).setIndex(0); // Go to Feed
+    // Send to Go Backend via WebSocket
+    ref.read(socketServiceProvider).sendMessage('CREATE_PARTY', newParty.toMap());
+    
+    // Optimistic UI update (optional, backend will broadcast it back anyway)
+    // ref.read(partyFeedProvider.notifier).addParty(newParty);
+    
+    ref.read(navIndexProvider.notifier).setIndex(0); // Back to Feed
   }
 
   @override
@@ -98,139 +102,67 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       backgroundColor: Colors.transparent,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(),
-              const SizedBox(height: 25),
+              const SizedBox(height: 30),
               
-              // --- 1. CORE IDENTITY ---
+              // --- CORE ---
+              _sectionHeader("ESSENCE"),
               WaterGlass(
                 height: 180,
                 borderRadius: 20,
                 child: Padding(
-                  padding: const EdgeInsets.all(15),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      _compactInput(_titleController, "Event Title", Icons.auto_awesome, isHeader: true),
-                      const Divider(color: Colors.white10, height: 20),
-                      Expanded(child: _compactInput(_descController, "Set the tone...", Icons.notes, maxLines: 3)),
+                      _compactInput(_titleController, "EVENT TITLE", FontAwesomeIcons.bolt),
+                      const Divider(color: Colors.white10, height: 30),
+                      Expanded(child: _compactInput(_descController, "SET THE TONE...", Icons.notes, maxLines: 3)),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 15),
+              const SizedBox(height: 25),
 
-              // --- 2. LOGISTICS ROW ---
+              // --- LOGISTICS ---
+              _sectionHeader("LOGISTICS"),
               Row(
                 children: [
-                  Expanded(child: _compactActionTile(Icons.calendar_today, "${_date.day}/${_date.month}", () => _pickDate(context))),
-                  const SizedBox(width: 10),
-                  Expanded(child: _compactActionTile(Icons.access_time, _time.format(context), () => _pickTime(context))),
-                  const SizedBox(width: 10),
-                  Expanded(child: WaterGlass(height: 60, borderRadius: 15, child: _compactInput(_cityController, "City", Icons.location_city, hideIcon: true))),
+                  Expanded(child: _actionTile(FontAwesomeIcons.calendarDay, "${_date.day}/${_date.month}", _pickDate)),
+                  const SizedBox(width: 15),
+                  Expanded(child: _actionTile(FontAwesomeIcons.clock, _time.format(context), _pickTime)),
                 ],
               ),
               const SizedBox(height: 15),
-
-              // --- 3. CURATION & VIBE ---
-              WaterGlass(
-                height: 130,
-                borderRadius: 20,
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("CURATION TAGS", style: TextStyle(color: AppColors.textCyan, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _availableTags.map((tag) {
-                          final isSelected = _selectedTags.contains(tag);
-                          return GestureDetector(
-                            onTap: () => setState(() => isSelected ? _selectedTags.remove(tag) : _selectedTags.add(tag)),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: isSelected ? AppColors.textCyan.withOpacity(0.2) : Colors.white.withOpacity(0.05),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: isSelected ? AppColors.textCyan : Colors.transparent),
-                              ),
-                              child: Text(tag, style: TextStyle(color: isSelected ? Colors.white : Colors.white38, fontSize: 11)),
-                            ),
-                          );
-                        }).toList(),
-                      )
-                    ],
-                  ),
-                ),
-              ),
+              _inputField(_cityController, "CITY", FontAwesomeIcons.locationDot),
               const SizedBox(height: 15),
+              _inputField(_addressController, "ADDRESS (HIDDEN UNTIL LOCK)", FontAwesomeIcons.mapPin),
+              const SizedBox(height: 25),
 
-              // --- 4. MECHANICS (Capacity & Money) ---
-              Row(
-                children: [
-                  // Capacity Slider
-                  Expanded(
-                    flex: 3,
-                    child: WaterGlass(
-                      height: 100, borderRadius: 20,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text("CAPACITY: ${_capacity.toInt()}", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                          Slider(
-                            value: _capacity, min: 2, max: 100, 
-                            activeColor: AppColors.gold, inactiveColor: Colors.white10,
-                            onChanged: (v) => setState(() => _capacity = v),
-                          ),
-                          Text(_autoLock ? "Auto-Lock: ON" : "Auto-Lock: OFF", style: TextStyle(fontSize: 9, color: _autoLock ? AppColors.textCyan : Colors.white38)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  // Rotation Pool
-                  Expanded(
-                    flex: 2,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _hasPool = !_hasPool),
-                      child: WaterGlass(
-                        height: 100, borderRadius: 20,
-                        borderColor: _hasPool ? AppColors.gold : Colors.transparent,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.account_balance_wallet, color: _hasPool ? AppColors.gold : Colors.white38),
-                            const SizedBox(height: 5),
-                            if (_hasPool)
-                              SizedBox(
-                                width: 60,
-                                child: TextField(
-                                  controller: _poolAmountController,
-                                  textAlign: TextAlign.center,
-                                  keyboardType: TextInputType.number,
-                                  style: const TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold),
-                                  decoration: const InputDecoration(hintText: "\$0", hintStyle: TextStyle(color: Colors.white38), border: InputBorder.none),
-                                ),
-                              )
-                            else
-                              const Text("NO POOL", style: TextStyle(fontSize: 10, color: Colors.white38))
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              // --- VIBE ---
+              _sectionHeader("VIBE & SOUND"),
+              _chipSelect("CURATION TAGS", _availableTags, _selectedTags),
+              const SizedBox(height: 15),
+              _chipSelect("SONIC FREQUENCIES", _availableMusic, _selectedMusic),
+              const SizedBox(height: 25),
 
-              const SizedBox(height: 40),
-              _buildCreateButton(),
-              const SizedBox(height: 80), // Bottom nav padding
+              // --- RULES ---
+              _sectionHeader("PROTOCOL (RULES)"),
+              _buildRuleInput(),
+              const SizedBox(height: 25),
+
+              // --- MECHANICS ---
+              _sectionHeader("MECHANICS"),
+              _buildCapacitySlider(),
+              const SizedBox(height: 15),
+              _buildPoolToggle(),
+
+              const SizedBox(height: 50),
+              _buildIgniteButton(),
+              const SizedBox(height: 100),
             ],
           ),
         ),
@@ -238,77 +170,191 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     );
   }
 
-  // --- UI COMPONENTS ---
-
   Widget _buildHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text("HOST\nA VIBE", style: GoogleFonts.playfairDisplay(fontSize: 32, fontWeight: FontWeight.w900, height: 1.0)),
+        const Text("HOST\nA VIBE", style: TextStyle(fontFamily: 'Frutiger', fontSize: 32, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: 2)),
         GestureDetector(
-          onTap: () {}, // Add photo logic
-          child: WaterGlass(width: 60, height: 60, borderRadius: 20, child: const Icon(Icons.add_a_photo, color: Colors.white38)),
+          onTap: () {},
+          child: WaterGlass(width: 70, height: 70, borderRadius: 20, child: const Icon(FontAwesomeIcons.camera, color: Colors.white24, size: 24)),
         ),
       ],
     );
   }
 
-  Widget _compactInput(TextEditingController ctrl, String hint, IconData icon, {bool isHeader = false, int maxLines = 1, bool hideIcon = false}) {
+  Widget _sectionHeader(String text) => Padding(
+    padding: const EdgeInsets.only(left: 5, bottom: 12),
+    child: Text(text, style: const TextStyle(fontFamily: 'Frutiger', color: AppColors.textPink, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
+  );
+
+  Widget _compactInput(TextEditingController ctrl, String hint, IconData icon, {int maxLines = 1}) {
     return TextField(
       controller: ctrl,
       maxLines: maxLines,
-      style: isHeader 
-          ? GoogleFonts.playfairDisplay(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white) 
-          : const TextStyle(color: Colors.white, fontSize: 14),
+      style: const TextStyle(fontFamily: 'Frutiger', color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.white24, fontSize: isHeader ? 22 : 14),
+        hintStyle: const TextStyle(color: Colors.white10, fontSize: 14),
         border: InputBorder.none,
-        prefixIcon: hideIcon ? null : Icon(icon, color: isHeader ? AppColors.textPink : Colors.white38, size: 20),
-        contentPadding: EdgeInsets.zero,
+        prefixIcon: Icon(icon, color: AppColors.textCyan, size: 18),
         isDense: true,
       ),
     );
   }
 
-  Widget _compactActionTile(IconData icon, String label, VoidCallback onTap) {
+  Widget _inputField(TextEditingController ctrl, String hint, IconData icon) {
+    return WaterGlass(
+      height: 65, borderRadius: 15,
+      child: _compactInput(ctrl, hint, icon),
+    );
+  }
+
+  Widget _actionTile(IconData icon, String label, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: WaterGlass(
-        height: 60, borderRadius: 15,
+        height: 65, borderRadius: 15,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 16, color: AppColors.textCyan),
-            const SizedBox(width: 8),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+            const SizedBox(width: 10),
+            Text(label, style: const TextStyle(fontFamily: 'Frutiger', fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCreateButton() {
-    return Container(
-      width: double.infinity, height: 60,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [AppColors.textCyan, AppColors.electricPurple]),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent),
-        onPressed: _handleCreateParty,
-        child: const Text("IGNITE PARTY", style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 2)),
+  Widget _chipSelect(String title, List<String> options, List<String> selected) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontFamily: 'Frutiger', color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8, runSpacing: 8,
+          children: options.map((opt) {
+            final isSelected = selected.contains(opt);
+            return GestureDetector(
+              onTap: () => setState(() => isSelected ? selected.remove(opt) : selected.add(opt)),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.textCyan.withOpacity(0.1) : Colors.white.withOpacity(0.03),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: isSelected ? AppColors.textCyan : Colors.white10),
+                ),
+                child: Text(opt, style: TextStyle(fontFamily: 'Frutiger', color: isSelected ? Colors.white : Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRuleInput() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: _inputField(_ruleController, "ADD PROTOCOL...", FontAwesomeIcons.shieldHalved)),
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: () {
+                if (_ruleController.text.isNotEmpty) {
+                  setState(() { _rules.add(_ruleController.text.toUpperCase()); _ruleController.clear(); });
+                }
+              },
+              child: WaterGlass(width: 65, height: 65, borderRadius: 15, child: const Icon(Icons.add, color: AppColors.textCyan)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 5,
+          children: _rules.map((r) => Chip(
+            label: Text(r, style: const TextStyle(fontSize: 9, color: Colors.white70)),
+            backgroundColor: Colors.white10,
+            onDeleted: () => setState(() => _rules.remove(r)),
+          )).toList(),
+        )
+      ],
+    );
+  }
+
+  Widget _buildCapacitySlider() {
+    return WaterGlass(
+      height: 100, borderRadius: 20,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text("MAX CAPACITY: ${_capacity.toInt()}", style: const TextStyle(fontFamily: 'Frutiger', fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+          Slider(
+            value: _capacity, min: 2, max: 200, 
+            activeColor: AppColors.textCyan, inactiveColor: Colors.white10,
+            onChanged: (v) => setState(() => _capacity = v),
+          ),
+          Text(_autoLock ? "AUTO-LOCK ON FULL" : "MANUAL LOCK", style: TextStyle(fontFamily: 'Frutiger', fontSize: 9, color: _autoLock ? AppColors.textCyan : Colors.white38)),
+        ],
       ),
     );
   }
 
-  Future<void> _pickDate(BuildContext context) async {
+  Widget _buildPoolToggle() {
+    return GestureDetector(
+      onTap: () => setState(() => _hasPool = !_hasPool),
+      child: WaterGlass(
+        height: 80, borderRadius: 20,
+        borderColor: _hasPool ? AppColors.gold : Colors.transparent,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(FontAwesomeIcons.wallet, color: _hasPool ? AppColors.gold : Colors.white24, size: 20),
+            const SizedBox(width: 15),
+            if (_hasPool)
+              SizedBox(
+                width: 100,
+                child: TextField(
+                  controller: _poolAmountController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(fontFamily: 'Frutiger', color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 18),
+                  decoration: const InputDecoration(hintText: "$0", hintStyle: TextStyle(color: Colors.white10), border: InputBorder.none),
+                ),
+              )
+            else
+              const Text("ENABLE ROTATION POOL", style: TextStyle(fontFamily: 'Frutiger', fontSize: 11, color: Colors.white24, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIgniteButton() {
+    return GestureDetector(
+      onTap: _handleCreateParty,
+      child: Container(
+        height: 65, width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+          gradient: const LinearGradient(colors: [AppColors.textCyan, AppColors.electricPurple]),
+          boxShadow: [BoxShadow(color: AppColors.textCyan.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 10))],
+        ),
+        alignment: Alignment.center,
+        child: const Text("IGNITE VIBE", style: TextStyle(fontFamily: 'Frutiger', color: Colors.black, fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 16)),
+      ),
+    );
+  }
+
+  Future<void> _pickDate() async {
     final d = await showDatePicker(context: context, initialDate: _date, firstDate: DateTime.now(), lastDate: DateTime(2030));
     if (d != null) setState(() => _date = d);
   }
 
-  Future<void> _pickTime(BuildContext context) async {
+  Future<void> _pickTime() async {
     final t = await showTimePicker(context: context, initialTime: _time);
     if (t != null) setState(() => _time = t);
   }

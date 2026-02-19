@@ -121,7 +121,9 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
         borderRadius: 20,
         child: ListTile(
           onTap: () {
-            // Logic: Navigate to Chat Room
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => ChatScreen(room: room)),
+            );
           },
           contentPadding: const EdgeInsets.symmetric(horizontal: 15),
           leading: Stack(

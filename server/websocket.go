@@ -32,7 +32,8 @@ type Hub struct {
 	rooms map[string]map[*Client]bool
 
 	// Inbound messages from the clients.
-	broadcast chan RoomEvent
+	broadcast       chan RoomEvent
+	globalBroadcast chan []byte
 
 	register   chan *Client
 	unregister chan *Client
@@ -48,12 +49,17 @@ type RoomEvent struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		broadcast:  make(chan RoomEvent, 1024), // Large buffer for high throughput
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		clients:    make(map[string]*Client),
-		rooms:      make(map[string]map[*Client]bool),
+		broadcast:       make(chan RoomEvent, 1024),
+		globalBroadcast: make(chan []byte, 1024),
+		register:        make(chan *Client),
+		unregister:      make(chan *Client),
+		clients:         make(map[string]*Client),
+		rooms:           make(map[string]map[*Client]bool),
 	}
+}
+
+func (h *Hub) broadcastGlobal(msg []byte) {
+	h.globalBroadcast <- msg
 }
 
 func (h *Hub) Run() {
@@ -75,6 +81,17 @@ func (h *Hub) Run() {
 				close(client.send)
 			}
 			h.mu.Unlock()
+
+		case msg := <-h.globalBroadcast:
+			h.mu.RLock()
+			for _, client := range h.clients {
+				select {
+				case client.send <- msg:
+				default:
+					go func(c *Client) { h.unregister <- c }(client)
+				}
+			}
+			h.mu.RUnlock()
 
 		case ev := <-h.broadcast:
 			h.mu.RLock()
@@ -175,6 +192,121 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			Payload: chatMsg,
 		})
 		c.hub.broadcast <- RoomEvent{RoomID: chatMsg.ChatID, Message: outgoing}
+
+	case "SEND_DM":
+		// Payload: {"RecipientID": "uuid", "Content": "text"}
+		var dmReq struct {
+			RecipientID string `json:"RecipientID"`
+			Content     string `json:"Content"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &dmReq)
+
+		// Create a synthetic ChatID for the DM (deterministic pair-wise ID)
+		u1, u2 := c.UID, dmReq.RecipientID
+		if u1 > u2 {
+			u1, u2 = u2, u1
+		}
+		dmChatID := u1 + "_" + u2
+
+		msg := ChatMessage{
+			ChatID:    dmChatID,
+			SenderID:  c.UID,
+			Content:   dmReq.Content,
+			Type:      MsgText,
+			CreatedAt: time.Now(),
+		}
+
+		// 1. Save to DB
+		SaveMessage(msg)
+
+		// 2. Broadcast to Recipient and Sender (Private)
+		outgoingDM, _ := json.Marshal(WSMessage{
+			Event:   "NEW_MESSAGE",
+			Payload: msg,
+		})
+		
+		c.hub.mu.RLock()
+		if recipient, ok := c.hub.clients[dmReq.RecipientID]; ok {
+			recipient.send <- outgoingDM
+		}
+		c.send <- outgoingDM // Send back to self for sync
+		c.hub.mu.RUnlock()
+
+	case "CREATE_PARTY":
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		var p Party
+		json.Unmarshal(payloadBytes, &p)
+		
+		p.HostID = c.UID
+		p.CreatedAt = time.Now()
+		p.UpdatedAt = time.Now()
+
+		id, err := CreateParty(p)
+		if err != nil {
+			log.Printf("Create Party DB Error: %v", err)
+			return
+		}
+		p.ID = id
+
+		broadcastMsg, _ := json.Marshal(WSMessage{
+			Event:   "NEW_PARTY",
+			Payload: p,
+		})
+		c.hub.broadcastGlobal(broadcastMsg)
+
+	case "SWIPE":
+		// Payload: {"PartyID": "uuid", "Direction": "right/left"}
+		var swipe struct {
+			PartyID   string `json:"PartyID"`
+			Direction string `json:"Direction"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &swipe)
+
+		status := "PENDING"
+		if swipe.Direction == "left" {
+			status = "DECLINED"
+		}
+
+		// Save swipe to party_applications table
+		query := `INSERT INTO party_applications (party_id, user_id, status) 
+				  VALUES ($1, $2, $3) ON CONFLICT (party_id, user_id) 
+				  DO UPDATE SET status = $3`
+		_, err := db.Exec(context.Background(), query, swipe.PartyID, c.UID, status)
+		if err != nil {
+			log.Printf("Swipe Save Error: %v", err)
+		}
+
+	case "GET_FEED":
+		// Payload: {"Lat": 0.0, "Lon": 0.0, "RadiusKm": 50}
+		var loc struct {
+			Lat      float64 `json:"Lat"`
+			Lon      float64 `json:"Lon"`
+			RadiusKm float64 `json:"RadiusKm"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &loc)
+
+		// Basic distance query (In production, use PostGIS or Haversine formula)
+		query := `SELECT id, host_id, title, description, party_photos, city, max_capacity, current_guest_count, vibe_tags, start_time 
+				  FROM parties 
+				  WHERE status = 'OPEN' 
+				  ORDER BY created_at DESC LIMIT 50`
+		
+		rows, _ := db.Query(context.Background(), query)
+		var parties []Party
+		for rows.Next() {
+			var p Party
+			rows.Scan(&p.ID, &p.HostID, &p.Title, &p.Description, &p.PartyPhotos, &p.City, &p.MaxCapacity, &p.CurrentGuestCount, &p.VibeTags, &p.StartTime)
+			parties = append(parties, p)
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "FEED_UPDATE",
+			Payload: parties,
+		})
+		c.send <- response
 	
 	case "ADD_CONTRIBUTION":
 		// Handle financial updates, save to DB, broadcast pool update to room

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
+import 'websocket.dart';
 
 class PartyFeedScreen extends ConsumerStatefulWidget {
   const PartyFeedScreen({super.key});
@@ -15,19 +17,82 @@ class PartyFeedScreen extends ConsumerStatefulWidget {
 
 class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
   final CardSwiperController controller = CardSwiperController();
+  bool _locationLoading = true;
+  String? _locationError;
+
+  @override
+  void initState() {
+    super.initState();
+    _determinePosition();
+  }
+
+  Future<void> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    setState(() { _locationLoading = true; _locationError = null; });
+
+    try {
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) throw 'Location services are disabled.';
+
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) throw 'Location permissions are denied';
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        throw 'Location permissions are permanently denied.';
+      }
+
+      final position = await Geolocator.getCurrentPosition();
+      
+      // Request parties nearby via WebSocket
+      ref.read(socketServiceProvider).sendMessage('GET_FEED', {
+        'Lat': position.latitude,
+        'Lon': position.longitude,
+        'RadiusKm': 50.0,
+      });
+
+      if (mounted) setState(() => _locationLoading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _locationError = e.toString();
+          _locationLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // This watches the partyFeedProvider which is updated in real-time by the WebSocket receiver
     final parties = ref.watch(partyFeedProvider);
+
+    if (_locationLoading) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.textCyan));
+    }
+
+    if (_locationError != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.location_off, color: Colors.white24, size: 50),
+            const SizedBox(height: 20),
+            Text(_locationError!, style: const TextStyle(color: Colors.white54, fontFamily: 'Frutiger')),
+            TextButton(onPressed: _determinePosition, child: const Text("RETRY", style: TextStyle(color: AppColors.textCyan))),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
-      // extendBody allows content to sit behind the glass navbar
       extendBody: true, 
       body: Stack(
         children: [
-          // LAYER 1: THE FULL-SCREEN IMMERSIVE SWIPER
           Positioned.fill(
             child: parties.isEmpty
                 ? _buildEmptyState()
@@ -39,11 +104,14 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
                     padding: EdgeInsets.zero,
                     onSwipe: (previousIndex, currentIndex, direction) {
                       final party = parties[previousIndex];
-                      // Logic: Notify Go Backend via WebSocket of the swipe
-                      // ref.read(socketServiceProvider).sendMessage('SWIPE', {
-                      //   'party_id': party.id,
-                      //   'direction': direction.name,
-                      // });
+                      // 1. Remove from local buffer immediately
+                      ref.read(partyFeedProvider.notifier).markAsSwiped(party.id);
+                      
+                      // 2. Send Swipe to Backend
+                      ref.read(socketServiceProvider).sendMessage('SWIPE', {
+                        'PartyID': party.id,
+                        'Direction': direction.name,
+                      });
                       return true;
                     },
                     cardBuilder: (context, index, x, y) {
@@ -52,18 +120,18 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
                   ),
           ),
 
-          // LAYER 2: GLOBAL ACTION BUTTONS (Floating above Bottom Nav)
+          // Layer 2: Action Buttons
           Positioned(
-            bottom: 110, // Adjusted to sit perfectly above your custom navbar
+            bottom: 110,
             left: 0,
             right: 0,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _roundActionButton(Icons.close, AppColors.textPink, () {
+                _roundActionButton(FontAwesomeIcons.xmark, AppColors.textPink, () {
                   controller.swipe(CardSwiperDirection.left);
                 }),
-                _roundActionButton(Icons.check, AppColors.textCyan, () {
+                _roundActionButton(FontAwesomeIcons.check, AppColors.textCyan, () {
                   controller.swipe(CardSwiperDirection.right);
                 }),
               ],
@@ -75,14 +143,12 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
   }
 
   Widget _buildFeedCard(BuildContext context, Party party) {
-    // Map the Go []string for Photos to the first image or a placeholder
     final displayImage = party.partyPhotos.isNotEmpty 
-        ? party.partyPhotos.first 
+        ? "https://waterparty.onrender.com/assets/${party.partyPhotos.first}" 
         : "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7";
 
     return GestureDetector(
       onTap: () {
-        // Expand to "Whole Card" detailed view
         Navigator.of(context).push(
           MaterialPageRoute(builder: (context) => PartyDetailScreen(party: party)),
         );
@@ -90,26 +156,17 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // The visual core
           Image.network(displayImage, fit: BoxFit.cover),
-          
-          // Deep gradient for data legibility
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withOpacity(0.2),
-                  Colors.transparent,
-                  Colors.black.withOpacity(0.9)
-                ],
-                stops: const [0.0, 0.4, 1.0],
+                colors: [Colors.black.withOpacity(0.1), Colors.transparent, Colors.black.withOpacity(0.9)],
+                stops: const [0.0, 0.5, 1.0],
               ),
             ),
           ),
-
-          // HUD Overlay inside the card
           Positioned(
             bottom: 210,
             left: 25,
@@ -119,15 +176,16 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
               children: [
                 Text(
                   party.title.toUpperCase(),
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 44,
+                  style: const TextStyle(
+                    fontFamily: 'Frutiger',
+                    fontSize: 38,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
                     height: 1,
                     letterSpacing: -1,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 15),
                 Row(
                   children: [
                     _chip(party.city.toUpperCase(), AppColors.textCyan),
@@ -138,9 +196,10 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
                 const SizedBox(height: 15),
                 Text(
                   party.vibeTags.take(3).join(" • ").toUpperCase(),
-                  style: GoogleFonts.outfit(
+                  style: const TextStyle(
+                    fontFamily: 'Frutiger',
                     color: Colors.white54,
-                    fontSize: 12,
+                    fontSize: 10,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 2,
                   ),
@@ -155,12 +214,12 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
 
   Widget _chip(String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         border: Border.all(color: color.withOpacity(0.5)),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(5),
       ),
-      child: Text(text, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+      child: Text(text, style: TextStyle(fontFamily: 'Frutiger', color: color, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1)),
     );
   }
 
@@ -172,7 +231,7 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
         borderRadius: 40,
         borderColor: color.withOpacity(0.4),
         border: 2,
-        child: Icon(icon, color: color, size: 32),
+        child: Icon(icon, color: color, size: 28),
       ),
     );
   }
@@ -182,10 +241,10 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.water_drop_outlined, color: AppColors.textCyan, size: 60),
-          const SizedBox(height: 20),
-          Text("SILENCE", style: GoogleFonts.playfairDisplay(fontSize: 24, color: Colors.white24, letterSpacing: 10)),
-          const Text("NO PARTIES CURRENTLY LIVE", style: TextStyle(color: Colors.white10, fontSize: 10, letterSpacing: 2)),
+          const Icon(FontAwesomeIcons.water, color: AppColors.textCyan, size: 40),
+          const SizedBox(height: 25),
+          const Text("SILENCE", style: TextStyle(fontFamily: 'Frutiger', fontSize: 20, color: Colors.white24, letterSpacing: 8, fontWeight: FontWeight.w900)),
+          const Text("NO VIBES NEARBY", style: TextStyle(fontFamily: 'Frutiger', color: Colors.white10, fontSize: 9, letterSpacing: 2, fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -209,10 +268,10 @@ class PartyDetailScreen extends StatelessWidget {
           CustomScrollView(
             slivers: [
               SliverAppBar(
-                expandedHeight: 550,
+                expandedHeight: 500,
                 pinned: true,
                 backgroundColor: Colors.black,
-                leading: const SizedBox(), // Hidden to use custom back button
+                leading: const SizedBox(),
                 flexibleSpace: FlexibleSpaceBar(
                   background: Image.network(party.partyPhotos.first, fit: BoxFit.cover),
                 ),
@@ -223,45 +282,44 @@ class PartyDetailScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(party.title, style: GoogleFonts.playfairDisplay(fontSize: 40, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 20),
+                      Text(party.title, style: const TextStyle(fontFamily: 'Frutiger', fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white)),
+                      const SizedBox(height: 25),
                       
-                      // Logistics Grid
                       Row(
                         children: [
-                          _detailStat(Icons.schedule, "STARTS", "${party.startTime.hour}:00"),
+                          _detailStat(FontAwesomeIcons.clock, "STARTS", "${party.startTime.hour}:00"),
                           const Spacer(),
-                          _detailStat(Icons.place, "CITY", party.city),
+                          _detailStat(FontAwesomeIcons.locationDot, "CITY", party.city),
                           const Spacer(),
-                          _detailStat(Icons.group, "LIMIT", "${party.maxCapacity}"),
+                          _detailStat(FontAwesomeIcons.userGroup, "LIMIT", "${party.maxCapacity}"),
                         ],
                       ),
                       
                       const SizedBox(height: 40),
-                      const Text("THE DESCRIPTION", style: TextStyle(color: AppColors.textPink, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 2)),
+                      const Text("PROTOCOL", style: TextStyle(fontFamily: 'Frutiger', color: AppColors.textPink, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 2)),
                       const SizedBox(height: 15),
-                      Text(party.description, style: const TextStyle(fontSize: 17, height: 1.6, color: Colors.white70)),
+                      Text(party.description, style: const TextStyle(fontFamily: 'Frutiger', fontSize: 15, height: 1.6, color: Colors.white70)),
                       
-                      const SizedBox(height: 40),
                       if (party.rotationPool != null) ...[
-                        const Text("ROTATION POOL", style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 2)),
+                        const SizedBox(height: 40),
+                        const Text("ROTATION POOL", style: TextStyle(fontFamily: 'Frutiger', color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 2)),
                         const SizedBox(height: 15),
                         WaterGlass(
-                          height: 100,
+                          height: 80,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.account_balance_wallet, color: AppColors.gold),
+                              const Icon(FontAwesomeIcons.wallet, color: AppColors.gold, size: 18),
                               const SizedBox(width: 15),
                               Text(
                                 "\$${party.rotationPool!.currentAmount.toInt()} / \$${party.rotationPool!.targetAmount.toInt()}",
-                                style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                                style: const TextStyle(fontFamily: 'Frutiger', fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
                               )
                             ],
                           ),
                         ),
                       ],
-                      const SizedBox(height: 200), // Space for bottom buttons
+                      const SizedBox(height: 200), 
                     ],
                   ),
                 ),
@@ -269,23 +327,21 @@ class PartyDetailScreen extends StatelessWidget {
             ],
           ),
 
-          // LAYER 2: FLOATING BACK BUTTON
           Positioned(
             top: 60, left: 20,
             child: GestureDetector(
               onTap: () => Navigator.pop(context),
-              child: WaterGlass(width: 50, height: 50, borderRadius: 25, child: const Icon(Icons.close, color: Colors.white)),
+              child: WaterGlass(width: 50, height: 50, borderRadius: 25, child: const Icon(FontAwesomeIcons.xmark, color: Colors.white, size: 20)),
             ),
           ),
 
-          // LAYER 3: DECISION BUTTONS
           Positioned(
             bottom: 40, left: 0, right: 0,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _decisionBtn(Icons.close, AppColors.textPink, "SKIP", () => Navigator.pop(context)),
-                _decisionBtn(Icons.flash_on, AppColors.textCyan, "REQUEST", () => Navigator.pop(context)),
+                _decisionBtn(FontAwesomeIcons.xmark, AppColors.textPink, "SKIP", () => Navigator.pop(context)),
+                _decisionBtn(FontAwesomeIcons.bolt, AppColors.textCyan, "REQUEST", () => Navigator.pop(context)),
               ],
             ),
           ),
@@ -298,9 +354,9 @@ class PartyDetailScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [Icon(icon, size: 12, color: Colors.white38), const SizedBox(width: 5), Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10))]),
+        Row(children: [Icon(icon, size: 10, color: Colors.white38), const SizedBox(width: 5), Text(label, style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold))]),
         const SizedBox(height: 5),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(value, style: const TextStyle(fontFamily: 'Frutiger', fontWeight: FontWeight.w900, fontSize: 15, color: Colors.white)),
       ],
     );
   }
@@ -310,9 +366,9 @@ class PartyDetailScreen extends StatelessWidget {
       onTap: onTap,
       child: Column(
         children: [
-          WaterGlass(width: 80, height: 80, borderRadius: 40, borderColor: color, border: 2, child: Icon(icon, color: color, size: 30)),
-          const SizedBox(height: 8),
-          Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
+          WaterGlass(width: 80, height: 80, borderRadius: 40, borderColor: color, border: 2, child: Icon(icon, color: color, size: 24)),
+          const SizedBox(height: 10),
+          Text(label, style: TextStyle(fontFamily: 'Frutiger', color: color, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 2)),
         ],
       ),
     );
