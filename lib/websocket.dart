@@ -29,42 +29,25 @@ class SocketService {
   void _handleIncomingMessage(dynamic rawData) {
     final Map<String, dynamic> data = jsonDecode(rawData);
     
-    // This matches your Go: type WSMessage struct { Event string, Payload interface{} }
     final String event = data['Event'];
     final dynamic payload = data['Payload'];
 
     switch (event) {
       case 'NEW_MESSAGE':
-        _handleNewChatMessage(payload);
+        final message = ChatMessage.fromMap(payload);
+        ref.read(chatProvider.notifier).updateRoomWithNewMessage(message);
+        break;
+      case 'NEW_PARTY':
+        final party = Party.fromMap(payload);
+        ref.read(partyFeedProvider.notifier).addParty(party);
         break;
       case 'PARTY_LOCKED':
-        _handlePartyUpdate(payload);
+        // Logic for party locked
         break;
       case 'LOCATION_REVEALED':
-        _handleLocationReveal(payload);
-        break;
-      case 'POOL_UPDATE':
-        _handlePoolUpdate(payload);
+        // Logic for location reveal
         break;
     }
-  }
-
-  void _handleNewChatMessage(dynamic payload) {
-    // Convert payload to ChatMessage model and update Riverpod state
-    final message = ChatMessage(
-      id: payload['ID'],
-      senderId: payload['SenderID'],
-      content: payload['Content'],
-      type: MessageType.values.byName(payload['Type']),
-      createdAt: DateTime.parse(payload['CreatedAt']),
-    );
-    // Push to your ChatProvider (you would create this in providers.dart)
-    // ref.read(chatProvider.notifier).addMessage(message);
-  }
-
-  void _handleLocationReveal(dynamic payload) {
-    // payload would contain PartyID, Address, Lat, Lon
-    // ref.read(partyFeedProvider.notifier).revealLocation(payload['PartyID'], payload['Address']);
   }
 
   // Send message to Go Backend

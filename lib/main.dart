@@ -48,13 +48,16 @@ class MainScaffold extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-  	final user = ref.watch(authProvider);
+    final user = ref.watch(authProvider);
 
-  // Initialize Socket when user logs in
-  if (user != null) {
-    // In a real app, you'd get the session token from your auth provider
-    ref.read(socketServiceProvider).connect("user_session_token");
-  }
+    // Initialize Socket when user logs in
+    if (user != null) {
+      ref.read(authProvider.notifier).getToken().then((token) {
+        if (token != null) {
+          ref.read(socketServiceProvider).connect(token);
+        }
+      });
+    }
   
     final currentIndex = ref.watch(navIndexProvider);
 

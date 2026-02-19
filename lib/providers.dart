@@ -64,6 +64,10 @@ class AuthNotifier extends Notifier<User?> {
 
   void logout() async => await _auth.signOut();
 
+  Future<String?> getToken() async {
+    return await _auth.currentUser?.getIdToken();
+  }
+
   Future<void> updateUserProfile({String? realName, String? bio, List<String>? profilePhotos}) async {
     if (state == null) return;
     state = state!.copyWith(realName: realName, bio: bio, profilePhotos: profilePhotos);
