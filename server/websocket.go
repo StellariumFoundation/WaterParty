@@ -225,11 +225,16 @@ func (c *Client) writePump() {
 
 // ServeWs handles websocket requests from the peer.
 func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
-	// Extract UID from context (added by AuthMiddleware)
+	// Extract UID from context or query parameter
 	uid, ok := r.Context().Value("uid").(string)
 	if !ok || uid == "" {
-		http.Error(w, "Unauthorized: Missing UID", http.StatusUnauthorized)
-		return
+		// Fallback to query parameter for non-firebase auth
+		uid = r.URL.Query().Get("uid")
+	}
+
+	if uid == "" {
+		// For now, allow anonymous or handle as needed for Render deployment
+		uid = "anonymous_" + time.Now().Format("150405")
 	}
 
 	conn, err := upgrader.Upgrade(w, r, nil)

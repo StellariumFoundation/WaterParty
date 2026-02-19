@@ -52,11 +52,7 @@ class MainScaffold extends ConsumerWidget {
 
     // Initialize Socket when user logs in
     if (user != null) {
-      ref.read(authProvider.notifier).getToken().then((token) {
-        if (token != null) {
-          ref.read(socketServiceProvider).connect(token);
-        }
-      });
+      ref.read(socketServiceProvider).connect(user.id);
     }
   
     final currentIndex = ref.watch(navIndexProvider);

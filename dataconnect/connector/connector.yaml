@@ -1,5 +1,0 @@
-connectorId: "default"
-generate:
-  dartSdk:
-    outputDir: "../../lib/generated"
-    package: "water_party_api"

@@ -18,16 +18,13 @@ func main() {
 	InitDB(connStr)
 	log.Println("✅ Database connection pool established")
 
-	// 3. Initialize Firebase
-	InitFirebase()
-
-	// 4. Initialize and start the WebSocket Hub
+	// 3. Initialize and start the WebSocket Hub
 	hub := NewHub()
 	go hub.Run()
 	log.Println("✅ WebSocket Hub started (Room-based routing enabled)")
 
-	// 5. Image/Asset Handler (Wrapped with Auth)
-	http.HandleFunc("/assets/", AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	// 4. Image/Asset Handler
+	http.HandleFunc("/assets/", func(w http.ResponseWriter, r *http.Request) {
 		// Only allow GET requests for assets
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -53,12 +50,12 @@ func main() {
 		w.Header().Set("ETag", hash)
 		
 		w.Write(data)
-	}))
+	})
 
-	// 6. High-Performance WebSocket Route (Wrapped with Auth)
-	http.HandleFunc("/ws", AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	// 5. High-Performance WebSocket Route
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWs(hub, w, r)
-	}))
+	})
 
 	// 6. Health Check (Useful for Load Balancers/K8s)
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

@@ -11,18 +11,18 @@ class SocketService {
 
   SocketService(this.ref);
 
-  void connect(String token) {
+  void connect(String uid) {
     if (_isConnected) return;
 
-    // Use your Go server URL (e.g., ws://api.waterparty.com/ws)
-    final uri = Uri.parse('ws://YOUR_GO_SERVER_IP/ws?token=$token');
+    // Use your Render/Production URL here
+    final uri = Uri.parse('ws://YOUR_RENDER_URL/ws?uid=$uid');
     _channel = WebSocketChannel.connect(uri);
     _isConnected = true;
 
     _channel!.stream.listen(
       (data) => _handleIncomingMessage(data),
-      onDone: () => _reconnect(token),
-      onError: (err) => _reconnect(token),
+      onDone: () => _reconnect(uid),
+      onError: (err) => _reconnect(uid),
     );
   }
 
