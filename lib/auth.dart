@@ -109,7 +109,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   onTap: () => ref.read(authProvider.notifier).signInWithGoogle(),
                   child: WaterGlass(
                     width: 60, height: 60, borderRadius: 30,
-                    child: const Icon(FontAwesomeIcons.google, color: Colors.white, size: 24),
+                    child: Icon(FontAwesomeIcons.google, color: Colors.white, size: 24),
                   ),
                 ),
 

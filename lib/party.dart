@@ -89,7 +89,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     ref.read(partyFeedProvider.notifier).addParty(newParty);
 
     // 4. Reset & Nav
-    ref.read(navIndexProvider.notifier).state = 0; // Go to Feed
+    ref.read(navIndexProvider.notifier).setIndex(0); // Go to Feed
   }
 
   @override

@@ -271,33 +271,66 @@ class ChatRoom {
   final String id;
   final String partyId;
   final String hostId;
+  final String title;
+  final String imageUrl;
+  final bool isGroup;
   final List<String> participantIds;
   final bool isActive;
   final List<ChatMessage> recentMessages;
   final String lastMessageContent;
   final DateTime? lastMessageAt;
+  final int unreadCount;
 
   const ChatRoom({
     required this.id,
     required this.partyId,
     required this.hostId,
+    this.title = '',
+    this.imageUrl = '',
+    this.isGroup = true,
     this.participantIds = const [],
     this.isActive = true,
     this.recentMessages = const [],
     this.lastMessageContent = '',
     this.lastMessageAt,
+    this.unreadCount = 0,
   });
+
+  ChatRoom copyWith({
+    String? lastMessageContent,
+    DateTime? lastMessageAt,
+    int? unreadCount,
+  }) {
+    return ChatRoom(
+      id: id,
+      partyId: partyId,
+      hostId: hostId,
+      title: title,
+      imageUrl: imageUrl,
+      isGroup: isGroup,
+      participantIds: participantIds,
+      isActive: isActive,
+      recentMessages: recentMessages,
+      lastMessageContent: lastMessageContent ?? this.lastMessageContent,
+      lastMessageAt: lastMessageAt ?? this.lastMessageAt,
+      unreadCount: unreadCount ?? this.unreadCount,
+    );
+  }
 
   factory ChatRoom.fromMap(Map<String, dynamic> map) {
     return ChatRoom(
       id: map['ID'] ?? '',
       partyId: map['PartyID'] ?? '',
       hostId: map['HostID'] ?? '',
+      title: map['Title'] ?? '',
+      imageUrl: map['ImageUrl'] ?? '',
+      isGroup: map['IsGroup'] ?? true,
       participantIds: List<String>.from(map['ParticipantIDs'] ?? []),
       isActive: map['IsActive'] ?? true,
       recentMessages: (map['RecentMessages'] as List? ?? []).map((m) => ChatMessage.fromMap(m)).toList(),
       lastMessageContent: map['LastMessageContent'] ?? '',
       lastMessageAt: map['LastMessageAt'] != null ? DateTime.parse(map['LastMessageAt']) : null,
+      unreadCount: map['UnreadCount'] ?? 0,
     );
   }
 }
@@ -336,12 +369,14 @@ class ChatMessage {
 
 class Crowdfunding {
   final String id;
+  final String partyId;
   final double targetAmount;
   final double currentAmount;
   final List<Contribution> contributors;
 
   const Crowdfunding({
     required this.id,
+    this.partyId = '',
     required this.targetAmount,
     required this.currentAmount,
     this.contributors = const [],
@@ -350,6 +385,7 @@ class Crowdfunding {
   factory Crowdfunding.fromMap(Map<String, dynamic> map) {
     return Crowdfunding(
       id: map['ID'] ?? '',
+      partyId: map['PartyID'] ?? '',
       targetAmount: (map['TargetAmount'] ?? 0.0).toDouble(),
       currentAmount: (map['CurrentAmount'] ?? 0.0).toDouble(),
       contributors: (map['Contributors'] as List? ?? []).map((c) => Contribution.fromMap(c)).toList(),

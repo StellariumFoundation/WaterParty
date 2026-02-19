@@ -64,6 +64,11 @@ class AuthNotifier extends Notifier<User?> {
 
   void logout() async => await _auth.signOut();
 
+  Future<void> updateUserProfile({String? realName, String? bio, List<String>? profilePhotos}) async {
+    if (state == null) return;
+    state = state!.copyWith(realName: realName, bio: bio, profilePhotos: profilePhotos);
+  }
+
   User _mapFirebaseUser(fb.User fbUser) {
     return User(
       id: fbUser.uid,
@@ -128,3 +133,22 @@ class ChatNotifier extends Notifier<List<ChatRoom>> {
 }
 
 final chatProvider = NotifierProvider<ChatNotifier, List<ChatRoom>>(ChatNotifier.new);
+
+class NavIndexNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+  void setIndex(int index) => state = index;
+}
+
+final navIndexProvider = NotifierProvider<NavIndexNotifier, int>(NavIndexNotifier.new);
+
+class PartyFeedNotifier extends Notifier<List<Party>> {
+  @override
+  List<Party> build() => [];
+  
+  void addParty(Party party) {
+    state = [...state, party];
+  }
+}
+
+final partyFeedProvider = NotifierProvider<PartyFeedNotifier, List<Party>>(PartyFeedNotifier.new);
