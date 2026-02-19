@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   # ---------------------------------------------------
-  # 1. ANDROID BUILD (Highly Optimized)
+  # 1. ANDROID BUILD
   # ---------------------------------------------------
   build-android:
     runs-on: ubuntu-latest
@@ -26,27 +26,22 @@ jobs:
           channel: 'master'
           cache: true
       
-      - run: flutter pub get
-
-      # Build APKs once with split-per-abi. 
-      # This generates both the specific ABIs and often the combined one.
-      - name: Build Optimized APKs
-        run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=./debug-info
+      - name: Build Android via Makefile
+        run: make build-android
       
       - name: Prepare Artifacts
         run: |
-          cp build/app/outputs/flutter-apk/app-release.apk WaterParty-Universal.apk || true
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk WaterParty-Android-arm64.apk || true
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk WaterParty-Android-armv7.apk || true
-          cp build/app/outputs/flutter-apk/app-x86_64-release.apk WaterParty-Android-x86.apk || true
+          mkdir -p artifacts
+          cp build/app/outputs/flutter-apk/app-release.apk artifacts/WaterParty-Universal.apk || true
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk artifacts/WaterParty-Android-arm64.apk || true
 
       - uses: actions/upload-artifact@v4
         with:
-          name: WaterParty-Android-All
-          path: WaterParty-*.apk
+          name: WaterParty-Android
+          path: artifacts/WaterParty-*.apk
 
   # ---------------------------------------------------
-  # 2. LINUX BUILD (Stripped Binary)
+  # 2. LINUX BUILD
   # ---------------------------------------------------
   build-linux:
     runs-on: ubuntu-latest
@@ -62,16 +57,8 @@ jobs:
           channel: 'master'
           cache: true
           
-      - run: flutter config --enable-linux-desktop
-      - run: flutter pub get
-      
-      - name: Build Linux Release
-        run: flutter build linux --release --obfuscate --split-debug-info=./debug-info
-
-      # DYNAMIC STRIP: Finds any executable file in the bundle folder and strips it
-      - name: Strip Debug Symbols
-        run: |
-          find build/linux/x64/release/bundle/ -maxdepth 1 -type f -executable -exec strip {} +
+      - name: Build Linux via Makefile
+        run: make build-linux
 
       - name: Compress Build
         run: tar -czvf WaterParty-Linux.tar.gz -C build/linux/x64/release/bundle .
@@ -82,7 +69,7 @@ jobs:
           path: WaterParty-Linux.tar.gz
 
   # ---------------------------------------------------
-  # 3. WEB BUILD (Optimized)
+  # 3. WEB BUILD
   # ---------------------------------------------------
   build-web:
     runs-on: ubuntu-latest
@@ -94,12 +81,8 @@ jobs:
           channel: 'master'
           cache: true
           
-      - run: flutter pub get
-      
-      # On Master Channel, flags have changed. We use basic release which 
-      # is now highly optimized for Wasm/CanvasKit automatically.
-      - name: Build Optimized Web
-        run: flutter build web --release
+      - name: Build Web via Makefile
+        run: make build-web
       
       - name: Compress Build
         run: zip -r WaterParty-Web.zip build/web
@@ -110,10 +93,32 @@ jobs:
           path: WaterParty-Web.zip
 
   # ---------------------------------------------------
-  # 4. AUTOMATIC RELEASE
+  # 4. SERVER BUILD (Go 1.26.0)
+  # ---------------------------------------------------
+  build-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.0'
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: Build Server via Makefile
+        run: make build-server
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WaterParty-Server
+          path: server/partyserver
+
+  # ---------------------------------------------------
+  # 5. AUTOMATIC RELEASE
   # ---------------------------------------------------
   create-release:
-    needs: [build-android, build-linux, build-web]
+    needs: [build-android, build-linux, build-web, build-server]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -122,7 +127,6 @@ jobs:
         id: get_version
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
-          echo "Detected Version: $VERSION"
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Download all Artifacts
@@ -135,6 +139,7 @@ jobs:
           find all_artifacts/ -name "*.apk" -exec mv {} . \;
           find all_artifacts/ -name "*.tar.gz" -exec mv {} . \;
           find all_artifacts/ -name "*.zip" -exec mv {} . \;
+          find all_artifacts/ -name "partyserver" -exec mv {} . \;
 
       - name: Create or Update Release
         uses: softprops/action-gh-release@v1
@@ -145,5 +150,6 @@ jobs:
             *.apk
             *.tar.gz
             *.zip
+            partyserver
           draft: false
           prerelease: false
