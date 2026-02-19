@@ -1,6 +1,7 @@
 // main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'match.dart'; // Feed
@@ -8,8 +9,9 @@ import 'matches.dart'; // Chat
 import 'party.dart'; // Create
 import 'profile.dart'; // Profile
 import 'auth.dart'; // Auth Screen (ensure file name matches)
+import 'websocket.dart';
 
-void main() {
+void main() async {
 	WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   runApp(
@@ -36,9 +38,7 @@ class WaterPartyApp extends ConsumerWidget {
       ),
       home: user != null 
           ? const MainScaffold() 
-          : AuthScreen(onLoginSuccess: () {
-              ref.read(authProvider.notifier).login();
-            }),
+          : const AuthScreen(),
     );
   }
 }
