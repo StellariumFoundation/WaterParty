@@ -8,23 +8,51 @@ import 'match.dart'; // Feed
 import 'matches.dart'; // Chat
 import 'party.dart'; // Create
 import 'profile.dart'; // Profile
-import 'auth.dart'; // Auth Screen (ensure file name matches)
+import 'auth.dart'; // Auth Screen
 import 'websocket.dart';
 
 void main() async {
-	WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  String? initError;
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    initError = e.toString();
+    debugPrint("Firebase Initialization Error: $e");
+  }
+
   runApp(
-    const ProviderScope(child: WaterPartyApp()),
+    ProviderScope(
+      child: WaterPartyApp(error: initError),
+    ),
   );
 }
 
 class WaterPartyApp extends ConsumerWidget {
-  const WaterPartyApp({super.key});
+  final String? error;
+  const WaterPartyApp({this.error, super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the auth provider. If user is null, show AuthScreen.
+    if (error != null) {
+      return MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Text(
+                "Initialization Error:\n$error\n\nEnsure you have added google-services.json (Android) or GoogleService-Info.plist (iOS).",
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red, fontSize: 14),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final user = ref.watch(authProvider);
 
     return MaterialApp(
@@ -32,7 +60,7 @@ class WaterPartyApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.transparent,
+        scaffoldBackgroundColor: Colors.black, // Default to black
         useMaterial3: true,
         fontFamily: AppColors.fontFamily,
       ),
@@ -43,18 +71,28 @@ class WaterPartyApp extends ConsumerWidget {
   }
 }
 
-class MainScaffold extends ConsumerWidget {
+class MainScaffold extends ConsumerStatefulWidget {
   const MainScaffold({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authProvider);
+  ConsumerState<MainScaffold> createState() => _MainScaffoldState();
+}
 
+class _MainScaffoldState extends ConsumerState<MainScaffold> {
+  @override
+  void initState() {
+    super.initState();
     // Initialize Socket when user logs in
-    if (user != null) {
-      ref.read(socketServiceProvider).connect(user.id);
-    }
-  
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(authProvider);
+      if (user != null) {
+        ref.read(socketServiceProvider).connect(user.id);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final currentIndex = ref.watch(navIndexProvider);
 
     final List<Widget> screens = [
@@ -82,10 +120,10 @@ class MainScaffold extends ConsumerWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _navItem(context, ref, Icons.style_rounded, "Feed", 0),
-                _navItem(context, ref, Icons.forum_rounded, "Chats", 1),
-                _navItem(context, ref, Icons.celebration_rounded, "Host", 2),
-                _navItem(context, ref, Icons.person_rounded, "Profile", 3),
+                _navItem(Icons.style_rounded, "Feed", 0),
+                _navItem(Icons.forum_rounded, "Chats", 1),
+                _navItem(Icons.celebration_rounded, "Host", 2),
+                _navItem(Icons.person_rounded, "Profile", 3),
               ],
             ),
           ),
@@ -94,7 +132,7 @@ class MainScaffold extends ConsumerWidget {
     );
   }
 
-  Widget _navItem(BuildContext context, WidgetRef ref, IconData icon, String label, int index) {
+  Widget _navItem(IconData icon, String label, int index) {
     final currentIndex = ref.watch(navIndexProvider);
     final isSelected = currentIndex == index;
 
@@ -138,4 +176,3 @@ class MainScaffold extends ConsumerWidget {
     );
   }
 }
-
