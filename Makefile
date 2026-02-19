@@ -45,15 +45,15 @@ release-server:
 	@echo "--- Releasing Server (Multi-Platform Binaries) ---"
 	mkdir -p release/server
 	# Linux 64-bit
-	GOOS=linux GOARCH=amd64 go build -o release/server/$(SERVER_BINARY)-linux-amd64 $(SERVER_DIR)/main.go
+	GOOS=linux GOARCH=amd64 go build -o release/server/$(SERVER_BINARY)-linux-amd64 ./$(SERVER_DIR)
 	# Linux ARM64
-	GOOS=linux GOARCH=arm64 go build -o release/server/$(SERVER_BINARY)-linux-arm64 $(SERVER_DIR)/main.go
+	GOOS=linux GOARCH=arm64 go build -o release/server/$(SERVER_BINARY)-linux-arm64 ./$(SERVER_DIR)
 	# Windows 64-bit
-	GOOS=windows GOARCH=amd64 go build -o release/server/$(SERVER_BINARY)-windows-amd64.exe $(SERVER_DIR)/main.go
+	GOOS=windows GOARCH=amd64 go build -o release/server/$(SERVER_BINARY)-windows-amd64.exe ./$(SERVER_DIR)
 	# macOS 64-bit (Intel)
-	GOOS=darwin GOARCH=amd64 go build -o release/server/$(SERVER_BINARY)-darwin-amd64 $(SERVER_DIR)/main.go
+	GOOS=darwin GOARCH=amd64 go build -o release/server/$(SERVER_BINARY)-darwin-amd64 ./$(SERVER_DIR)
 	# macOS ARM64 (Apple Silicon)
-	GOOS=darwin GOARCH=arm64 go build -o release/server/$(SERVER_BINARY)-darwin-arm64 $(SERVER_DIR)/main.go
+	GOOS=darwin GOARCH=arm64 go build -o release/server/$(SERVER_BINARY)-darwin-arm64 ./$(SERVER_DIR)
 	@echo "Server binaries ready in release/server/"
 
 release-app: build-app
