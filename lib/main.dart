@@ -35,24 +35,6 @@ class WaterPartyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (error != null) {
-      return MaterialApp(
-        home: Scaffold(
-          backgroundColor: Colors.black,
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Text(
-                "Initialization Error:\n$error\n\nEnsure you have added google-services.json (Android) or GoogleService-Info.plist (iOS).",
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red, fontSize: 14),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
     final user = ref.watch(authProvider);
 
     return MaterialApp(
@@ -60,13 +42,13 @@ class WaterPartyApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.black, // Default to black
+        scaffoldBackgroundColor: Colors.black,
         useMaterial3: true,
         fontFamily: AppColors.fontFamily,
       ),
       home: user != null 
           ? const MainScaffold() 
-          : const AuthScreen(),
+          : AuthScreen(initError: error),
     );
   }
 }

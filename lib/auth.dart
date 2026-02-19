@@ -8,7 +8,8 @@ import 'providers.dart';
 enum AuthMode { email, phone }
 
 class AuthScreen extends ConsumerStatefulWidget {
-  const AuthScreen({super.key});
+  final String? initError;
+  const AuthScreen({this.initError, super.key});
 
   @override
   ConsumerState<AuthScreen> createState() => _AuthScreenState();
@@ -19,6 +20,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   bool isLogin = true;
   bool isLoading = false;
   bool otpSent = false;
+  bool useMock = false;
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -26,6 +28,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _otpController = TextEditingController();
 
   Future<void> _handleAuth() async {
+    if (widget.initError != null || useMock) {
+       // Bypass Firebase and use mock login
+       ref.read(authProvider.notifier).mockLogin();
+       return;
+    }
+
     setState(() => isLoading = true);
     try {
       if (_mode == AuthMode.email) {
@@ -95,10 +103,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   child: WaterGlass(
                     height: 60, borderRadius: 30, borderColor: AppColors.textCyan,
                     child: isLoading ? const CircularProgressIndicator(color: AppColors.textCyan) : 
-                    Text(otpSent ? "VERIFY CODE" : (isLogin ? "ENTER THE VIBE" : "JOIN COLLECTIVE"), 
+                    Text(widget.initError != null ? "ENTER AS GUEST" : (otpSent ? "VERIFY CODE" : (isLogin ? "ENTER THE VIBE" : "JOIN COLLECTIVE")), 
                     style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textCyan, letterSpacing: 1.5)),
                   ),
                 ),
+
+                if (widget.initError != null) ...[
+                  const SizedBox(height: 20),
+                  const Text("FIREBASE CONFIG MISSING", style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
 
                 const SizedBox(height: 40),
                 const Text("OR", style: TextStyle(color: Colors.white24, fontSize: 10)),

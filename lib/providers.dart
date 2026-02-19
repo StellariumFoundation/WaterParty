@@ -64,6 +64,15 @@ class AuthNotifier extends Notifier<User?> {
 
   void logout() async => await _auth.signOut();
 
+  void mockLogin() {
+    state = const User(
+      id: "mock_user_123",
+      username: "Guest_Vibe",
+      realName: "Guest User",
+      email: "guest@waterparty.com",
+    );
+  }
+
   Future<String?> getToken() async {
     return await _auth.currentUser?.getIdToken();
   }
