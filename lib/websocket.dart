@@ -5,6 +5,7 @@ import 'providers.dart';
 import 'models.dart';
 
 class SocketService {
+  static const String serverUrl = "waterparty.onrender.com";
   final Ref ref;
   WebSocketChannel? _channel;
   bool _isConnected = false;
@@ -14,8 +15,7 @@ class SocketService {
   void connect(String uid) {
     if (_isConnected) return;
 
-    // Use your Render/Production URL here
-    final uri = Uri.parse('ws://YOUR_RENDER_URL/ws?uid=$uid');
+    final uri = Uri.parse('wss://$serverUrl/ws?uid=$uid');
     _channel = WebSocketChannel.connect(uri);
     _isConnected = true;
 
