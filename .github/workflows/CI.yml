@@ -5,9 +5,6 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
-permissions:
-  contents: write # Required to create Releases
-
 jobs:
   # ---------------------------------------------------
   # 1. ANDROID BUILD
@@ -113,43 +110,3 @@ jobs:
         with:
           name: WaterParty-Server
           path: server/partyserver
-
-  # ---------------------------------------------------
-  # 5. AUTOMATIC RELEASE
-  # ---------------------------------------------------
-  create-release:
-    needs: [build-android, build-linux, build-web, build-server]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get Version from Pubspec
-        id: get_version
-        run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
-
-      - name: Download all Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: all_artifacts
-
-      - name: Move artifacts to root
-        run: |
-          find all_artifacts/ -name "*.apk" -exec mv {} . \;
-          find all_artifacts/ -name "*.tar.gz" -exec mv {} . \;
-          find all_artifacts/ -name "*.zip" -exec mv {} . \;
-          find all_artifacts/ -name "partyserver" -exec mv {} . \;
-
-      - name: Create or Update Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ env.APP_VERSION }}
-          name: Water Party Release v${{ env.APP_VERSION }}
-          files: |
-            *.apk
-            *.tar.gz
-            *.zip
-            partyserver
-          draft: false
-          prerelease: false
