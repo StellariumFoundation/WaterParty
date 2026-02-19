@@ -41,20 +41,22 @@ build-web:
 # --- Release ---
 release: release-server release-app
 
+GO_BUILD_FLAGS = -ldflags="-s -w" -trimpath
+
 release-server: 
-	@echo "--- Releasing Server (Multi-Platform Binaries) ---"
+	@echo "--- Releasing Optimized Server (Multi-Platform Binaries) ---"
 	mkdir -p release/server
 	# Linux 64-bit
-	cd $(SERVER_DIR) && GOOS=linux GOARCH=amd64 go build -o ../release/server/$(SERVER_BINARY)-linux-amd64 .
+	cd $(SERVER_DIR) && GOOS=linux GOARCH=amd64 go build $(GO_BUILD_FLAGS) -o ../release/server/$(SERVER_BINARY)-linux-amd64 .
 	# Linux ARM64
-	cd $(SERVER_DIR) && GOOS=linux GOARCH=arm64 go build -o ../release/server/$(SERVER_BINARY)-linux-arm64 .
+	cd $(SERVER_DIR) && GOOS=linux GOARCH=arm64 go build $(GO_BUILD_FLAGS) -o ../release/server/$(SERVER_BINARY)-linux-arm64 .
 	# Windows 64-bit
-	cd $(SERVER_DIR) && GOOS=windows GOARCH=amd64 go build -o ../release/server/$(SERVER_BINARY)-windows-amd64.exe .
+	cd $(SERVER_DIR) && GOOS=windows GOARCH=amd64 go build $(GO_BUILD_FLAGS) -o ../release/server/$(SERVER_BINARY)-windows-amd64.exe .
 	# macOS 64-bit (Intel)
-	cd $(SERVER_DIR) && GOOS=darwin GOARCH=amd64 go build -o ../release/server/$(SERVER_BINARY)-darwin-amd64 .
+	cd $(SERVER_DIR) && GOOS=darwin GOARCH=amd64 go build $(GO_BUILD_FLAGS) -o ../release/server/$(SERVER_BINARY)-darwin-amd64 .
 	# macOS ARM64 (Apple Silicon)
-	cd $(SERVER_DIR) && GOOS=darwin GOARCH=arm64 go build -o ../release/server/$(SERVER_BINARY)-darwin-arm64 .
-	@echo "Server binaries ready in release/server/"
+	cd $(SERVER_DIR) && GOOS=darwin GOARCH=arm64 go build $(GO_BUILD_FLAGS) -o ../release/server/$(SERVER_BINARY)-darwin-arm64 .
+	@echo "Optimized server binaries ready in release/server/"
 
 release-app: build-app
 	@echo "--- Packaging App for Release v$(VERSION) ---"
