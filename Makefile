@@ -4,8 +4,9 @@
 SERVER_DIR = server
 SERVER_BINARY = partyserver
 VERSION = $(shell grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+GO_BUILD_FLAGS = -ldflags="-s -w" -trimpath
 
-.PHONY: all build build-server build-app release release-server release-app install-deps clean
+.PHONY: all build build-server build-app build-app-native release release-server release-app install-deps clean build-linux build-android build-web build-macos
 
 all: build
 
@@ -15,14 +16,26 @@ install-deps:
 	flutter pub get
 	cd $(SERVER_DIR) && go mod download
 
+# Detect OS for native app build
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+  NATIVE_APP_TARGET = build-linux
+endif
+ifeq ($(UNAME_S),Darwin)
+  NATIVE_APP_TARGET = build-macos
+endif
+
 # --- Build ---
-build: install-deps build-server build-app
+# 'make build' now only builds for the current platform
+build: install-deps build-server build-app-native
 
 build-server:
-	@echo "--- Building Go Server (Partyserver) ---"
-	cd $(SERVER_DIR) && go build -o $(SERVER_BINARY) .
+	@echo "--- Building Optimized Go Server (Native) ---"
+	cd $(SERVER_DIR) && go build $(GO_BUILD_FLAGS) -o $(SERVER_BINARY) .
 
-build-app: build-android build-linux build-web
+build-app-native: $(NATIVE_APP_TARGET)
+
+build-app: build-android build-linux build-web build-macos
 
 build-android:
 	@echo "--- Building Android APKs (Universal + ABI Specific) ---"
@@ -35,14 +48,17 @@ build-linux:
 	flutter build linux --release --obfuscate --split-debug-info=./debug-info
 	find build/linux/x64/release/bundle/ -maxdepth 1 -type f -executable -exec strip {} +
 
+build-macos:
+	@echo "--- Building macOS Bundle ---"
+	flutter config --enable-macos-desktop
+	flutter build macos --release --obfuscate --split-debug-info=./debug-info
+
 build-web:
 	@echo "--- Building Web Artifacts ---"
 	flutter build web --release
 
 # --- Release ---
 release: release-server release-app
-
-GO_BUILD_FLAGS = -ldflags="-s -w" -trimpath
 
 release-server: 
 	@echo "--- Releasing Optimized Server (Multi-Platform Binaries) ---"
@@ -68,9 +84,9 @@ release-app: build-app
 	cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk release/app/WaterParty-Android-arm64.apk || true
 	cp build/app/outputs/flutter-apk/app-x86_64-release.apk release/app/WaterParty-Android-x86_64.apk || true
 	# Linux
-	tar -czvf release/app/WaterParty-Linux-v$(VERSION).tar.gz -C build/linux/x64/release/bundle .
+	tar -czvf release/app/WaterParty-Linux-v$(VERSION).tar.gz -C build/linux/x64/release/bundle . || true
 	# Web
-	cd build/web && zip -r ../../release/app/WaterParty-Web-v$(VERSION).zip .
+	cd build/web && zip -r ../../release/app/WaterParty-Web-v$(VERSION).zip . || true
 	@echo "App artifacts ready in release/app/"
 
 clean:
