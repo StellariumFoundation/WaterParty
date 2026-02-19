@@ -67,7 +67,7 @@ func (h *Hub) Run() {
 		case client := <-h.unregister:
 			h.mu.Lock()
 			if _, ok := h.clients[client.UID]; ok {
-				delete(h.clients[client.UID])
+				delete(h.clients, client.UID)
 				// Remove client from all rooms they were in
 				for roomID := range h.rooms {
 					delete(h.rooms[roomID], client)
