@@ -225,10 +225,10 @@ func (c *Client) writePump() {
 
 // ServeWs handles websocket requests from the peer.
 func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
-	// Extract UID from URL or Token
-	uid := r.URL.Query().Get("uid")
-	if uid == "" {
-		http.Error(w, "No UID provided", http.StatusUnauthorized)
+	// Extract UID from context (added by AuthMiddleware)
+	uid, ok := r.Context().Value("uid").(string)
+	if !ok || uid == "" {
+		http.Error(w, "Unauthorized: Missing UID", http.StatusUnauthorized)
 		return
 	}
 

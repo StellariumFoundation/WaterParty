@@ -1,0 +1,30 @@
+{
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/ws",
+        "run": {
+          "serviceId": "water-party-server",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/assets/**",
+        "run": {
+          "serviceId": "water-party-server",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

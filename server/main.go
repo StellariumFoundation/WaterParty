@@ -15,19 +15,19 @@ func main() {
 	port := getEnv("PORT", "8080")
 
 	// 2. Initialize Database (pgxpool from database.go)
-	// This creates the pool and runs the schema setup from your database logic
 	InitDB(connStr)
 	log.Println("✅ Database connection pool established")
 
-	// 3. Initialize and start the WebSocket Hub
-	// The hub handles room-based routing and ultra-efficient broadcasting
+	// 3. Initialize Firebase
+	InitFirebase()
+
+	// 4. Initialize and start the WebSocket Hub
 	hub := NewHub()
 	go hub.Run()
 	log.Println("✅ WebSocket Hub started (Room-based routing enabled)")
 
-	// 4. Image/Asset Handler (The Hash-based system)
-	// URL example: http://api.yoursite.com/assets/f2ca1bb6c...
-	http.HandleFunc("/assets/", func(w http.ResponseWriter, r *http.Request) {
+	// 5. Image/Asset Handler (Wrapped with Auth)
+	http.HandleFunc("/assets/", AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		// Only allow GET requests for assets
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -47,21 +47,18 @@ func main() {
 			return
 		}
 
-		// Optimization: Set cache headers so the mobile app doesn't re-download 
-		// the same profile/party photos repeatedly.
 		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		w.Header().Set("ETag", hash)
 		
 		w.Write(data)
-	})
+	}))
 
-	// 5. High-Performance WebSocket Route
-	// This delegates logic to the ServeWs function in websocket.go
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+	// 6. High-Performance WebSocket Route (Wrapped with Auth)
+	http.HandleFunc("/ws", AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		ServeWs(hub, w, r)
-	})
+	}))
 
 	// 6. Health Check (Useful for Load Balancers/K8s)
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
