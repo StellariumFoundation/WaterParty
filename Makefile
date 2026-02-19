@@ -25,7 +25,8 @@ build-server:
 build-app: build-android build-linux build-web
 
 build-android:
-	@echo "--- Building Android APK ---"
+	@echo "--- Building Android APKs (Universal + ABI Specific) ---"
+	flutter build apk --release --obfuscate --split-debug-info=./debug-info
 	flutter build apk --release --split-per-abi --obfuscate --split-debug-info=./debug-info
 
 build-linux:
@@ -61,9 +62,11 @@ release-server:
 release-app: build-app
 	@echo "--- Packaging App for Release v$(VERSION) ---"
 	mkdir -p release/app
-	# Android
+	# Android APKs
 	cp build/app/outputs/flutter-apk/app-release.apk release/app/WaterParty-Universal.apk || true
+	cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk release/app/WaterParty-Android-armv7.apk || true
 	cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk release/app/WaterParty-Android-arm64.apk || true
+	cp build/app/outputs/flutter-apk/app-x86_64-release.apk release/app/WaterParty-Android-x86_64.apk || true
 	# Linux
 	tar -czvf release/app/WaterParty-Linux-v$(VERSION).tar.gz -C build/linux/x64/release/bundle .
 	# Web
