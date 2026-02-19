@@ -1,0 +1,12 @@
+specVersion: "v1beta"
+serviceId: "waterparty-api"
+location: "us-central1"
+schema:
+  source: "schema"
+  datasource:
+    postgresql:
+      database: "partyapp"
+      cloudSql:
+        instanceId: "YOUR_CLOUD_SQL_INSTANCE_ID" # Update this in Firebase Console
+connectorDirs:
+  - "connector"

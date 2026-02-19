@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "build/web",
+    "public": "web",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -10,21 +10,26 @@
       {
         "source": "/ws",
         "run": {
-          "serviceId": "water-party-server",
+          "serviceId": "party-server",
           "region": "us-central1"
         }
       },
       {
         "source": "/assets/**",
         "run": {
-          "serviceId": "water-party-server",
+          "serviceId": "party-server",
           "region": "us-central1"
         }
-      },
-      {
-        "source": "**",
-        "destination": "/index.html"
       }
     ]
+  },
+  "apphosting": {
+    "source": "server",
+    "backend": {
+      "cpu": "GEN_1",
+      "app": "partyserver",
+      "build": "go build -o partyserver .",
+      "start": "./partyserver"
+    }
   }
 }

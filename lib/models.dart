@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 // ==========================================
-// ENUMS & CONSTANTS
+// ENUMS & CONSTANTS (Synced with models.go)
 // ==========================================
 
 enum PartyStatus { OPEN, LOCKED, LIVE, COMPLETED, CANCELLED }
@@ -10,35 +10,8 @@ enum ApplicantStatus { PENDING, ACCEPTED, DECLINED, WAITLIST }
 
 enum MessageType { TEXT, IMAGE, VIDEO, AUDIO, SYSTEM, AI, PAYMENT }
 
-// Extension to handle Go's string-based enums
 extension PartyStatusExt on PartyStatus {
   String get value => toString().split('.').last;
-}
-
-// ==========================================
-// WEBSOCKET ENVELOPE
-// ==========================================
-
-class WSMessage {
-  final String event;
-  final dynamic payload;
-  final String? token;
-
-  WSMessage({required this.event, required this.payload, this.token});
-
-  Map<String, dynamic> toMap() => {
-    'Event': event,
-    'Payload': payload,
-    'Token': token,
-  };
-
-  factory WSMessage.fromMap(Map<String, dynamic> map) {
-    return WSMessage(
-      event: map['Event'] ?? '',
-      payload: map['Payload'],
-      token: map['Token'],
-    );
-  }
 }
 
 // ==========================================
@@ -170,14 +143,51 @@ class User {
     );
   }
 
-  User copyWith({String? bio, String? realName, List<String>? profilePhotos}) {
+  User copyWith({
+    String? realName,
+    String? bio,
+    List<String>? profilePhotos,
+    double? trustScore,
+  }) {
     return User(
       id: id,
       username: username,
       realName: realName ?? this.realName,
-      bio: bio ?? this.bio,
+      phoneNumber: phoneNumber,
+      email: email,
       profilePhotos: profilePhotos ?? this.profilePhotos,
-      // ... keep other fields same
+      age: age,
+      dateOfBirth: dateOfBirth,
+      heightCm: heightCm,
+      gender: gender,
+      lookingFor: lookingFor,
+      drinkingPref: drinkingPref,
+      smokingPref: smokingPref,
+      cannabisPref: cannabisPref,
+      musicGenres: musicGenres,
+      topArtists: topArtists,
+      jobTitle: jobTitle,
+      company: company,
+      school: school,
+      degree: degree,
+      instagramHandle: instagramHandle,
+      twitterHandle: twitterHandle,
+      linkedinHandle: linkedinHandle,
+      xHandle: xHandle,
+      tiktokHandle: tiktokHandle,
+      isVerified: isVerified,
+      trustScore: trustScore ?? this.trustScore,
+      eloScore: eloScore,
+      partiesHosted: partiesHosted,
+      flakeCount: flakeCount,
+      walletAddress: walletAddress,
+      locationLat: locationLat,
+      locationLon: locationLon,
+      lastActiveAt: lastActiveAt,
+      createdAt: createdAt,
+      bio: bio ?? this.bio,
+      interests: interests,
+      vibeTags: vibeTags,
     );
   }
 }
@@ -207,6 +217,8 @@ class Party {
   final List<String> rules;
   final Crowdfunding? rotationPool;
   final String chatRoomId;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   const Party({
     required this.id,
@@ -232,6 +244,8 @@ class Party {
     this.rules = const [],
     this.rotationPool,
     this.chatRoomId = '',
+    this.createdAt,
+    this.updatedAt,
   });
 
   factory Party.fromMap(Map<String, dynamic> map) {
@@ -259,13 +273,11 @@ class Party {
       rules: List<String>.from(map['Rules'] ?? []),
       rotationPool: map['RotationPool'] != null ? Crowdfunding.fromMap(map['RotationPool']) : null,
       chatRoomId: map['ChatRoomID'] ?? '',
+      createdAt: map['CreatedAt'] != null ? DateTime.parse(map['CreatedAt']) : null,
+      updatedAt: map['UpdatedAt'] != null ? DateTime.parse(map['UpdatedAt']) : null,
     );
   }
 }
-
-// ==========================================
-// CHAT & FINANCIALS
-// ==========================================
 
 class ChatRoom {
   final String id;
@@ -342,6 +354,9 @@ class ChatMessage {
   final MessageType type;
   final String content;
   final String mediaUrl;
+  final String thumbnailUrl;
+  final Map<String, dynamic> metadata;
+  final String replyToId;
   final DateTime createdAt;
 
   const ChatMessage({
@@ -351,6 +366,9 @@ class ChatMessage {
     required this.type,
     required this.content,
     this.mediaUrl = '',
+    this.thumbnailUrl = '',
+    this.metadata = const {},
+    this.replyToId = '',
     required this.createdAt,
   });
 
@@ -362,6 +380,9 @@ class ChatMessage {
       type: MessageType.values.firstWhere((e) => e.toString().split('.').last == map['Type'], orElse: () => MessageType.TEXT),
       content: map['Content'] ?? '',
       mediaUrl: map['MediaURL'] ?? '',
+      thumbnailUrl: map['ThumbnailURL'] ?? '',
+      metadata: Map<String, dynamic>.from(map['Metadata'] ?? {}),
+      replyToId: map['ReplyToID'] ?? '',
       createdAt: DateTime.parse(map['CreatedAt']),
     );
   }
@@ -372,14 +393,18 @@ class Crowdfunding {
   final String partyId;
   final double targetAmount;
   final double currentAmount;
+  final String currency;
   final List<Contribution> contributors;
+  final bool isFunded;
 
   const Crowdfunding({
     required this.id,
     this.partyId = '',
     required this.targetAmount,
     required this.currentAmount,
+    this.currency = 'USD',
     this.contributors = const [],
+    this.isFunded = false,
   });
 
   factory Crowdfunding.fromMap(Map<String, dynamic> map) {
@@ -388,7 +413,9 @@ class Crowdfunding {
       partyId: map['PartyID'] ?? '',
       targetAmount: (map['TargetAmount'] ?? 0.0).toDouble(),
       currentAmount: (map['CurrentAmount'] ?? 0.0).toDouble(),
+      currency: map['Currency'] ?? 'USD',
       contributors: (map['Contributors'] as List? ?? []).map((c) => Contribution.fromMap(c)).toList(),
+      isFunded: map['IsFunded'] ?? false,
     );
   }
 }
