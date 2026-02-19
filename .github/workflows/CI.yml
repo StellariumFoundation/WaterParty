@@ -90,7 +90,7 @@ jobs:
           path: WaterParty-Web.zip
 
   # ---------------------------------------------------
-  # 4. SERVER BUILD (Go 1.26.0)
+  # 4. SERVER BUILD (Go 1.26.0 - Multi-Platform)
   # ---------------------------------------------------
   build-server:
     runs-on: ubuntu-latest
@@ -103,10 +103,10 @@ jobs:
           cache: true
           cache-dependency-path: server/go.sum
 
-      - name: Build Server via Makefile
-        run: make build-server
+      - name: Build All Server Binaries via Makefile
+        run: make release-server
 
       - uses: actions/upload-artifact@v4
         with:
-          name: WaterParty-Server
-          path: server/partyserver
+          name: WaterParty-Server-All
+          path: release/server/partyserver-*
