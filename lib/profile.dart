@@ -101,9 +101,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     
     // Quick Hack for demo since copyWith in models.dart was limited in previous step:
     ref.read(authProvider.notifier).updateUserProfile(
-      _realNameCtrl.text, 
-      _bioCtrl.text, 
-      _instaCtrl.text
+      realName: _realNameCtrl.text, 
+      bio: _bioCtrl.text, 
     );
   }
 
