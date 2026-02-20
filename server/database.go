@@ -129,6 +129,14 @@ BEGIN
     END IF;
 END $$;
 
+-- Fix potentially misnamed column from previous attempts
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='wallet data') THEN
+        ALTER TABLE users RENAME COLUMN "wallet data" TO wallet_data;
+    END IF;
+END $$;
+
 -- ==========================================
 -- PARTIES TABLE
 -- ==========================================

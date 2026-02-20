@@ -35,6 +35,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
   final _xCtrl = TextEditingController();
   final _twitterCtrl = TextEditingController();
   final _tiktokCtrl = TextEditingController();
+  final _walletTypeCtrl = TextEditingController();
   final _walletDataCtrl = TextEditingController();
 
   DateTime? _selectedBirthDate;
@@ -67,6 +68,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
       _xCtrl.text = prefs.getString('reg_x') ?? '';
       _tiktokCtrl.text = prefs.getString('reg_tiktok') ?? '';
       _linkedInCtrl.text = prefs.getString('reg_linkedin') ?? '';
+      _walletTypeCtrl.text = prefs.getString('reg_pay_type_text') ?? '';
       _walletDataCtrl.text = prefs.getString('reg_wallet') ?? '';
       _selectedGender = prefs.getString('reg_gender') ?? 'OTHER';
       _selectedPaymentType = prefs.getString('reg_pay_type') ?? 'PAYPAL';
@@ -90,6 +92,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
     await prefs.setString('reg_x', _xCtrl.text);
     await prefs.setString('reg_tiktok', _tiktokCtrl.text);
     await prefs.setString('reg_linkedin', _linkedInCtrl.text);
+    await prefs.setString('reg_pay_type_text', _walletTypeCtrl.text);
     await prefs.setString('reg_wallet', _walletDataCtrl.text);
     await prefs.setString('reg_gender', _selectedGender);
     await prefs.setString('reg_pay_type', _selectedPaymentType);
@@ -117,6 +120,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
     _xCtrl.dispose();
     _twitterCtrl.dispose();
     _tiktokCtrl.dispose();
+    _walletTypeCtrl.dispose();
     _walletDataCtrl.dispose();
     super.dispose();
   }
@@ -216,7 +220,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
           xHandle: _xCtrl.text,
           twitterHandle: _twitterCtrl.text,
           tiktokHandle: _tiktokCtrl.text,
-          walletData: WalletInfo(type: _selectedPaymentType, data: _walletDataCtrl.text),
+          walletData: WalletInfo(type: _walletTypeCtrl.text, data: _walletDataCtrl.text),
           interests: _interests,
           trustScore: 100.0,
         );
@@ -425,28 +429,20 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
         return Column(
           children: [
             _stepHeader("FINAL: ECOSYSTEM"),
-            Text("WAYS TO RECEIVE PAYMENT", style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white54, fontWeight: FontWeight.bold)),
+            Text("WAYS TO RECEIVE PAYMENT", 
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white54, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
+            _input(_walletTypeCtrl, "PAYMENT FORM (PAYPAL, ZELLE, BANK, ETC...)", FontAwesomeIcons.creditCard),
             const SizedBox(height: 5),
-            Text("Select how you want to be paid: PayPal, Bank Account, Zelle, or Crypto.", 
+            Text("Specify your preferred method of receiving funds.", 
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white24, fontSize: 10)),
             const SizedBox(height: 15),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _paymentTypeChip("PAYPAL"),
-                  const SizedBox(width: 10),
-                  _paymentTypeChip("BANK"),
-                  const SizedBox(width: 10),
-                  _paymentTypeChip("ZELLE"),
-                  const SizedBox(width: 10),
-                  _paymentTypeChip("CRYPTO"),
-                ],
-              ),
-            ),
-            const SizedBox(height: 15),
-            _input(_walletDataCtrl, "BANK ACCOUNT DATA, USERNAME, WALLET ADDRESS", FontAwesomeIcons.wallet),
+            _input(_walletDataCtrl, "PAYMENT DATA (IBAN, USERNAME, WALLET ADDRESS)", FontAwesomeIcons.wallet),
+            const SizedBox(height: 5),
+            Text("Provide the details required for the method specified above.", 
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white24, fontSize: 10)),
             const SizedBox(height: 30),
             Text("WHAT KIND OF PARTIES DO YOU LIKE?",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
