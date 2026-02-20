@@ -49,6 +49,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    
+    // Add listeners for real-time draft saving
+    final ctrls = [
+      _realNameCtrl, _emailCtrl, _phoneCtrl, _bioCtrl, _jobCtrl, _compCtrl,
+      _schoolCtrl, _degreeCtrl, _instaCtrl, _twitterCtrl, _xCtrl, _tiktokCtrl,
+      _linkedInCtrl, _walletTypeCtrl, _walletDataCtrl
+    ];
+    for (var c in ctrls) {
+      c.addListener(_saveDraft);
+    }
+    
     _loadDraft();
   }
 
