@@ -137,7 +137,9 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Printf("Registration Error: %v", err)
-		http.Error(w, "Registration failed: "+err.Error(), http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Registration failed: " + err.Error()})
 		return
 	}
 
@@ -164,12 +166,16 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	user, hash, err := GetUserByEmail(req.Email)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "User not found"})
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid credentials"})
 		return
 	}
 

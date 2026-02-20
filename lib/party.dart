@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
+import 'websocket.dart';
 
 class CreatePartyScreen extends ConsumerStatefulWidget {
   const CreatePartyScreen({super.key});
@@ -398,7 +399,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                         fontSize: 18,
                       ),
                   decoration: const InputDecoration(
-                      hintText: "$0",
+                      hintText: "\$0",
                       hintStyle: TextStyle(color: Colors.white10),
                       border: InputBorder.none),
                 ),

@@ -85,8 +85,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
           ),
           child: Text(
             label,
-            style: const TextStyle(
-              
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.5,

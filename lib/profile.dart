@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
+import 'websocket.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -580,7 +581,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           }).toList(),
         ),
       ],
-    );
-  }
-}
-}
+        );
+      }
+    }
+    
