@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
+import 'chat.dart';
 
 class MatchesScreen extends ConsumerStatefulWidget {
   const MatchesScreen({super.key});
@@ -27,8 +27,8 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text("Connections", 
-          style: GoogleFonts.playfairDisplay(fontWeight: FontWeight.bold, fontSize: 32)),
+        title: const Text("CONNECTIONS", 
+          style: TextStyle(fontFamily: 'Frutiger', fontWeight: FontWeight.w900, fontSize: 32, letterSpacing: 2, color: Colors.white)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
@@ -80,10 +80,11 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
           ),
           child: Text(
             label,
-            style: GoogleFonts.outfit(
+            style: const TextStyle(
+              fontFamily: 'Frutiger',
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
+              letterSpacing: 1.5,
               color: isSelected ? AppColors.textCyan : Colors.white38,
             ),
           ),

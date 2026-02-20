@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
@@ -14,6 +14,36 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool isEditing = false;
+  bool _isUploading = false;
+
+  Future<void> _pickAndUploadPhoto() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    
+    if (image != null) {
+      setState(() => _isUploading = true);
+      try {
+        final bytes = await image.readAsBytes();
+        final hash = await ref.read(authProvider.notifier).uploadImage(bytes, "image/jpeg");
+        
+        final user = ref.read(authProvider);
+        if (user != null) {
+          final updatedPhotos = [...user.profilePhotos, hash];
+          await ref.read(authProvider.notifier).updateUserProfile(profilePhotos: updatedPhotos);
+          
+          // Wire to backend
+          ref.read(socketServiceProvider).sendMessage('UPDATE_PROFILE', {
+            'ID': user.id,
+            'ProfilePhotos': updatedPhotos,
+          });
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Upload failed: $e")));
+      } finally {
+        if (mounted) setState(() => _isUploading = false);
+      }
+    }
+  }
 
   // --- Controllers for Text Input ---
   late TextEditingController _realNameCtrl;
@@ -163,9 +193,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   // --- 1. PHOTO CAROUSEL (TINDER STYLE) ---
   Widget _buildPhotoCarousel(User user) {
-    final photos = user.profilePhotos.isEmpty 
-        ? ["https://images.unsplash.com/photo-1500648767791-00dcc994a43e"] // Fallback
-        : user.profilePhotos;
+    final photos = user.profilePhotos;
 
     return SizedBox(
       height: 400,
@@ -173,12 +201,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: Stack(
         children: [
           PageView.builder(
-            itemCount: photos.length + (isEditing ? 1 : 0),
+            itemCount: photos.isEmpty && !isEditing ? 1 : photos.length + (isEditing ? 1 : 0),
             itemBuilder: (context, index) {
-              if (index >= photos.length) {
-                return _buildAddPhotoCard();
+              if (index < photos.length) {
+                final photoUrl = photos[index].startsWith("http") ? photos[index] : "https://waterparty.onrender.com/assets/${photos[index]}";
+                return Image.network(photoUrl, fit: BoxFit.cover);
               }
-              return Image.network(photos[index], fit: BoxFit.cover);
+              if (isEditing) return _buildAddPhotoCard();
+              return Image.network("https://images.unsplash.com/photo-1500648767791-00dcc994a43e", fit: BoxFit.cover);
             },
           ),
           // Gradient Overlay
@@ -214,16 +244,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildAddPhotoCard() {
-    return Container(
-      color: Colors.white10,
-      child: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.add_a_photo, color: Colors.white38, size: 40),
-            SizedBox(height: 10),
-            Text("Add Photo", style: TextStyle(color: Colors.white38)),
-          ],
+    return GestureDetector(
+      onTap: _isUploading ? null : _pickAndUploadPhoto,
+      child: Container(
+        color: Colors.white.withOpacity(0.05),
+        child: Center(
+          child: _isUploading 
+            ? const CircularProgressIndicator(color: AppColors.textCyan)
+            : const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_a_photo, color: Colors.white24, size: 50),
+                  SizedBox(height: 15),
+                  Text("UPLOAD VIBE", style: TextStyle(fontFamily: 'Frutiger', color: Colors.white24, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                ],
+              ),
         ),
       ),
     );
