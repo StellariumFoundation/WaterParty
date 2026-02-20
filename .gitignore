@@ -6,6 +6,7 @@ build/
 *.apk
 *.zip
 *.tar.gz
+server/server
 
 # Flutter/Dart
 .dart_tool/
