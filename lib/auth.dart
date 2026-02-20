@@ -91,6 +91,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } else {
       // Registration logic
       if (currentStep == 0) {
+        if (_realNameCtrl.text.isEmpty || _emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
+          _showError("Name, Email and Password are required");
+          return;
+        }
         if (!_isValidEmail(_emailCtrl.text)) {
           _showError("Please enter a valid email address");
           return;
@@ -106,7 +110,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       try {
         final newUser = User(
           id: "", // Server generates
-          username: _userCtrl.text,
+          username: _userCtrl.text.isEmpty ? _emailCtrl.text.split('@')[0] : _userCtrl.text,
           realName: _realNameCtrl.text,
           email: _emailCtrl.text,
           phoneNumber: _phoneCtrl.text,
@@ -131,6 +135,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         );
         
         await ref.read(authProvider.notifier).register(newUser, _passCtrl.text);
+        // On success, switch to profile tab
+        ref.read(navIndexProvider.notifier).setIndex(3);
       } catch (e) {
         _showError(e.toString().replaceAll("Exception: ", ""));
       } finally {
@@ -225,21 +231,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         return Column(
           children: [
             _stepHeader("STEP 1: CORE IDENTITY"),
-            _input(_userCtrl, "USERNAME", Icons.person_outline),
-            const SizedBox(height: 15),
-            _input(_realNameCtrl, "REAL NAME", Icons.badge_outlined),
+            _input(_realNameCtrl, "FULL NAME", Icons.badge_outlined),
             const SizedBox(height: 15),
             _input(_emailCtrl, "EMAIL", Icons.email_outlined),
             const SizedBox(height: 15),
             _input(_passCtrl, "PASSWORD", Icons.lock_outline, obscure: true),
-            const SizedBox(height: 15),
-            _input(_phoneCtrl, "PHONE", Icons.phone_outlined),
           ],
         );
       case 1:
         return Column(
           children: [
-            _stepHeader("STEP 2: BIOMETRICS"),
+            _stepHeader("STEP 2: VIBE CHECK"),
+            _input(_userCtrl, "USERNAME", Icons.person_outline),
+            const SizedBox(height: 15),
+            _input(_phoneCtrl, "PHONE NUMBER", Icons.phone_outlined),
+            const SizedBox(height: 15),
             Row(
               children: [
                 Expanded(
@@ -254,19 +260,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             ),
             const SizedBox(height: 15),
             _input(_genderCtrl, "GENDER", Icons.wc_outlined),
-            const SizedBox(height: 15),
-            _input(_bioCtrl, "BIO / MANIFESTO", Icons.notes, maxLines: 3),
           ],
         );
       case 2:
         return Column(
           children: [
-            _stepHeader("STEP 3: STATUS"),
+            _stepHeader("STEP 3: LIFESTYLE"),
+            _input(_bioCtrl, "BIO / MANIFESTO", Icons.notes, maxLines: 3),
+            const SizedBox(height: 15),
             _input(_jobCtrl, "JOB TITLE", Icons.work_outline),
             const SizedBox(height: 15),
             _input(_compCtrl, "COMPANY", Icons.business_outlined),
-            const SizedBox(height: 15),
-            _input(_schoolCtrl, "SCHOOL", Icons.school_outlined),
             const SizedBox(height: 15),
             _input(_instaCtrl, "INSTAGRAM", FontAwesomeIcons.instagram),
             const SizedBox(height: 15),
@@ -276,7 +280,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       case 3:
         return Column(
           children: [
-            _stepHeader("FINAL: VIBE CHECK"),
+            _stepHeader("FINAL: ECOSYSTEM"),
             _input(_walletCtrl, "WALLET ADDRESS", FontAwesomeIcons.wallet),
             const SizedBox(height: 30),
             Text("SELECT YOUR FREQUENCIES",
