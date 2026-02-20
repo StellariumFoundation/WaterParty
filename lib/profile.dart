@@ -200,11 +200,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     : "https://waterparty.onrender.com/assets/${photos[index]}";
                 return Image.network(photoUrl, fit: BoxFit.cover);
               }
-              if (isEditing) return _buildAddPhotoCard();
-              return Image.network(
-                  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
-                  fit: BoxFit.cover);
-            },
+                            if (isEditing) return _buildAddPhotoCard();
+                            return Image.network("https://images.unsplash.com/photo-1511367461989-f85a21fda167?q=80&w=1000", fit: BoxFit.cover); // Generic Person Placeholder
+                          },
+              
           ),
           Positioned.fill(
             child: Container(

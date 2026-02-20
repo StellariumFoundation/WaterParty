@@ -145,7 +145,7 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
   Widget _buildFeedCard(BuildContext context, Party party) {
     final displayImage = party.partyPhotos.isNotEmpty 
         ? "https://waterparty.onrender.com/assets/${party.partyPhotos.first}" 
-        : "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7";
+        : "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000"; // Neutral Party Placeholder
 
     return GestureDetector(
       onTap: () {

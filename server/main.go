@@ -15,7 +15,10 @@ import (
 
 func main() {
 	// 1. Configuration (Use environment variables for production)
-	connStr := getEnv("DATABASE_URL", "postgresql://waterpartydb_user:w1byijILsoURYmv8IaWRq8KAsudEkAuw@dpg-d6bnb73uibrs73clenig-a.oregon-postgres.render.com/waterpartydb")
+	connStr := getEnv("DATABASE_URL", "")
+	if connStr == "" {
+		log.Fatal("❌ DATABASE_URL environment variable is required")
+	}
 	port := getEnv("PORT", "8080")
 
 	// 2. Initialize Database (pgxpool from database.go)

@@ -113,19 +113,7 @@ final authProvider = NotifierProvider<AuthNotifier, User?>(AuthNotifier.new);
 class ChatNotifier extends Notifier<List<ChatRoom>> {
   @override
   List<ChatRoom> build() {
-    return [
-      ChatRoom(
-        id: "c1",
-        partyId: "p1",
-        hostId: "u2",
-        title: "Rooftop Jazz & Drinks",
-        imageUrl: "https://images.unsplash.com/photo-1514525253440-b39345208668",
-        isGroup: true,
-        lastMessageContent: "Sarah: I'm bringing the vintage red!",
-        lastMessageAt: DateTime.now().subtract(const Duration(minutes: 2)),
-        unreadCount: 3,
-      ),
-    ];
+    return [];
   }
 
   void updateRoomWithNewMessage(ChatMessage msg) {

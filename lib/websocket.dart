@@ -58,10 +58,11 @@ class SocketService {
   // Send message to Go Backend
   void sendMessage(String event, dynamic payload) {
     if (_channel != null) {
+      final user = ref.read(authProvider);
       final msg = jsonEncode({
         'Event': event,
         'Payload': payload,
-        'Token': 'auth_token_here',
+        'Token': user?.id ?? 'anonymous',
       });
       _channel!.sink.add(msg);
     }

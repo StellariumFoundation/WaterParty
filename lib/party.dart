@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'theme.dart';
 import 'providers.dart';
@@ -37,6 +38,29 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   final List<String> _rules = [];
   String _selectedMood = "CHILL";
 
+  List<String> _partyPhotos = [];
+  bool _isUploading = false;
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    
+    if (image != null) {
+      setState(() => _isUploading = true);
+      try {
+        final bytes = await image.readAsBytes();
+        final hash = await ref.read(authProvider.notifier).uploadImage(bytes, "image/jpeg");
+        setState(() {
+          _partyPhotos.add(hash);
+        });
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Upload failed: $e")));
+      } finally {
+        if (mounted) setState(() => _isUploading = false);
+      }
+    }
+  }
+
   void _handleCreateParty() {
     final user = ref.read(authProvider);
     if (user == null) return;
@@ -64,7 +88,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       hostId: user.id,
       title: _titleController.text.isEmpty ? "UNTITLED VIBE" : _titleController.text.toUpperCase(),
       description: _descController.text,
-      partyPhotos: ["https://images.unsplash.com/photo-1516450360452-9312f5e86fc7"], 
+      partyPhotos: _partyPhotos, 
       startTime: startDateTime,
       endTime: startDateTime.add(const Duration(hours: 6)),
       status: PartyStatus.OPEN,
@@ -163,13 +187,16 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                   letterSpacing: 2,
                 )),
         GestureDetector(
-          onTap: () {},
+          onTap: _isUploading ? null : _pickImage,
           child: WaterGlass(
               width: 70,
               height: 70,
               borderRadius: 20,
-              child: const Icon(FontAwesomeIcons.camera,
-                  color: Colors.white24, size: 24)),
+              child: _isUploading 
+                ? const CircularProgressIndicator(color: AppColors.textCyan, strokeWidth: 2)
+                : Icon(FontAwesomeIcons.camera,
+                  color: _partyPhotos.isNotEmpty ? AppColors.textCyan : Colors.white24, 
+                  size: 24)),
         ),
       ],
     );

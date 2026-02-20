@@ -131,8 +131,11 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(room.isGroup ? 12 : 30),
-                child: Image.network(room.imageUrl,
-                    width: 60, height: 60, fit: BoxFit.cover),
+                child: Image.network(
+                    room.imageUrl.isNotEmpty ? room.imageUrl : "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000",
+                    width: 60,
+                    height: 60,
+                    fit: BoxFit.cover),
               ),
               if (room.isGroup && room.partyId.isNotEmpty)
                 const Positioned(
