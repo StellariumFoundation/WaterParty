@@ -49,7 +49,6 @@ type WSMessage struct {
 
 type User struct {
 	ID              string     `json:"ID" db:"id"`
-	Username        string     `json:"Username" db:"username"`
 	RealName        string     `json:"RealName" db:"real_name"`
 	PhoneNumber     string     `json:"PhoneNumber" db:"phone_number"`
 	Email           string     `json:"Email" db:"email"`
@@ -86,7 +85,6 @@ type User struct {
 	CreatedAt       *time.Time `json:"CreatedAt,omitempty" db:"created_at"`
 	Bio             string     `json:"Bio" db:"bio"`
 	Interests       []string   `json:"Interests" db:"interests"`
-	VibeTags        []string   `json:"VibeTags" db:"vibe_tags"`
 }
 
 type Party struct {

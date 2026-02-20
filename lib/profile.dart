@@ -88,7 +88,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _drinking = user.drinkingPref.isEmpty ? "Social" : user.drinkingPref;
     _smoking = user.smokingPref.isEmpty ? "No" : user.smokingPref;
     _cannabis = user.cannabisPref.isEmpty ? "No" : user.cannabisPref;
-    _interests = List.from(user.interests.isEmpty ? user.vibeTags : user.interests);
+    _interests = List.from(user.interests);
   }
 
   @override
@@ -112,11 +112,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void _saveChanges() {
     final currentUser = ref.read(authProvider);
     if (currentUser == null) return;
-
-    final updatedUser = currentUser.copyWith(
-      realName: _realNameCtrl.text,
-      bio: _bioCtrl.text,
-    );
 
     ref.read(authProvider.notifier).updateUserProfile(
       realName: _realNameCtrl.text, 
@@ -200,10 +195,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     : "https://waterparty.onrender.com/assets/${photos[index]}";
                 return Image.network(photoUrl, fit: BoxFit.cover);
               }
-                            if (isEditing) return _buildAddPhotoCard();
-                            return Image.network("https://images.unsplash.com/photo-1511367461989-f85a21fda167?q=80&w=1000", fit: BoxFit.cover); // Generic Person Placeholder
-                          },
-              
+              if (isEditing) return _buildAddPhotoCard();
+              return Image.network("https://images.unsplash.com/photo-1511367461989-f85a21fda167?q=80&w=1000", fit: BoxFit.cover); 
+            },
           ),
           Positioned.fill(
             child: Container(
@@ -313,12 +307,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               )
           ],
         ),
-        if (!isEditing)
-          Text("@${user.username}",
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppColors.textCyan)),
       ],
     );
   }
@@ -373,9 +361,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: _buildInfoTile(
                     Icons.height,
                     "Height",
-                    isEditing
-                        ? "$_heightCm cm"
-                        : "$_heightCm cm")),
+                    "$_heightCm cm")),
             const SizedBox(width: 10),
             Expanded(
                 child: _buildDropdownTile(Icons.local_bar, "Drinks", _drinking,

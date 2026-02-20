@@ -118,24 +118,24 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	u := req.User
 	
 	query := `INSERT INTO users (
-		username, real_name, phone_number, email, password_hash, profile_photos, age, date_of_birth,
+		real_name, phone_number, email, password_hash, profile_photos, age, date_of_birth,
 		height_cm, gender, looking_for, drinking_pref, smoking_pref, cannabis_pref,
 		music_genres, top_artists, job_title, company, school, degree,
 		instagram_handle, twitter_handle, linkedin_handle, x_handle, tiktok_handle,
 		is_verified, trust_score, elo_score, parties_hosted, flake_count,
-		wallet_address, location_lat, location_lon, bio, interests, vibe_tags, last_active_at
+		wallet_address, location_lat, location_lon, bio, interests, last_active_at
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 
-		$19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37) 
+		$19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35) 
 	RETURNING id, created_at, last_active_at`
 
 	var createdAt, lastActiveAt time.Time
 	err := db.QueryRow(context.Background(), query,
-		u.Username, u.RealName, u.PhoneNumber, u.Email, string(hash), u.ProfilePhotos, u.Age, u.DateOfBirth,
+		u.RealName, u.PhoneNumber, u.Email, string(hash), u.ProfilePhotos, u.Age, u.DateOfBirth,
 		u.HeightCm, u.Gender, u.LookingFor, u.DrinkingPref, u.SmokingPref, u.CannabisPref,
 		u.MusicGenres, u.TopArtists, u.JobTitle, u.Company, u.School, u.Degree,
 		u.InstagramHandle, u.TwitterHandle, u.LinkedinHandle, u.XHandle, u.TikTokHandle,
 		u.IsVerified, u.TrustScore, u.EloScore, u.PartiesHosted, u.FlakeCount,
-		u.WalletAddress, u.LocationLat, u.LocationLon, u.Bio, u.Interests, u.VibeTags, time.Now(),
+		u.WalletAddress, u.LocationLat, u.LocationLon, u.Bio, u.Interests, time.Now(),
 	).Scan(&u.ID, &createdAt, &lastActiveAt)
 
 	if err != nil {

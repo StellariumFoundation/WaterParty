@@ -58,7 +58,6 @@ CREATE TABLE IF NOT EXISTS assets (
 -- ==========================================
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    username TEXT UNIQUE NOT NULL,
     real_name TEXT,
     phone_number TEXT,
     email TEXT UNIQUE,
@@ -109,7 +108,6 @@ CREATE TABLE IF NOT EXISTS users (
     -- Bio
     bio TEXT,
     interests TEXT[] DEFAULT '{}',
-    vibe_tags TEXT[] DEFAULT '{}',
     
     last_active_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -278,45 +276,45 @@ func GetAsset(hash string) ([]byte, string, error) {
 
 func CreateUser(u User) (string, error) {
 	query := `INSERT INTO users (
-		username, real_name, phone_number, email, profile_photos, age, date_of_birth,
+		real_name, phone_number, email, profile_photos, age, date_of_birth,
 		height_cm, gender, looking_for, drinking_pref, smoking_pref, cannabis_pref,
 		music_genres, top_artists, job_title, company, school, degree,
 		instagram_handle, twitter_handle, linkedin_handle, x_handle, tiktok_handle,
 		is_verified, trust_score, elo_score, parties_hosted, flake_count,
-		wallet_address, location_lat, location_lon, bio, interests, vibe_tags, last_active_at
+		wallet_address, location_lat, location_lon, bio, interests, last_active_at
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 
-		$19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36) 
+		$19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35) 
 	RETURNING id`
 
 	var id string
 	now := time.Now()
 	err := db.QueryRow(context.Background(), query,
-		u.Username, u.RealName, u.PhoneNumber, u.Email, u.ProfilePhotos, u.Age, u.DateOfBirth,
+		u.RealName, u.PhoneNumber, u.Email, u.ProfilePhotos, u.Age, u.DateOfBirth,
 		u.HeightCm, u.Gender, u.LookingFor, u.DrinkingPref, u.SmokingPref, u.CannabisPref,
 		u.MusicGenres, u.TopArtists, u.JobTitle, u.Company, u.School, u.Degree,
 		u.InstagramHandle, u.TwitterHandle, u.LinkedinHandle, u.XHandle, u.TikTokHandle,
 		u.IsVerified, u.TrustScore, u.EloScore, u.PartiesHosted, u.FlakeCount,
-		u.WalletAddress, u.LocationLat, u.LocationLon, u.Bio, u.Interests, u.VibeTags, &now,
+		u.WalletAddress, u.LocationLat, u.LocationLon, u.Bio, u.Interests, &now,
 	).Scan(&id)
 	return id, err
 }
 
 func GetUser(id string) (User, error) {
 	var u User
-	query := `SELECT id, username, real_name, phone_number, email, profile_photos, age, date_of_birth,
+	query := `SELECT id, real_name, phone_number, email, profile_photos, age, date_of_birth,
 		height_cm, gender, looking_for, drinking_pref, smoking_pref, cannabis_pref, music_genres,
 		top_artists, job_title, company, school, degree, instagram_handle, twitter_handle,
 		linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, elo_score,
 		parties_hosted, flake_count, wallet_address, location_lat, location_lon, bio,
-		interests, vibe_tags, last_active_at, created_at FROM users WHERE id = $1`
+		interests, last_active_at, created_at FROM users WHERE id = $1`
 
 	err := db.QueryRow(context.Background(), query, id).Scan(
-		&u.ID, &u.Username, &u.RealName, &u.PhoneNumber, &u.Email, &u.ProfilePhotos, &u.Age, &u.DateOfBirth,
+		&u.ID, &u.RealName, &u.PhoneNumber, &u.Email, &u.ProfilePhotos, &u.Age, &u.DateOfBirth,
 		&u.HeightCm, &u.Gender, &u.LookingFor, &u.DrinkingPref, &u.SmokingPref, &u.CannabisPref, &u.MusicGenres,
 		&u.TopArtists, &u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle, &u.TwitterHandle,
 		&u.LinkedinHandle, &u.XHandle, &u.TikTokHandle, &u.IsVerified, &u.TrustScore, &u.EloScore,
 		&u.PartiesHosted, &u.FlakeCount, &u.WalletAddress, &u.LocationLat, &u.LocationLon, &u.Bio,
-		&u.Interests, &u.VibeTags, &u.LastActiveAt, &u.CreatedAt,
+		&u.Interests, &u.LastActiveAt, &u.CreatedAt,
 	)
 	return u, err
 }
@@ -324,21 +322,21 @@ func GetUser(id string) (User, error) {
 func GetUserByEmail(email string) (User, string, error) {
 	var u User
 	var passwordHash string
-	query := `SELECT id, username, real_name, phone_number, email, password_hash, profile_photos, age, 
+	query := `SELECT id, real_name, phone_number, email, password_hash, profile_photos, age, 
 		date_of_birth, height_cm, gender, looking_for, drinking_pref, smoking_pref, cannabis_pref, 
 		music_genres, top_artists, job_title, company, school, degree, instagram_handle, 
 		twitter_handle, linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, 
 		elo_score, parties_hosted, flake_count, wallet_address, location_lat, location_lon, 
-		last_active_at, created_at, bio, interests, vibe_tags 
+		last_active_at, created_at, bio, interests 
 		FROM users WHERE email = $1`
 
 	err := db.QueryRow(context.Background(), query, email).Scan(
-		&u.ID, &u.Username, &u.RealName, &u.PhoneNumber, &u.Email, &passwordHash, &u.ProfilePhotos, &u.Age,
+		&u.ID, &u.RealName, &u.PhoneNumber, &u.Email, &passwordHash, &u.ProfilePhotos, &u.Age,
 		&u.DateOfBirth, &u.HeightCm, &u.Gender, &u.LookingFor, &u.DrinkingPref, &u.SmokingPref, &u.CannabisPref,
 		&u.MusicGenres, &u.TopArtists, &u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle,
 		&u.TwitterHandle, &u.LinkedinHandle, &u.XHandle, &u.TikTokHandle, &u.IsVerified, &u.TrustScore,
 		&u.EloScore, &u.PartiesHosted, &u.FlakeCount, &u.WalletAddress, &u.LocationLat, &u.LocationLon,
-		&u.LastActiveAt, &u.CreatedAt, &u.Bio, &u.Interests, &u.VibeTags,
+		&u.LastActiveAt, &u.CreatedAt, &u.Bio, &u.Interests,
 	)
 	return u, passwordHash, err
 }
@@ -346,11 +344,11 @@ func GetUserByEmail(email string) (User, string, error) {
 func UpdateUser(u User) error {
 	query := `UPDATE users SET 
 		real_name=$1, phone_number=$2, profile_photos=$3, bio=$4, 
-		location_lat=$5, location_lon=$6, last_active_at=$7, vibe_tags=$8, 
-		interests=$9, instagram_handle=$10, twitter_handle=$11, tiktok_handle=$12
-		WHERE id=$13`
+		location_lat=$5, location_lon=$6, last_active_at=$7, 
+		interests=$8, instagram_handle=$9, twitter_handle=$10, tiktok_handle=$11
+		WHERE id=$12`
 	_, err := db.Exec(context.Background(), query, u.RealName, u.PhoneNumber, u.ProfilePhotos, 
-		u.Bio, u.LocationLat, u.LocationLon, time.Now(), u.VibeTags, u.Interests, 
+		u.Bio, u.LocationLat, u.LocationLon, time.Now(), u.Interests, 
 		u.InstagramHandle, u.TwitterHandle, u.TikTokHandle, u.ID)
 	return err
 }

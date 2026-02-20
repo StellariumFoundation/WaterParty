@@ -20,7 +20,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   // Controllers for all fields
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  final _userCtrl = TextEditingController();
   final _realNameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _ageCtrl = TextEditingController();
@@ -38,16 +37,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _walletCtrl = TextEditingController();
 
   // Multi-select lists
-  final List<String> _musicGenres = [];
   final List<String> _interests = [];
-  final List<String> _lookingFor = [];
-  final List<String> _vibeTags = [];
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     _passCtrl.dispose();
-    _userCtrl.dispose();
     _realNameCtrl.dispose();
     _phoneCtrl.dispose();
     _ageCtrl.dispose();
@@ -110,7 +105,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       try {
         final newUser = User(
           id: "", // Server generates
-          username: _userCtrl.text.isEmpty ? _emailCtrl.text.split('@')[0] : _userCtrl.text,
           realName: _realNameCtrl.text,
           email: _emailCtrl.text,
           phoneNumber: _phoneCtrl.text,
@@ -127,10 +121,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           xHandle: _xCtrl.text,
           tiktokHandle: _tiktokCtrl.text,
           walletAddress: _walletCtrl.text,
-          musicGenres: _musicGenres,
           interests: _interests,
-          lookingFor: _lookingFor,
-          vibeTags: _vibeTags,
           trustScore: 100.0,
         );
         
@@ -152,7 +143,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         content: Text(m, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white)),
         backgroundColor: Colors.redAccent.withOpacity(0.8),
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(bottom: 100, left: 20, right: 20),
+        margin: const EdgeInsets.only(bottom: 120, left: 20, right: 20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
@@ -161,7 +152,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false, // Prevent white bar/jumping on keyboard
+      resizeToAvoidBottomInset: false,
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -176,7 +167,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   Expanded(
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(30, 20, 30, 150), // Extra bottom padding for fixed button
+                      padding: const EdgeInsets.fromLTRB(30, 20, 30, 180),
                       child: isLogin ? _buildLoginFields() : _buildRegisterStepper(),
                     ),
                   ),
@@ -241,10 +232,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       case 1:
         return Column(
           children: [
-            _stepHeader("STEP 2: VIBE CHECK"),
-            _input(_userCtrl, "USERNAME", Icons.person_outline),
-            const SizedBox(height: 15),
-            _input(_phoneCtrl, "PHONE NUMBER", Icons.phone_outlined),
+            _stepHeader("STEP 2: DETAILS"),
+            _input(_phoneCtrl, "PHONE NUMBER (OPTIONAL)", Icons.phone_outlined),
             const SizedBox(height: 15),
             Row(
               children: [
@@ -283,13 +272,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             _stepHeader("FINAL: ECOSYSTEM"),
             _input(_walletCtrl, "WALLET ADDRESS", FontAwesomeIcons.wallet),
             const SizedBox(height: 30),
-            Text("SELECT YOUR FREQUENCIES",
+            Text("WHAT KIND OF PARTIES DO YOU LIKE?",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.textCyan,
                       fontWeight: FontWeight.bold,
                     )),
             const SizedBox(height: 15),
-            _vibeChips(),
+            _interestChips(),
           ],
         );
       default:
@@ -336,23 +325,23 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     );
   }
 
-  Widget _vibeChips() {
+  Widget _interestChips() {
     final List<String> options = [
-      "#TECH",
-      "#ART",
-      "#WEB3",
-      "#RAVE",
-      "#DEEP",
-      "#CHILL"
+      "RAVES",
+      "HOUSE PARTIES",
+      "DINNER PARTIES",
+      "NETWORKING",
+      "OUTDOOR",
+      "CHILL"
     ];
     return Wrap(
       spacing: 10,
       runSpacing: 10,
       children: options.map((v) {
-        bool active = _vibeTags.contains(v);
+        bool active = _interests.contains(v);
         return GestureDetector(
           onTap: () =>
-              setState(() => active ? _vibeTags.remove(v) : _vibeTags.add(v)),
+              setState(() => active ? _interests.remove(v) : _interests.add(v)),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
             decoration: BoxDecoration(

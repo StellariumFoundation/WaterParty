@@ -21,7 +21,6 @@ extension PartyStatusExt on PartyStatus {
 @immutable
 class User {
   final String id;
-  final String username;
   final String realName;
   final String phoneNumber;
   final String email;
@@ -57,11 +56,9 @@ class User {
   final DateTime? createdAt;
   final String bio;
   final List<String> interests;
-  final List<String> vibeTags;
 
   const User({
     required this.id,
-    required this.username,
     required this.realName,
     this.phoneNumber = '',
     this.email = '',
@@ -97,13 +94,11 @@ class User {
     this.createdAt,
     this.bio = '',
     this.interests = const [],
-    this.vibeTags = const [],
   });
 
   factory User.fromMap(Map<String, dynamic> map) {
     return User(
       id: map['ID'] ?? '',
-      username: map['Username'] ?? '',
       realName: map['RealName'] ?? '',
       phoneNumber: map['PhoneNumber'] ?? '',
       email: map['Email'] ?? '',
@@ -139,7 +134,6 @@ class User {
       createdAt: map['CreatedAt'] != null ? DateTime.parse(map['CreatedAt']) : null,
       bio: map['Bio'] ?? '',
       interests: List<String>.from(map['Interests'] ?? []),
-      vibeTags: List<String>.from(map['VibeTags'] ?? []),
     );
   }
 
@@ -151,7 +145,6 @@ class User {
   }) {
     return User(
       id: id,
-      username: username,
       realName: realName ?? this.realName,
       phoneNumber: phoneNumber,
       email: email,
@@ -187,14 +180,12 @@ class User {
       createdAt: createdAt,
       bio: bio ?? this.bio,
       interests: interests,
-      vibeTags: vibeTags,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'ID': id,
-      'Username': username,
       'RealName': realName,
       'PhoneNumber': phoneNumber,
       'Email': email,
@@ -228,7 +219,6 @@ class User {
       'LocationLon': locationLon,
       'Bio': bio,
       'Interests': interests,
-      'VibeTags': vibeTags,
     };
   }
 }
