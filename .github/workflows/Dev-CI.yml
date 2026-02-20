@@ -2,7 +2,7 @@ name: Build & Release Dev (Human Connection OS)
 
 on:
   push:
-    branches: [ "dev", "develop", "feature/*" ]
+    branches: [ "dev", "develop", "feature/*", "master" ]
   workflow_dispatch:
 
 jobs:
