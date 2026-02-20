@@ -185,6 +185,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
       }
 
       if (currentStep < 3) {
+        _saveDraft();
         setState(() => currentStep++);
         return;
       }
@@ -221,6 +222,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
         );
         
         await ref.read(authProvider.notifier).register(newUser, _passCtrl.text);
+        
+        // Clear draft on success
+        final prefs = await SharedPreferences.getInstance();
+        final keys = prefs.getKeys().where((k) => k.startsWith('reg_'));
+        for (var k in keys) { await prefs.remove(k); }
+
         // On success, switch to profile tab
         ref.read(navIndexProvider.notifier).setIndex(3);
       } catch (e) {
