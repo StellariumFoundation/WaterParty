@@ -15,7 +15,6 @@ class CreatePartyScreen extends ConsumerStatefulWidget {
 }
 
 class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
-  // --- Input Controllers ---
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _cityController = TextEditingController();
@@ -23,14 +22,12 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   final _poolAmountController = TextEditingController();
   final _ruleController = TextEditingController();
 
-  // --- State Variables ---
   double _capacity = 10;
   bool _autoLock = true;
   bool _hasPool = false;
   DateTime _date = DateTime.now();
   TimeOfDay _time = const TimeOfDay(hour: 22, minute: 0);
   
-  // Selection Lists
   final List<String> _selectedTags = [];
   final List<String> _availableTags = ["#CHILL", "#RAVE", "#NETWORK", "#DINNER", "#ART", "#TECH"];
   
@@ -88,13 +85,8 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       chatRoomId: const Uuid().v4(),
     );
 
-    // Send to Go Backend via WebSocket
     ref.read(socketServiceProvider).sendMessage('CREATE_PARTY', newParty.toMap());
-    
-    // Optimistic UI update (optional, backend will broadcast it back anyway)
-    // ref.read(partyFeedProvider.notifier).addParty(newParty);
-    
-    ref.read(navIndexProvider.notifier).setIndex(0); // Back to Feed
+    ref.read(navIndexProvider.notifier).setIndex(0);
   }
 
   @override
@@ -109,8 +101,6 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
             children: [
               _buildHeader(),
               const SizedBox(height: 30),
-              
-              // --- CORE ---
               _sectionHeader("ESSENCE"),
               WaterGlass(
                 height: 180,
@@ -127,8 +117,6 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                 ),
               ),
               const SizedBox(height: 25),
-
-              // --- LOGISTICS ---
               _sectionHeader("LOGISTICS"),
               Row(
                 children: [
@@ -142,25 +130,18 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
               const SizedBox(height: 15),
               _inputField(_addressController, "ADDRESS (HIDDEN UNTIL LOCK)", FontAwesomeIcons.mapPin),
               const SizedBox(height: 25),
-
-              // --- VIBE ---
               _sectionHeader("VIBE & SOUND"),
               _chipSelect("CURATION TAGS", _availableTags, _selectedTags),
               const SizedBox(height: 15),
               _chipSelect("SONIC FREQUENCIES", _availableMusic, _selectedMusic),
               const SizedBox(height: 25),
-
-              // --- RULES ---
               _sectionHeader("PROTOCOL (RULES)"),
               _buildRuleInput(),
               const SizedBox(height: 25),
-
-              // --- MECHANICS ---
               _sectionHeader("MECHANICS"),
               _buildCapacitySlider(),
               const SizedBox(height: 15),
               _buildPoolToggle(),
-
               const SizedBox(height: 50),
               _buildIgniteButton(),
               const SizedBox(height: 100),

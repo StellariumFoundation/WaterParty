@@ -113,24 +113,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final currentUser = ref.read(authProvider);
     if (currentUser == null) return;
 
-    // Create updated User object
-    // Note: In a real app, this copyWith would be much larger to cover all fields
-    // For this example, we assume we update the fields we edited.
     final updatedUser = currentUser.copyWith(
       realName: _realNameCtrl.text,
       bio: _bioCtrl.text,
-      // For the full struct update, you might need to extend copyWith in models.dart
-      // or recreate the User object fully if copyWith is limited.
     );
 
-    // 1. Update Local Provider
-    // (Assuming you add a method to AuthNotifier to accept a full User object)
-    // ref.read(authProvider.notifier).updateUser(updatedUser); 
-    
-    // 2. Send to Backend via WebSocket
-    // ref.read(socketServiceProvider).sendMessage('UPDATE_PROFILE', updatedUser.toMap());
-    
-    // Quick Hack for demo since copyWith in models.dart was limited in previous step:
     ref.read(authProvider.notifier).updateUserProfile(
       realName: _realNameCtrl.text, 
       bio: _bioCtrl.text, 
@@ -147,7 +134,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // --- SCROLLABLE CONTENT ---
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
@@ -169,7 +155,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           _buildWorkEducationSection(),
                           const SizedBox(height: 20),
                           _buildInterestsSection(),
-                          const SizedBox(height: 100), // Spacing for FAB
+                          const SizedBox(height: 100),
                         ],
                       ),
                     ),
@@ -195,7 +181,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // --- 1. PHOTO CAROUSEL (TINDER STYLE) ---
   Widget _buildPhotoCarousel(User user) {
     final photos = user.profilePhotos;
 
@@ -221,7 +206,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   fit: BoxFit.cover);
             },
           ),
-          // Gradient Overlay
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -237,7 +221,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
             ),
           ),
-          // Trust Score Badge
           Positioned(
             top: 20,
             right: 20,
@@ -291,7 +274,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // --- 2. IDENTITY (Name & Age) ---
   Widget _buildIdentitySection(User user) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,7 +324,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // --- 3. BIO ---
   Widget _buildBioSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,7 +357,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // --- 4. LIFESTYLE (Chips/Grid) ---
   Widget _buildLifestyleSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -396,7 +376,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     "Height",
                     isEditing
                         ? "$_heightCm cm"
-                        : "$_heightCm cm")), // Add slider logic if really building
+                        : "$_heightCm cm")),
             const SizedBox(width: 10),
             Expanded(
                 child: _buildDropdownTile(Icons.local_bar, "Drinks", _drinking,
@@ -492,7 +472,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // --- 5. WORK & EDUCATION ---
   Widget _buildWorkEducationSection() {
     return Column(
       children: [
@@ -535,7 +514,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // --- 6. INTERESTS (VIBE TAGS) ---
   Widget _buildInterestsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -581,7 +559,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           }).toList(),
         ),
       ],
-        );
-      }
-    }
-    
+    );
+  }
+}

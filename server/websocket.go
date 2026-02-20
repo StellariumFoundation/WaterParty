@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -239,8 +240,9 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		json.Unmarshal(payloadBytes, &p)
 		
 		p.HostID = c.UID
-		p.CreatedAt = time.Now()
-		p.UpdatedAt = time.Now()
+		now := time.Now()
+		p.CreatedAt = &now
+		p.UpdatedAt = &now
 
 		id, err := CreateParty(p)
 		if err != nil {

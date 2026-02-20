@@ -17,10 +17,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch the global chat state
     final allChatRooms = ref.watch(chatProvider);
-
-    // Filter based on the Go 'isGroup' flag
     final partyChats = allChatRooms.where((room) => room.isGroup).toList();
     final directMessages = allChatRooms.where((room) => !room.isGroup).toList();
 
@@ -41,7 +38,6 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- TAB TOGGLE ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: WaterGlass(
@@ -55,10 +51,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: 10),
-
-          // --- CONTENT AREA ---
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
@@ -120,7 +113,6 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
   }
 
   Widget _buildChatTile(ChatRoom room) {
-    // Helper to format DateTime to "2m ago" style
     String timeLabel = _formatDateTime(room.lastMessageAt);
 
     return Padding(
@@ -142,7 +134,6 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                 child: Image.network(room.imageUrl,
                     width: 60, height: 60, fit: BoxFit.cover),
               ),
-              // Show online status or locked status based on Go model data
               if (room.isGroup && room.partyId.isNotEmpty)
                 const Positioned(
                     bottom: 0,

@@ -59,20 +59,20 @@ func main() {
 		w.Header().Set("ETag", hash)
 		
 		w.Write(data)
-	})
+	}))
 
 	// 6. High-Performance WebSocket Route
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWs(hub, w, r)
 	})
 
-	// 6. Health Check (Useful for Load Balancers/K8s)
+	// 7. Health Check (Useful for Load Balancers/K8s)
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
 
-	// 7. Start Server with optimized timeouts
+	// 8. Start Server with optimized timeouts
 	server := &http.Server{
 		Addr:         ":" + port,
 		ReadTimeout:  5 * time.Second,
@@ -125,6 +125,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		$19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37) 
 	RETURNING id, created_at, last_active_at`
 
+	var createdAt, lastActiveAt time.Time
 	err := db.QueryRow(context.Background(), query,
 		u.Username, u.RealName, u.PhoneNumber, u.Email, string(hash), u.ProfilePhotos, u.Age, u.DateOfBirth,
 		u.HeightCm, u.Gender, u.LookingFor, u.DrinkingPref, u.SmokingPref, u.CannabisPref,
@@ -132,7 +133,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		u.InstagramHandle, u.TwitterHandle, u.LinkedinHandle, u.XHandle, u.TikTokHandle,
 		u.IsVerified, u.TrustScore, u.EloScore, u.PartiesHosted, u.FlakeCount,
 		u.WalletAddress, u.LocationLat, u.LocationLon, u.Bio, u.Interests, u.VibeTags, time.Now(),
-	).Scan(&u.ID, &u.CreatedAt, &u.LastActiveAt)
+	).Scan(&u.ID, &createdAt, &lastActiveAt)
 
 	if err != nil {
 		log.Printf("Registration Error: %v", err)
@@ -142,7 +143,9 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u.ID = id
+	u.CreatedAt = &createdAt
+	u.LastActiveAt = &lastActiveAt
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(u)
 }
