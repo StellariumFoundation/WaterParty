@@ -23,19 +23,22 @@ jobs:
           channel: 'master'
           cache: true
       
-      - name: Build Android via Makefile
-        run: make build-android
+      - name: Build Android APK & AAB via Makefile
+        run: |
+          make build-android
+          make build-aab
       
       - name: Prepare Artifacts
         run: |
           mkdir -p artifacts
           cp build/app/outputs/flutter-apk/app-release.apk artifacts/WaterParty-Universal.apk || true
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk artifacts/WaterParty-Android-arm64.apk || true
+          cp build/app/outputs/bundle/release/app-release.aab artifacts/WaterParty.aab || true
 
       - uses: actions/upload-artifact@v4
         with:
           name: WaterParty-Android
-          path: artifacts/WaterParty-*.apk
+          path: artifacts/WaterParty-*
 
   # ---------------------------------------------------
   # 2. LINUX BUILD
@@ -122,13 +125,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get Version from Pubspec
-        id: get_version
-        run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
-          echo "Detected Version: $VERSION"
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
-
       - name: Download all Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -137,33 +133,40 @@ jobs:
       - name: Move artifacts to root
         run: |
           find all_artifacts/ -name "WaterParty-*.apk" -exec mv {} . \;
+          find all_artifacts/ -name "WaterParty.aab" -exec mv {} . \;
           find all_artifacts/ -name "WaterParty-Linux.tar.gz" -exec mv {} . \;
           find all_artifacts/ -name "WaterParty-Web.zip" -exec mv {} . \;
           find all_artifacts/ -name "partyserver-*" -exec mv {} . \;
 
-      - name: Create or Update Release
+      - name: Update Static Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ env.APP_VERSION }}
-          name: Water Party Release v${{ env.APP_VERSION }}
+          tag_name: release
+          name: Water Party Production Build
           body: |
-            ## 🚀 Human Connection OS - Build v${{ env.APP_VERSION }}
+            ## 🚀 Human Connection OS - Latest Build
             
-            This release contains the latest builds for the Water Party platform.
+            This is an automated production build of the Water Party ecosystem.
             
-            ### 📱 Mobile & Desktop
-            - **Android**: Optimized APKs for arm64 and Universal.
-            - **Linux**: Stripped and compressed tarball.
-            - **Web**: Optimized JavaScript bundle.
+            ### 📱 Mobile
+            - **Android (Universal)**: All-in-one APK.
+            - **Android (ARM64)**: Optimized for modern devices.
+            - **Android (AAB)**: For Play Store submission.
             
-            ### ⚡ Server (Go 1.26.0)
-            - **Multi-Platform**: Binaries for Linux, Windows, and macOS (Intel/M-series).
+            ### 💻 Desktop & Web
+            - **Linux**: Compressed binary bundle.
+            - **Web**: Optimized JavaScript release.
             
-            *Automated build powered by Makefile.*
+            ### ⚡ Server
+            - **Multi-Platform**: Binaries for Linux, Windows, and macOS.
+            
+            *No new git tags were created for this release.*
           files: |
             WaterParty-*.apk
+            WaterParty.aab
             WaterParty-Linux.tar.gz
             WaterParty-Web.zip
             partyserver-*
           draft: false
           prerelease: false
+          generate_release_notes: false

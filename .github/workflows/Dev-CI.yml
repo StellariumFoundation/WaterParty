@@ -1,0 +1,78 @@
+name: Build & Release Dev (Human Connection OS)
+
+on:
+  push:
+    branches: [ "dev", "develop", "feature/*" ]
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------
+  # 1. DEV BUILD (Android arm64 + Linux x64)
+  # ---------------------------------------------------
+  build-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      
+      - name: Install Linux Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libespeak-ng-dev espeak-ng
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'master'
+          cache: true
+      
+      - name: Build Dev Release via Makefile
+        run: make release-dev
+      
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WaterParty-Dev-Artifacts
+          path: release/dev/*
+
+  # ---------------------------------------------------
+  # 2. DEV RELEASE
+  # ---------------------------------------------------
+  create-dev-release:
+    needs: build-dev
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Dev Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: WaterParty-Dev-Artifacts
+          path: .
+
+      - name: Update Static Dev Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: dev
+          name: Water Party Development Build
+          body: |
+            ## 🚧 Development Build - Latest
+            
+            This is an automated development build of the Water Party ecosystem.
+            These builds are intended for testing and may be unstable.
+            
+            ### 📱 Mobile & Desktop
+            - **Android (ARM64)**: Optimized development APK.
+            - **Linux**: Compressed development tarball.
+            
+            *Build triggered by push to dev or feature branch.*
+          files: |
+            WaterParty-Dev-arm64.apk
+            WaterParty-Dev-Linux.tar.gz
+          draft: false
+          prerelease: true
+          generate_release_notes: false

@@ -42,6 +42,14 @@ build-android:
 	flutter build apk --release --obfuscate --split-debug-info=./debug-info
 	flutter build apk --release --split-per-abi --obfuscate --split-debug-info=./debug-info
 
+build-aab:
+	@echo "--- Building Android App Bundle ---"
+	flutter build appbundle --release --obfuscate --split-debug-info=./debug-info
+
+build-ios:
+	@echo "--- Building iOS (No-Codesign) ---"
+	flutter build ios --release --no-codesign
+
 build-linux:
 	@echo "--- Building Linux Bundle ---"
 	flutter config --enable-linux-desktop
@@ -75,19 +83,32 @@ release-server:
 	cd $(SERVER_DIR) && GOOS=darwin GOARCH=arm64 go build $(GO_BUILD_FLAGS) -o ../release/server/$(SERVER_BINARY)-darwin-arm64 .
 	@echo "Optimized server binaries ready in release/server/"
 
-release-app: build-app
+release-app: build-android build-aab build-linux build-web
 	@echo "--- Packaging App for Release v$(VERSION) ---"
 	mkdir -p release/app
 	# Android APKs
 	cp build/app/outputs/flutter-apk/app-release.apk release/app/WaterParty-Universal.apk || true
-	cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk release/app/WaterParty-Android-armv7.apk || true
 	cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk release/app/WaterParty-Android-arm64.apk || true
-	cp build/app/outputs/flutter-apk/app-x86_64-release.apk release/app/WaterParty-Android-x86_64.apk || true
+	# Android AAB
+	cp build/app/outputs/bundle/release/app-release.aab release/app/WaterParty.aab || true
 	# Linux
-	tar -czvf release/app/WaterParty-Linux-v$(VERSION).tar.gz -C build/linux/x64/release/bundle . || true
+	tar -czvf release/app/WaterParty-Linux.tar.gz -C build/linux/x64/release/bundle . || true
 	# Web
-	cd build/web && zip -r ../../release/app/WaterParty-Web-v$(VERSION).zip . || true
+	cd build/web && zip -r ../../release/app/WaterParty-Web.zip . || true
 	@echo "App artifacts ready in release/app/"
+
+# Dev Release: Only arm64 apk and linux x64
+release-dev:
+	@echo "--- Building Dev Release (ARM64 APK + Linux x64) ---"
+	mkdir -p release/dev
+	# Build Android arm64
+	flutter build apk --release --target-platform android-arm64 --obfuscate --split-debug-info=./debug-info
+	cp build/app/outputs/flutter-apk/app-release.apk release/dev/WaterParty-Dev-arm64.apk || true
+	# Build Linux
+	flutter config --enable-linux-desktop
+	flutter build linux --release
+	tar -czvf release/dev/WaterParty-Dev-Linux.tar.gz -C build/linux/x64/release/bundle . || true
+	@echo "Dev artifacts ready in release/dev/"
 
 clean:
 	@echo "--- Cleaning Build Artifacts ---"
