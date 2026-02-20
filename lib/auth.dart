@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:intl/intl.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
@@ -12,7 +13,7 @@ class AuthScreen extends ConsumerStatefulWidget {
   ConsumerState<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends ConsumerState<AuthScreen> {
+class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObserver {
   bool isLogin = true;
   bool isLoading = false;
   int currentStep = 0;
@@ -22,9 +23,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _passCtrl = TextEditingController();
   final _realNameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  final _ageCtrl = TextEditingController();
   final _heightCtrl = TextEditingController();
-  final _genderCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
   final _jobCtrl = TextEditingController();
   final _compCtrl = TextEditingController();
@@ -33,21 +32,31 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _instaCtrl = TextEditingController();
   final _linkedInCtrl = TextEditingController();
   final _xCtrl = TextEditingController();
+  final _twitterCtrl = TextEditingController();
   final _tiktokCtrl = TextEditingController();
-  final _walletCtrl = TextEditingController();
+  final _walletDataCtrl = TextEditingController();
+
+  DateTime? _selectedBirthDate;
+  String _selectedGender = "OTHER";
+  String _selectedPaymentType = "PAYPAL";
 
   // Multi-select lists
   final List<String> _interests = [];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _emailCtrl.dispose();
     _passCtrl.dispose();
     _realNameCtrl.dispose();
     _phoneCtrl.dispose();
-    _ageCtrl.dispose();
     _heightCtrl.dispose();
-    _genderCtrl.dispose();
     _bioCtrl.dispose();
     _jobCtrl.dispose();
     _compCtrl.dispose();
@@ -56,13 +65,37 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     _instaCtrl.dispose();
     _linkedInCtrl.dispose();
     _xCtrl.dispose();
+    _twitterCtrl.dispose();
     _tiktokCtrl.dispose();
-    _walletCtrl.dispose();
+    _walletDataCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // If we wanted to persist state manually on minimize, we could do it here
+    // But Riverpod providers should handle this if they are kept alive.
   }
 
   bool _isValidEmail(String email) {
     return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
+
+  bool _isPasswordStrong(String pass) {
+    // 8 characters, at least one letter and one number
+    if (pass.length < 8) return false;
+    bool hasLetter = pass.contains(RegExp(r'[a-zA-Z]'));
+    bool hasNumber = pass.contains(RegExp(r'[0-9]'));
+    return hasLetter && hasNumber;
+  }
+
+  int _calculateAge(DateTime birthDate) {
+    DateTime now = DateTime.now();
+    int age = now.year - birthDate.year;
+    if (now.month < birthDate.month || (now.month == birthDate.month && now.day < birthDate.day)) {
+      age--;
+    }
+    return age;
   }
 
   Future<void> _handleAuth() async {
@@ -94,6 +127,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           _showError("Please enter a valid email address");
           return;
         }
+        if (!_isPasswordStrong(_passCtrl.text)) {
+          _showError("Password must be 8+ chars with letters & numbers");
+          return;
+        }
       }
 
       if (currentStep < 3) {
@@ -101,6 +138,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         return;
       }
       
+      if (_selectedBirthDate == null) {
+        _showError("Please select your birthday");
+        return;
+      }
+
       setState(() => isLoading = true);
       try {
         final newUser = User(
@@ -108,9 +150,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           realName: _realNameCtrl.text,
           email: _emailCtrl.text,
           phoneNumber: _phoneCtrl.text,
-          age: int.tryParse(_ageCtrl.text) ?? 0,
+          age: _calculateAge(_selectedBirthDate!),
+          dateOfBirth: _selectedBirthDate,
           heightCm: int.tryParse(_heightCtrl.text) ?? 0,
-          gender: _genderCtrl.text,
+          gender: _selectedGender,
           bio: _bioCtrl.text,
           jobTitle: _jobCtrl.text,
           company: _compCtrl.text,
@@ -119,8 +162,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           instagramHandle: _instaCtrl.text,
           linkedinHandle: _linkedInCtrl.text,
           xHandle: _xCtrl.text,
+          twitterHandle: _twitterCtrl.text,
           tiktokHandle: _tiktokCtrl.text,
-          walletData: WalletInfo(type: 'Crypto', data: _walletCtrl.text),
+          walletData: WalletInfo(type: _selectedPaymentType, data: _walletDataCtrl.text),
           interests: _interests,
           trustScore: 100.0,
         );
@@ -238,17 +282,64 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             Row(
               children: [
                 Expanded(
-                    child: _input(_ageCtrl, "AGE", Icons.cake_outlined,
-                        type: TextInputType.number)),
+                  child: GestureDetector(
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
+                        firstDate: DateTime(1900),
+                        lastDate: DateTime.now(),
+                        builder: (context, child) {
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: const ColorScheme.dark(
+                                primary: AppColors.textCyan,
+                                onPrimary: Colors.black,
+                                surface: Color(0xFF111111),
+                                onSurface: Colors.white,
+                              ),
+                            ),
+                            child: child!,
+                          );
+                        },
+                      );
+                      if (date != null) setState(() => _selectedBirthDate = date);
+                    },
+                    child: WaterGlass(
+                      height: 65,
+                      borderRadius: 15,
+                      child: Center(
+                        child: Text(
+                          _selectedBirthDate == null
+                              ? "BIRTHDAY"
+                              : DateFormat('MMM d, yyyy').format(_selectedBirthDate!),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: _selectedBirthDate == null ? Colors.white24 : Colors.white,
+                              ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 15),
                 Expanded(
-                    child: _input(_heightCtrl, "HEIGHT (CM)",
-                        Icons.straighten_outlined,
-                        type: TextInputType.number)),
+                  child: _input(_heightCtrl, "HEIGHT (CM)", Icons.straighten_outlined,
+                      type: TextInputType.number),
+                ),
               ],
             ),
             const SizedBox(height: 15),
-            _input(_genderCtrl, "GENDER", Icons.wc_outlined),
+            Text("GENDER", style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white54, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _genderChip("MALE"),
+                const SizedBox(width: 10),
+                _genderChip("FEMALE"),
+                const SizedBox(width: 10),
+                _genderChip("OTHER"),
+              ],
+            ),
           ],
         );
       case 2:
@@ -263,14 +354,37 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             const SizedBox(height: 15),
             _input(_instaCtrl, "INSTAGRAM", FontAwesomeIcons.instagram),
             const SizedBox(height: 15),
-            _input(_xCtrl, "X / TWITTER", FontAwesomeIcons.xTwitter),
+            _input(_twitterCtrl, "TWITTER", FontAwesomeIcons.twitter),
+            const SizedBox(height: 15),
+            _input(_xCtrl, "X", FontAwesomeIcons.xTwitter),
+            const SizedBox(height: 15),
+            _input(_tiktokCtrl, "TIKTOK", FontAwesomeIcons.tiktok),
+            const SizedBox(height: 15),
+            _input(_linkedInCtrl, "LINKEDIN", FontAwesomeIcons.linkedin),
           ],
         );
       case 3:
         return Column(
           children: [
             _stepHeader("FINAL: ECOSYSTEM"),
-            _input(_walletCtrl, "WALLET ADDRESS", FontAwesomeIcons.wallet),
+            Text("PAYMENT METHOD", style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white54, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _paymentTypeChip("PAYPAL"),
+                  const SizedBox(width: 10),
+                  _paymentTypeChip("BANK"),
+                  const SizedBox(width: 10),
+                  _paymentTypeChip("ZELLE"),
+                  const SizedBox(width: 10),
+                  _paymentTypeChip("CRYPTO"),
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
+            _input(_walletDataCtrl, "PAYMENT DATA (EMAIL / IBAN / ADDRESS)", FontAwesomeIcons.wallet),
             const SizedBox(height: 30),
             Text("WHAT KIND OF PARTIES DO YOU LIKE?",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -284,6 +398,41 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       default:
         return const SizedBox();
     }
+  }
+
+  Widget _genderChip(String label) {
+    bool active = _selectedGender == label;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedGender = label),
+        child: Container(
+          height: 50,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: active ? AppColors.textCyan : Colors.white10),
+            color: active ? AppColors.textCyan.withOpacity(0.1) : Colors.transparent,
+          ),
+          alignment: Alignment.center,
+          child: Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: active ? Colors.white : Colors.white24, fontWeight: FontWeight.bold)),
+        ),
+      ),
+    );
+  }
+
+  Widget _paymentTypeChip(String label) {
+    bool active = _selectedPaymentType == label;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedPaymentType = label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: active ? AppColors.textCyan : Colors.white10),
+          color: active ? AppColors.textCyan.withOpacity(0.1) : Colors.transparent,
+        ),
+        child: Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: active ? Colors.white : Colors.white24, fontWeight: FontWeight.bold)),
+      ),
+    );
   }
 
   Widget _stepHeader(String text) => Padding(
@@ -409,7 +558,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           ? "ENTER THE VIBE"
                           : (currentStep < 3
                               ? "CONTINUE"
-                              : "INITIATE PROTOCOL"),
+                              : "SIGN UP"),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Colors.black,
                             fontWeight: FontWeight.w900,
