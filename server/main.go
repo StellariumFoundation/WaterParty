@@ -123,9 +123,8 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		wallet_address, location_lat, location_lon, bio, interests, vibe_tags, last_active_at
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 
 		$19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37) 
-	RETURNING id`
+	RETURNING id, created_at, last_active_at`
 
-	var id string
 	err := db.QueryRow(context.Background(), query,
 		u.Username, u.RealName, u.PhoneNumber, u.Email, string(hash), u.ProfilePhotos, u.Age, u.DateOfBirth,
 		u.HeightCm, u.Gender, u.LookingFor, u.DrinkingPref, u.SmokingPref, u.CannabisPref,
@@ -133,7 +132,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		u.InstagramHandle, u.TwitterHandle, u.LinkedinHandle, u.XHandle, u.TikTokHandle,
 		u.IsVerified, u.TrustScore, u.EloScore, u.PartiesHosted, u.FlakeCount,
 		u.WalletAddress, u.LocationLat, u.LocationLon, u.Bio, u.Interests, u.VibeTags, time.Now(),
-	).Scan(&id)
+	).Scan(&u.ID, &u.CreatedAt, &u.LastActiveAt)
 
 	if err != nil {
 		log.Printf("Registration Error: %v", err)

@@ -289,13 +289,14 @@ func CreateUser(u User) (string, error) {
 	RETURNING id`
 
 	var id string
+	now := time.Now()
 	err := db.QueryRow(context.Background(), query,
 		u.Username, u.RealName, u.PhoneNumber, u.Email, u.ProfilePhotos, u.Age, u.DateOfBirth,
 		u.HeightCm, u.Gender, u.LookingFor, u.DrinkingPref, u.SmokingPref, u.CannabisPref,
 		u.MusicGenres, u.TopArtists, u.JobTitle, u.Company, u.School, u.Degree,
 		u.InstagramHandle, u.TwitterHandle, u.LinkedinHandle, u.XHandle, u.TikTokHandle,
 		u.IsVerified, u.TrustScore, u.EloScore, u.PartiesHosted, u.FlakeCount,
-		u.WalletAddress, u.LocationLat, u.LocationLon, u.Bio, u.Interests, u.VibeTags, time.Now(),
+		u.WalletAddress, u.LocationLat, u.LocationLon, u.Bio, u.Interests, u.VibeTags, &now,
 	).Scan(&id)
 	return id, err
 }

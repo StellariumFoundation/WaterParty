@@ -48,45 +48,45 @@ type WSMessage struct {
 // ==========================================
 
 type User struct {
-	ID              string    `json:"ID" db:"id"`
-	Username        string    `json:"Username" db:"username"`
-	RealName        string    `json:"RealName" db:"real_name"`
-	PhoneNumber     string    `json:"PhoneNumber" db:"phone_number"`
-	Email           string    `json:"Email" db:"email"`
-	PasswordHash    string    `json:"-" db:"password_hash"`
-	ProfilePhotos   []string  `json:"ProfilePhotos" db:"profile_photos"` // Stores hashes
-	Age             int       `json:"Age" db:"age"`
-	DateOfBirth     time.Time `json:"DateOfBirth" db:"date_of_birth"`
-	HeightCm        int       `json:"HeightCm" db:"height_cm"`
-	Gender          string    `json:"Gender" db:"gender"`
-	LookingFor      []string  `json:"LookingFor" db:"looking_for"`
-	DrinkingPref    string    `json:"DrinkingPref" db:"drinking_pref"`
-	SmokingPref     string    `json:"SmokingPref" db:"smoking_pref"`
-	CannabisPref    string    `json:"CannabisPref" db:"cannabis_pref"`
-	MusicGenres     []string  `json:"MusicGenres" db:"music_genres"`
-	TopArtists      []string  `json:"TopArtists" db:"top_artists"`
-	JobTitle        string    `json:"JobTitle" db:"job_title"`
-	Company         string    `json:"Company" db:"company"`
-	School          string    `json:"School" db:"school"`
-	Degree          string    `json:"Degree" db:"degree"`
-	InstagramHandle string    `json:"InstagramHandle" db:"instagram_handle"`
-	TwitterHandle   string    `json:"TwitterHandle" db:"twitter_handle"`
-	LinkedinHandle  string    `json:"LinkedinHandle" db:"linkedin_handle"`
-	XHandle         string    `json:"XHandle" db:"x_handle"`
-	TikTokHandle    string    `json:"TikTokHandle" db:"tiktok_handle"`
-	IsVerified      bool      `json:"IsVerified" db:"is_verified"`
-	TrustScore      float64   `json:"TrustScore" db:"trust_score"`
-	EloScore        float64   `json:"EloScore" db:"elo_score"`
-	PartiesHosted   int       `json:"PartiesHosted" db:"parties_hosted"`
-	FlakeCount      int       `json:"FlakeCount" db:"flake_count"`
-	WalletAddress   string    `json:"WalletAddress" db:"wallet_address"`
-	LocationLat     float64   `json:"LocationLat" db:"location_lat"`
-	LocationLon     float64   `json:"LocationLon" db:"location_lon"`
-	LastActiveAt    time.Time `json:"LastActiveAt" db:"last_active_at"`
-	CreatedAt       time.Time `json:"CreatedAt" db:"created_at"`
-	Bio             string    `json:"Bio" db:"bio"`
-	Interests       []string  `json:"Interests" db:"interests"`
-	VibeTags        []string  `json:"VibeTags" db:"vibe_tags"`
+	ID              string     `json:"ID" db:"id"`
+	Username        string     `json:"Username" db:"username"`
+	RealName        string     `json:"RealName" db:"real_name"`
+	PhoneNumber     string     `json:"PhoneNumber" db:"phone_number"`
+	Email           string     `json:"Email" db:"email"`
+	PasswordHash    string     `json:"-" db:"password_hash"`
+	ProfilePhotos   []string   `json:"ProfilePhotos" db:"profile_photos"` // Stores hashes
+	Age             int        `json:"Age" db:"age"`
+	DateOfBirth     *time.Time `json:"DateOfBirth,omitempty" db:"date_of_birth"`
+	HeightCm        int        `json:"HeightCm" db:"height_cm"`
+	Gender          string     `json:"Gender" db:"gender"`
+	LookingFor      []string   `json:"LookingFor" db:"looking_for"`
+	DrinkingPref    string     `json:"DrinkingPref" db:"drinking_pref"`
+	SmokingPref     string     `json:"SmokingPref" db:"smoking_pref"`
+	CannabisPref    string     `json:"CannabisPref" db:"cannabis_pref"`
+	MusicGenres     []string   `json:"MusicGenres" db:"music_genres"`
+	TopArtists      []string   `json:"TopArtists" db:"top_artists"`
+	JobTitle        string     `json:"JobTitle" db:"job_title"`
+	Company         string     `json:"Company" db:"company"`
+	School          string     `json:"School" db:"school"`
+	Degree          string     `json:"Degree" db:"degree"`
+	InstagramHandle string     `json:"InstagramHandle" db:"instagram_handle"`
+	TwitterHandle   string     `json:"TwitterHandle" db:"twitter_handle"`
+	LinkedinHandle  string     `json:"LinkedinHandle" db:"linkedin_handle"`
+	XHandle         string     `json:"XHandle" db:"x_handle"`
+	TikTokHandle    string     `json:"TikTokHandle" db:"tiktok_handle"`
+	IsVerified      bool       `json:"IsVerified" db:"is_verified"`
+	TrustScore      float64    `json:"TrustScore" db:"trust_score"`
+	EloScore        float64    `json:"EloScore" db:"elo_score"`
+	PartiesHosted   int        `json:"PartiesHosted" db:"parties_hosted"`
+	FlakeCount      int        `json:"FlakeCount" db:"flake_count"`
+	WalletAddress   string     `json:"WalletAddress" db:"wallet_address"`
+	LocationLat     float64    `json:"LocationLat" db:"location_lat"`
+	LocationLon     float64    `json:"LocationLon" db:"location_lon"`
+	LastActiveAt    *time.Time `json:"LastActiveAt,omitempty" db:"last_active_at"`
+	CreatedAt       *time.Time `json:"CreatedAt,omitempty" db:"created_at"`
+	Bio             string     `json:"Bio" db:"bio"`
+	Interests       []string   `json:"Interests" db:"interests"`
+	VibeTags        []string   `json:"VibeTags" db:"vibe_tags"`
 }
 
 type Party struct {
@@ -113,8 +113,8 @@ type Party struct {
 	Rules              []string       `json:"Rules" db:"rules"`
 	RotationPool       *Crowdfunding  `json:"RotationPool" db:"rotation_pool"` // Nested or separate table
 	ChatRoomID         string         `json:"ChatRoomID" db:"chat_room_id"`
-	CreatedAt          time.Time      `json:"CreatedAt" db:"created_at"`
-	UpdatedAt          time.Time      `json:"UpdatedAt" db:"updated_at"`
+	CreatedAt          *time.Time     `json:"CreatedAt,omitempty" db:"created_at"`
+	UpdatedAt          *time.Time     `json:"UpdatedAt,omitempty" db:"updated_at"`
 }
 
 type ChatMessage struct {
