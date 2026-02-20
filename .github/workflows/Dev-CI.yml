@@ -99,7 +99,7 @@ jobs:
           path: .
 
       - name: Update Static Dev Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: dev
           name: Water Party Development Build
