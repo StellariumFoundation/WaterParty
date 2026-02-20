@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
@@ -47,11 +48,60 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadDraft();
+  }
+
+  Future<void> _loadDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _realNameCtrl.text = prefs.getString('reg_name') ?? '';
+      _emailCtrl.text = prefs.getString('reg_email') ?? '';
+      _phoneCtrl.text = prefs.getString('reg_phone') ?? '';
+      _bioCtrl.text = prefs.getString('reg_bio') ?? '';
+      _jobCtrl.text = prefs.getString('reg_job') ?? '';
+      _compCtrl.text = prefs.getString('reg_company') ?? '';
+      _schoolCtrl.text = prefs.getString('reg_school') ?? '';
+      _degreeCtrl.text = prefs.getString('reg_degree') ?? '';
+      _instaCtrl.text = prefs.getString('reg_insta') ?? '';
+      _twitterCtrl.text = prefs.getString('reg_twitter') ?? '';
+      _xCtrl.text = prefs.getString('reg_x') ?? '';
+      _tiktokCtrl.text = prefs.getString('reg_tiktok') ?? '';
+      _linkedInCtrl.text = prefs.getString('reg_linkedin') ?? '';
+      _walletDataCtrl.text = prefs.getString('reg_wallet') ?? '';
+      _selectedGender = prefs.getString('reg_gender') ?? 'OTHER';
+      _selectedPaymentType = prefs.getString('reg_pay_type') ?? 'PAYPAL';
+      final bday = prefs.getString('reg_bday');
+      if (bday != null) _selectedBirthDate = DateTime.parse(bday);
+    });
+  }
+
+  Future<void> _saveDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('reg_name', _realNameCtrl.text);
+    await prefs.setString('reg_email', _emailCtrl.text);
+    await prefs.setString('reg_phone', _phoneCtrl.text);
+    await prefs.setString('reg_bio', _bioCtrl.text);
+    await prefs.setString('reg_job', _jobCtrl.text);
+    await prefs.setString('reg_company', _compCtrl.text);
+    await prefs.setString('reg_school', _schoolCtrl.text);
+    await prefs.setString('reg_degree', _degreeCtrl.text);
+    await prefs.setString('reg_insta', _instaCtrl.text);
+    await prefs.setString('reg_twitter', _twitterCtrl.text);
+    await prefs.setString('reg_x', _xCtrl.text);
+    await prefs.setString('reg_tiktok', _tiktokCtrl.text);
+    await prefs.setString('reg_linkedin', _linkedInCtrl.text);
+    await prefs.setString('reg_wallet', _walletDataCtrl.text);
+    await prefs.setString('reg_gender', _selectedGender);
+    await prefs.setString('reg_pay_type', _selectedPaymentType);
+    if (_selectedBirthDate != null) {
+      await prefs.setString('reg_bday', _selectedBirthDate!.toIso8601String());
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _saveDraft();
     _emailCtrl.dispose();
     _passCtrl.dispose();
     _realNameCtrl.dispose();
@@ -73,8 +123,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // If we wanted to persist state manually on minimize, we could do it here
-    // But Riverpod providers should handle this if they are kept alive.
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      _saveDraft();
+    }
   }
 
   bool _isValidEmail(String email) {
@@ -367,8 +418,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
         return Column(
           children: [
             _stepHeader("FINAL: ECOSYSTEM"),
-            Text("PAYMENT METHOD", style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white54, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
+            Text("WAYS TO RECEIVE PAYMENT", style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white54, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 5),
+            Text("Select how you want to be paid: PayPal, Bank Account, Zelle, or Crypto.", 
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white24, fontSize: 10)),
+            const SizedBox(height: 15),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -384,7 +439,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
               ),
             ),
             const SizedBox(height: 15),
-            _input(_walletDataCtrl, "PAYMENT DATA (EMAIL / IBAN / ADDRESS)", FontAwesomeIcons.wallet),
+            _input(_walletDataCtrl, "BANK ACCOUNT DATA, USERNAME, WALLET ADDRESS", FontAwesomeIcons.wallet),
             const SizedBox(height: 30),
             Text("WHAT KIND OF PARTIES DO YOU LIKE?",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
