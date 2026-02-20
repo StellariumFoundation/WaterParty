@@ -220,7 +220,6 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 -- ==========================================
 -- INDEXES FOR HIGH EFFICIENCY
 -- ==========================================
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_parties_status ON parties(status);
 CREATE INDEX IF NOT EXISTS idx_parties_host_id ON parties(host_id);
@@ -359,14 +358,17 @@ func GetUserByEmail(email string) (User, string, error) {
 }
 
 func UpdateUser(u User) error {
+	walletJSON, _ := json.Marshal(u.WalletData)
 	query := `UPDATE users SET 
 		real_name=$1, phone_number=$2, profile_photos=$3, bio=$4, 
 		location_lat=$5, location_lon=$6, last_active_at=$7, 
-		interests=$8, instagram_handle=$9, twitter_handle=$10, tiktok_handle=$11
-		WHERE id=$12`
+		interests=$8, instagram_handle=$9, twitter_handle=$10, 
+		linkedin_handle=$11, x_handle=$12, tiktok_handle=$13, wallet_data=$14
+		WHERE id=$15`
 	_, err := db.Exec(context.Background(), query, u.RealName, u.PhoneNumber, u.ProfilePhotos, 
 		u.Bio, u.LocationLat, u.LocationLon, time.Now(), u.Interests, 
-		u.InstagramHandle, u.TwitterHandle, u.TikTokHandle, u.ID)
+		u.InstagramHandle, u.TwitterHandle, u.LinkedinHandle, u.XHandle, 
+		u.TikTokHandle, walletJSON, u.ID)
 	return err
 }
 
