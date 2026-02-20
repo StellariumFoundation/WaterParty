@@ -3,9 +3,10 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers.dart';
 import 'models.dart';
+import 'constants.dart';
 
 class SocketService {
-  static const String serverUrl = "waterparty.onrender.com";
+  static const String serverUrl = AppConstants.host;
   final Ref ref;
   WebSocketChannel? _channel;
   bool _isConnected = false;

@@ -70,7 +70,8 @@ Parties can have an associated `RotationPool` where guests contribute funds to r
 - PostgreSQL instance
 
 ### Environment Variables
-- `DATABASE_URL`: Postgres connection string.
+- `DATABASE_URL`: Postgres connection string (Primary).
+- `INTERNAL_DATABASE_URL`: Fallback for Render internal database connections.
 - `PORT`: Server port (defaults to 8080).
 
 ### Run

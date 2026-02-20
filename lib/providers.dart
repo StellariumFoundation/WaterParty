@@ -5,9 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'models.dart';
+import 'constants.dart';
 
 class AuthNotifier extends Notifier<User?> {
-  static const String apiBase = "https://waterparty.onrender.com";
+  static const String apiBase = AppConstants.apiBase;
   Database? _db;
 
   @override

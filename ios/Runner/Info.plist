@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>WaterParty needs your location to show you nearby parties.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>WaterParty needs access to your photos so you can upload profile and party photos.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>WaterParty needs access to your camera so you can take profile and party photos.</string>
 </dict>
 </plist>

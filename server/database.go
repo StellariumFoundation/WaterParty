@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS users (
     flake_count INTEGER DEFAULT 0,
     
     -- Financial & Geo
-    wallet_address TEXT,
+    wallet_data JSONB DEFAULT '{}',
     location_lat DOUBLE PRECISION,
     location_lon DOUBLE PRECISION,
     
@@ -275,13 +275,14 @@ func GetAsset(hash string) ([]byte, string, error) {
 // ==========================================
 
 func CreateUser(u User) (string, error) {
+	walletJSON, _ := json.Marshal(u.WalletData)
 	query := `INSERT INTO users (
 		real_name, phone_number, email, profile_photos, age, date_of_birth,
 		height_cm, gender, looking_for, drinking_pref, smoking_pref, cannabis_pref,
 		music_genres, top_artists, job_title, company, school, degree,
 		instagram_handle, twitter_handle, linkedin_handle, x_handle, tiktok_handle,
 		is_verified, trust_score, elo_score, parties_hosted, flake_count,
-		wallet_address, location_lat, location_lon, bio, interests, last_active_at
+		wallet_data, location_lat, location_lon, bio, interests, last_active_at
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 
 		$19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35) 
 	RETURNING id`
@@ -294,18 +295,19 @@ func CreateUser(u User) (string, error) {
 		u.MusicGenres, u.TopArtists, u.JobTitle, u.Company, u.School, u.Degree,
 		u.InstagramHandle, u.TwitterHandle, u.LinkedinHandle, u.XHandle, u.TikTokHandle,
 		u.IsVerified, u.TrustScore, u.EloScore, u.PartiesHosted, u.FlakeCount,
-		u.WalletAddress, u.LocationLat, u.LocationLon, u.Bio, u.Interests, &now,
+		walletJSON, u.LocationLat, u.LocationLon, u.Bio, u.Interests, &now,
 	).Scan(&id)
 	return id, err
 }
 
 func GetUser(id string) (User, error) {
 	var u User
+	var walletJSON []byte
 	query := `SELECT id, real_name, phone_number, email, profile_photos, age, date_of_birth,
 		height_cm, gender, looking_for, drinking_pref, smoking_pref, cannabis_pref, music_genres,
 		top_artists, job_title, company, school, degree, instagram_handle, twitter_handle,
 		linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, elo_score,
-		parties_hosted, flake_count, wallet_address, location_lat, location_lon, bio,
+		parties_hosted, flake_count, wallet_data, location_lat, location_lon, bio,
 		interests, last_active_at, created_at FROM users WHERE id = $1`
 
 	err := db.QueryRow(context.Background(), query, id).Scan(
@@ -313,20 +315,24 @@ func GetUser(id string) (User, error) {
 		&u.HeightCm, &u.Gender, &u.LookingFor, &u.DrinkingPref, &u.SmokingPref, &u.CannabisPref, &u.MusicGenres,
 		&u.TopArtists, &u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle, &u.TwitterHandle,
 		&u.LinkedinHandle, &u.XHandle, &u.TikTokHandle, &u.IsVerified, &u.TrustScore, &u.EloScore,
-		&u.PartiesHosted, &u.FlakeCount, &u.WalletAddress, &u.LocationLat, &u.LocationLon, &u.Bio,
+		&u.PartiesHosted, &u.FlakeCount, &walletJSON, &u.LocationLat, &u.LocationLon, &u.Bio,
 		&u.Interests, &u.LastActiveAt, &u.CreatedAt,
 	)
+	if err == nil {
+		json.Unmarshal(walletJSON, &u.WalletData)
+	}
 	return u, err
 }
 
 func GetUserByEmail(email string) (User, string, error) {
 	var u User
 	var passwordHash string
+	var walletJSON []byte
 	query := `SELECT id, real_name, phone_number, email, password_hash, profile_photos, age, 
 		date_of_birth, height_cm, gender, looking_for, drinking_pref, smoking_pref, cannabis_pref, 
 		music_genres, top_artists, job_title, company, school, degree, instagram_handle, 
 		twitter_handle, linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, 
-		elo_score, parties_hosted, flake_count, wallet_address, location_lat, location_lon, 
+		elo_score, parties_hosted, flake_count, wallet_data, location_lat, location_lon, 
 		last_active_at, created_at, bio, interests 
 		FROM users WHERE email = $1`
 
@@ -335,9 +341,12 @@ func GetUserByEmail(email string) (User, string, error) {
 		&u.DateOfBirth, &u.HeightCm, &u.Gender, &u.LookingFor, &u.DrinkingPref, &u.SmokingPref, &u.CannabisPref,
 		&u.MusicGenres, &u.TopArtists, &u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle,
 		&u.TwitterHandle, &u.LinkedinHandle, &u.XHandle, &u.TikTokHandle, &u.IsVerified, &u.TrustScore,
-		&u.EloScore, &u.PartiesHosted, &u.FlakeCount, &u.WalletAddress, &u.LocationLat, &u.LocationLon,
+		&u.EloScore, &u.PartiesHosted, &u.FlakeCount, &walletJSON, &u.LocationLat, &u.LocationLon,
 		&u.LastActiveAt, &u.CreatedAt, &u.Bio, &u.Interests,
 	)
+	if err == nil {
+		json.Unmarshal(walletJSON, &u.WalletData)
+	}
 	return u, passwordHash, err
 }
 

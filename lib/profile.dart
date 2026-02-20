@@ -5,6 +5,7 @@ import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
 import 'websocket.dart';
+import 'constants.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -192,7 +193,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               if (index < photos.length) {
                 final photoUrl = photos[index].startsWith("http")
                     ? photos[index]
-                    : "https://waterparty.onrender.com/assets/${photos[index]}";
+                    : AppConstants.assetUrl(photos[index]);
                 return Image.network(photoUrl, fit: BoxFit.cover);
               }
               if (isEditing) return _buildAddPhotoCard();

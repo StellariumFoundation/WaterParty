@@ -47,6 +47,11 @@ type WSMessage struct {
 // CORE ENTITIES
 // ==========================================
 
+type WalletInfo struct {
+	Type string `json:"Type" db:"wallet_type"` // e.g., "PayPal", "Bank", "Crypto"
+	Data string `json:"Data" db:"wallet_data"` // e.g., email, IBAN, address
+}
+
 type User struct {
 	ID              string     `json:"ID" db:"id"`
 	RealName        string     `json:"RealName" db:"real_name"`
@@ -78,7 +83,7 @@ type User struct {
 	EloScore        float64    `json:"EloScore" db:"elo_score"`
 	PartiesHosted   int        `json:"PartiesHosted" db:"parties_hosted"`
 	FlakeCount      int        `json:"FlakeCount" db:"flake_count"`
-	WalletAddress   string     `json:"WalletAddress" db:"wallet_address"`
+	WalletData      WalletInfo `json:"WalletData" db:"wallet_data"`
 	LocationLat     float64    `json:"LocationLat" db:"location_lat"`
 	LocationLon     float64    `json:"LocationLon" db:"location_lon"`
 	LastActiveAt    *time.Time `json:"LastActiveAt,omitempty" db:"last_active_at"`

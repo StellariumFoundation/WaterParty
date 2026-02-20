@@ -19,6 +19,28 @@ extension PartyStatusExt on PartyStatus {
 // ==========================================
 
 @immutable
+class WalletInfo {
+  final String type;
+  final String data;
+
+  const WalletInfo({this.type = '', this.data = ''});
+
+  factory WalletInfo.fromMap(Map<String, dynamic> map) {
+    return WalletInfo(
+      type: map['Type'] ?? '',
+      data: map['Data'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'Type': type,
+      'Data': data,
+    };
+  }
+}
+
+@immutable
 class User {
   final String id;
   final String realName;
@@ -49,7 +71,7 @@ class User {
   final double eloScore;
   final int partiesHosted;
   final int flakeCount;
-  final String walletAddress;
+  final WalletInfo walletData;
   final double locationLat;
   final double locationLon;
   final DateTime? lastActiveAt;
@@ -87,7 +109,7 @@ class User {
     this.eloScore = 0.0,
     this.partiesHosted = 0,
     this.flakeCount = 0,
-    this.walletAddress = '',
+    this.walletData = const WalletInfo(),
     this.locationLat = 0.0,
     this.locationLon = 0.0,
     this.lastActiveAt,
@@ -127,7 +149,7 @@ class User {
       eloScore: (map['EloScore'] ?? 0.0).toDouble(),
       partiesHosted: map['PartiesHosted'] ?? 0,
       flakeCount: map['FlakeCount'] ?? 0,
-      walletAddress: map['WalletAddress'] ?? '',
+      walletData: map['WalletData'] != null ? WalletInfo.fromMap(map['WalletData']) : const WalletInfo(),
       locationLat: (map['LocationLat'] ?? 0.0).toDouble(),
       locationLon: (map['LocationLon'] ?? 0.0).toDouble(),
       lastActiveAt: map['LastActiveAt'] != null ? DateTime.parse(map['LastActiveAt']) : null,
@@ -173,7 +195,7 @@ class User {
       eloScore: eloScore,
       partiesHosted: partiesHosted,
       flakeCount: flakeCount,
-      walletAddress: walletAddress,
+      walletData: walletData,
       locationLat: locationLat,
       locationLon: locationLon,
       lastActiveAt: lastActiveAt,
@@ -214,7 +236,7 @@ class User {
       'EloScore': eloScore,
       'PartiesHosted': partiesHosted,
       'FlakeCount': flakeCount,
-      'WalletAddress': walletAddress,
+      'WalletData': walletData.toMap(),
       'LocationLat': locationLat,
       'LocationLon': locationLon,
       'Bio': bio,
