@@ -129,6 +129,14 @@ BEGIN
     END IF;
 END $$;
 
+-- Drop obsolete username column if it exists to prevent NULL constraint errors
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='username') THEN
+        ALTER TABLE users DROP COLUMN username;
+    END IF;
+END $$;
+
 -- Fix potentially misnamed column from previous attempts
 DO $$
 BEGIN

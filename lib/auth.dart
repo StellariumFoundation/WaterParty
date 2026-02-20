@@ -188,6 +188,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
         }
       }
 
+      if (currentStep == 1) {
+        if (_selectedBirthDate == null) {
+          _showError("Your birthday is required");
+          return;
+        }
+      }
+
       if (currentStep < 3) {
         _saveDraft();
         setState(() => currentStep++);
