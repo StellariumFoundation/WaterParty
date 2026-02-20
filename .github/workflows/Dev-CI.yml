@@ -7,7 +7,7 @@ on:
 
 jobs:
   # ---------------------------------------------------
-  # 1. DEV BUILD (Android arm64 + Linux x64)
+  # 1. DEV BUILD (Android arm64 + Server Linux x64)
   # ---------------------------------------------------
   build-dev:
     runs-on: ubuntu-latest
@@ -18,11 +18,13 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
-      
-      - name: Install Linux Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libespeak-ng-dev espeak-ng
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.0'
+          cache: true
+          cache-dependency-path: server/go.sum
       
       - uses: subosito/flutter-action@v2
         with:
@@ -63,16 +65,17 @@ jobs:
             ## 🚧 Development Build - Latest
             
             This is an automated development build of the Water Party ecosystem.
-            These builds are intended for testing and may be unstable.
             
-            ### 📱 Mobile & Desktop
+            ### 📱 App
             - **Android (ARM64)**: Optimized development APK.
-            - **Linux**: Compressed development tarball.
+            
+            ### ⚡ Server
+            - **Linux x64**: Go server binary.
             
             *Build triggered by push to dev or feature branch.*
           files: |
             WaterParty-Dev-arm64.apk
-            WaterParty-Dev-Linux.tar.gz
+            partyserver-dev-linux-amd64
           draft: false
           prerelease: true
           generate_release_notes: false
