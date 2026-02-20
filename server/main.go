@@ -109,7 +109,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		User
+		User     User   `json:"user"`
 		Password string `json:"password"`
 	}
 
