@@ -121,6 +121,14 @@ BEGIN
     END IF;
 END $$;
 
+-- Ensure wallet_data column exists
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='wallet_data') THEN
+        ALTER TABLE users ADD COLUMN wallet_data JSONB DEFAULT '{}';
+    END IF;
+END $$;
+
 -- ==========================================
 -- PARTIES TABLE
 -- ==========================================
