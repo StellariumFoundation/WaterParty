@@ -120,7 +120,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           linkedinHandle: _linkedInCtrl.text,
           xHandle: _xCtrl.text,
           tiktokHandle: _tiktokCtrl.text,
-          walletAddress: _walletCtrl.text,
+          walletData: WalletInfo(type: 'Crypto', data: _walletCtrl.text),
           interests: _interests,
           trustScore: 100.0,
         );
