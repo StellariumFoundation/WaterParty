@@ -98,15 +98,18 @@ release-app: build-android build-aab build-linux build-web
 	@echo "App artifacts ready in release/app/"
 
 # Dev Release: Android arm64 APK + Server Linux x64
-release-dev:
-	@echo "--- Building Dev Release (App ARM64 + Server Linux x64) ---"
+release-dev: release-dev-app release-dev-server
+
+release-dev-app:
+	@echo "--- Building Dev App (ARM64 APK) - Fast Mode ---"
 	mkdir -p release/dev
-	# 1. Build Android arm64
-	flutter build apk --release --target-platform android-arm64 --obfuscate --split-debug-info=./debug-info
+	flutter build apk --release --target-platform android-arm64
 	cp build/app/outputs/flutter-apk/app-release.apk release/dev/WaterParty-Dev-arm64.apk || true
-	# 2. Build Server Linux x64
+
+release-dev-server:
+	@echo "--- Building Dev Server (Linux x64) ---"
+	mkdir -p release/dev
 	cd $(SERVER_DIR) && GOOS=linux GOARCH=amd64 go build $(GO_BUILD_FLAGS) -o ../release/dev/$(SERVER_BINARY)-dev-linux-amd64 .
-	@echo "Dev artifacts ready in release/dev/"
 
 clean:
 	@echo "--- Cleaning Build Artifacts ---"

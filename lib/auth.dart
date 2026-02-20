@@ -43,21 +43,60 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final List<String> _lookingFor = [];
   final List<String> _vibeTags = [];
 
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    _userCtrl.dispose();
+    _realNameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _ageCtrl.dispose();
+    _heightCtrl.dispose();
+    _genderCtrl.dispose();
+    _bioCtrl.dispose();
+    _jobCtrl.dispose();
+    _compCtrl.dispose();
+    _schoolCtrl.dispose();
+    _degreeCtrl.dispose();
+    _instaCtrl.dispose();
+    _linkedInCtrl.dispose();
+    _xCtrl.dispose();
+    _tiktokCtrl.dispose();
+    _walletCtrl.dispose();
+    super.dispose();
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
+
   Future<void> _handleAuth() async {
     if (isLogin) {
       if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
         _showError("Credentials required");
         return;
       }
+      if (!_isValidEmail(_emailCtrl.text)) {
+        _showError("Please enter a valid email address");
+        return;
+      }
       setState(() => isLoading = true);
       try {
         await ref.read(authProvider.notifier).login(_emailCtrl.text, _passCtrl.text);
       } catch (e) {
-        _showError(e.toString());
+        _showError(e.toString().replaceAll("Exception: ", ""));
       } finally {
         if (mounted) setState(() => isLoading = false);
       }
     } else {
+      // Registration logic
+      if (currentStep == 0) {
+        if (!_isValidEmail(_emailCtrl.text)) {
+          _showError("Please enter a valid email address");
+          return;
+        }
+      }
+
       if (currentStep < 3) {
         setState(() => currentStep++);
         return;
@@ -93,7 +132,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         
         await ref.read(authProvider.notifier).register(newUser, _passCtrl.text);
       } catch (e) {
-        _showError(e.toString());
+        _showError(e.toString().replaceAll("Exception: ", ""));
       } finally {
         if (mounted) setState(() => isLoading = false);
       }
@@ -101,28 +140,48 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   void _showError(String m) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(m, style: Theme.of(context).textTheme.bodySmall)));
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(m, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white)),
+        backgroundColor: Colors.redAccent.withOpacity(0.8),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(bottom: 100, left: 20, right: 20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(gradient: AppColors.stellariumGradient),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: SafeArea(
-          child: Column(
+    return Scaffold(
+      resizeToAvoidBottomInset: false, // Prevent white bar/jumping on keyboard
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(gradient: AppColors.stellariumGradient),
+        child: SafeArea(
+          child: Stack(
             children: [
-              const SizedBox(height: 40),
-              _buildHeader(),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-                  child: isLogin ? _buildLoginFields() : _buildRegisterStepper(),
-                ),
+              Column(
+                children: [
+                  const SizedBox(height: 40),
+                  _buildHeader(),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(30, 20, 30, 150), // Extra bottom padding for fixed button
+                      child: isLogin ? _buildLoginFields() : _buildRegisterStepper(),
+                    ),
+                  ),
+                ],
               ),
-              _buildBottomAction(),
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: _buildBottomAction(),
+              ),
             ],
           ),
         ),
@@ -139,7 +198,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   letterSpacing: 4,
                   color: Colors.white,
                 )),
-        Text(isLogin ? "SECURE ACCESS" : "EVOLVE YOUR VIBE",
+        Text("MATCH YOUR PARTY",
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.textPink,
                   fontWeight: FontWeight.bold,
@@ -312,9 +371,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   Widget _buildBottomAction() {
-    return Padding(
-      padding: const EdgeInsets.all(30),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(30, 20, 30, 40),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.black.withOpacity(0),
+            Colors.black.withOpacity(0.8),
+            Colors.black.withOpacity(0.9),
+          ],
+        ),
+      ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           GestureDetector(
             onTap: isLoading ? null : _handleAuth,
@@ -325,10 +396,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 borderRadius: BorderRadius.circular(15),
                 gradient: const LinearGradient(
                     colors: [AppColors.textCyan, AppColors.electricPurple]),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.textCyan.withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  )
+                ],
               ),
               alignment: Alignment.center,
               child: isLoading
-                  ? const CircularProgressIndicator(color: Colors.black)
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                          color: Colors.black, strokeWidth: 2))
                   : Text(
                       isLogin
                           ? "ENTER THE VIBE"
@@ -353,6 +435,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 isLogin ? "NO ACCOUNT? CREATE ONE" : "ALREADY ENROLLED? SIGN IN",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Colors.white24,
+                      fontWeight: FontWeight.bold,
                     )),
           ),
         ],
