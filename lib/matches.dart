@@ -27,8 +27,13 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text("CONNECTIONS", 
-          style: TextStyle(fontFamily: 'Frutiger', fontWeight: FontWeight.w900, fontSize: 32, letterSpacing: 2, color: Colors.white)),
+        title: Text("CONNECTIONS",
+            style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 32,
+                  letterSpacing: 2,
+                  color: Colors.white,
+                )),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
@@ -81,7 +86,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
           child: Text(
             label,
             style: const TextStyle(
-              fontFamily: 'Frutiger',
+              
               fontSize: 11,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.5,
@@ -96,7 +101,11 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
   Widget _buildList(List<ChatRoom> rooms, bool isPartyTab) {
     if (rooms.isEmpty) {
       return Center(
-        child: Text("No connections yet", style: TextStyle(color: Colors.white24)),
+        child: Text("No connections yet",
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.white24)),
       );
     }
 
@@ -131,38 +140,54 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(room.isGroup ? 12 : 30),
-                child: Image.network(room.imageUrl, width: 60, height: 60, fit: BoxFit.cover),
+                child: Image.network(room.imageUrl,
+                    width: 60, height: 60, fit: BoxFit.cover),
               ),
               // Show online status or locked status based on Go model data
               if (room.isGroup && room.partyId.isNotEmpty)
-                Positioned(bottom: 0, right: 0, child: Icon(Icons.lock, color: AppColors.gold, size: 18)),
+                const Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Icon(Icons.lock, color: AppColors.gold, size: 18)),
             ],
           ),
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(room.title, 
-                  maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white)),
+                child: Text(room.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold, color: Colors.white)),
               ),
-              Text(timeLabel, style: const TextStyle(color: Colors.white30, fontSize: 11)),
+              Text(timeLabel,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Colors.white30, fontSize: 11)),
             ],
           ),
           subtitle: Row(
             children: [
               Expanded(
-                child: Text(room.lastMessageContent, 
-                  maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: room.unreadCount > 0 ? Colors.white : Colors.white54, fontSize: 14)),
+                child: Text(room.lastMessageContent,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: room.unreadCount > 0
+                            ? Colors.white
+                            : Colors.white54)),
               ),
               if (room.unreadCount > 0)
                 Container(
                   margin: const EdgeInsets.only(left: 10),
                   padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(color: AppColors.textCyan, shape: BoxShape.circle),
-                  child: Text(room.unreadCount.toString(), 
-                    style: const TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
+                  decoration: const BoxDecoration(
+                      color: AppColors.textCyan, shape: BoxShape.circle),
+                  child: Text(room.unreadCount.toString(),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.black, fontWeight: FontWeight.bold)),
                 )
             ],
           ),

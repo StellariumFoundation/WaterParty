@@ -101,7 +101,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   void _showError(String m) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m, style: const TextStyle(fontFamily: 'Frutiger'))));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(m, style: Theme.of(context).textTheme.bodySmall)));
   }
 
   @override
@@ -132,8 +133,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
-        const Text("WATER PARTY", style: TextStyle(fontFamily: 'Frutiger', fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 4, color: Colors.white)),
-        Text(isLogin ? "SECURE ACCESS" : "EVOLVE YOUR VIBE", style: const TextStyle(fontFamily: 'Frutiger', color: AppColors.textPink, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
+        Text("WATER PARTY",
+            style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 4,
+                  color: Colors.white,
+                )),
+        Text(isLogin ? "SECURE ACCESS" : "EVOLVE YOUR VIBE",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textPink,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                )),
       ],
     );
   }
@@ -172,9 +183,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             _stepHeader("STEP 2: BIOMETRICS"),
             Row(
               children: [
-                Expanded(child: _input(_ageCtrl, "AGE", Icons.cake_outlined, type: TextInputType.number)),
+                Expanded(
+                    child: _input(_ageCtrl, "AGE", Icons.cake_outlined,
+                        type: TextInputType.number)),
                 const SizedBox(width: 15),
-                Expanded(child: _input(_heightCtrl, "HEIGHT (CM)", Icons.straighten_outlined, type: TextInputType.number)),
+                Expanded(
+                    child: _input(_heightCtrl, "HEIGHT (CM)",
+                        Icons.straighten_outlined,
+                        type: TextInputType.number)),
               ],
             ),
             const SizedBox(height: 15),
@@ -204,52 +220,91 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             _stepHeader("FINAL: VIBE CHECK"),
             _input(_walletCtrl, "WALLET ADDRESS", FontAwesomeIcons.wallet),
             const SizedBox(height: 30),
-            const Text("SELECT YOUR FREQUENCIES", style: TextStyle(fontFamily: 'Frutiger', color: AppColors.textCyan, fontSize: 12, fontWeight: FontWeight.bold)),
+            Text("SELECT YOUR FREQUENCIES",
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textCyan,
+                      fontWeight: FontWeight.bold,
+                    )),
             const SizedBox(height: 15),
             _vibeChips(),
           ],
         );
-      default: return const SizedBox();
+      default:
+        return const SizedBox();
     }
   }
 
   Widget _stepHeader(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 30),
-    child: Text(text, style: const TextStyle(fontFamily: 'Frutiger', color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-  );
+        padding: const EdgeInsets.only(bottom: 30),
+        child: Text(text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white54,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                )),
+      );
 
-  Widget _input(TextEditingController c, String h, IconData i, {bool obscure = false, int maxLines = 1, TextInputType type = TextInputType.text}) {
+  Widget _input(TextEditingController c, String h, IconData i,
+      {bool obscure = false,
+      int maxLines = 1,
+      TextInputType type = TextInputType.text}) {
     return WaterGlass(
       height: maxLines == 1 ? 65 : 120,
       borderRadius: 15,
       child: TextField(
-        controller: c, obscureText: obscure, maxLines: maxLines, keyboardType: type,
-        style: const TextStyle(fontFamily: 'Frutiger', color: Colors.white, fontSize: 14),
+        controller: c,
+        obscureText: obscure,
+        maxLines: maxLines,
+        keyboardType: type,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.white,
+            ),
         decoration: InputDecoration(
-          hintText: h, hintStyle: const TextStyle(color: Colors.white10, fontSize: 11),
+          hintText: h,
+          hintStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white10,
+                fontSize: 11,
+              ),
           prefixIcon: Icon(i, color: Colors.white24, size: 20),
-          border: InputBorder.none, contentPadding: const EdgeInsets.all(20),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.all(20),
         ),
       ),
     );
   }
 
   Widget _vibeChips() {
-    final List<String> options = ["#TECH", "#ART", "#WEB3", "#RAVE", "#DEEP", "#CHILL"];
+    final List<String> options = [
+      "#TECH",
+      "#ART",
+      "#WEB3",
+      "#RAVE",
+      "#DEEP",
+      "#CHILL"
+    ];
     return Wrap(
-      spacing: 10, runSpacing: 10,
+      spacing: 10,
+      runSpacing: 10,
       children: options.map((v) {
         bool active = _vibeTags.contains(v);
         return GestureDetector(
-          onTap: () => setState(() => active ? _vibeTags.remove(v) : _vibeTags.add(v)),
+          onTap: () =>
+              setState(() => active ? _vibeTags.remove(v) : _vibeTags.add(v)),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: active ? AppColors.textCyan : Colors.white10),
-              color: active ? AppColors.textCyan.withOpacity(0.1) : Colors.transparent,
+              border: Border.all(
+                  color: active ? AppColors.textCyan : Colors.white10),
+              color: active
+                  ? AppColors.textCyan.withOpacity(0.1)
+                  : Colors.transparent,
             ),
-            child: Text(v, style: TextStyle(fontFamily: 'Frutiger', color: active ? Colors.white : Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
+            child: Text(v,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: active ? Colors.white : Colors.white24,
+                      fontWeight: FontWeight.bold,
+                    )),
           ),
         );
       }).toList(),
@@ -264,21 +319,41 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           GestureDetector(
             onTap: isLoading ? null : _handleAuth,
             child: Container(
-              height: 60, width: double.infinity,
+              height: 60,
+              width: double.infinity,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(15),
-                gradient: const LinearGradient(colors: [AppColors.textCyan, AppColors.electricPurple]),
+                gradient: const LinearGradient(
+                    colors: [AppColors.textCyan, AppColors.electricPurple]),
               ),
               alignment: Alignment.center,
-              child: isLoading ? const CircularProgressIndicator(color: Colors.black) : 
-              Text(isLogin ? "ENTER THE VIBE" : (currentStep < 3 ? "CONTINUE" : "INITIATE PROTOCOL"), 
-              style: const TextStyle(fontFamily: 'Frutiger', color: Colors.black, fontWeight: FontWeight.w900, letterSpacing: 2)),
+              child: isLoading
+                  ? const CircularProgressIndicator(color: Colors.black)
+                  : Text(
+                      isLogin
+                          ? "ENTER THE VIBE"
+                          : (currentStep < 3
+                              ? "CONTINUE"
+                              : "INITIATE PROTOCOL"),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                          ),
+                    ),
             ),
           ),
           const SizedBox(height: 20),
           TextButton(
-            onPressed: () => setState(() { isLogin = !isLogin; currentStep = 0; }),
-            child: Text(isLogin ? "NO ACCOUNT? CREATE ONE" : "ALREADY ENROLLED? SIGN IN", style: const TextStyle(fontFamily: 'Frutiger', color: Colors.white24, fontSize: 11)),
+            onPressed: () => setState(() {
+              isLogin = !isLogin;
+              currentStep = 0;
+            }),
+            child: Text(
+                isLogin ? "NO ACCOUNT? CREATE ONE" : "ALREADY ENROLLED? SIGN IN",
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white24,
+                    )),
           ),
         ],
       ),

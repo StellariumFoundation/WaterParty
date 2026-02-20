@@ -69,7 +69,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 radius: 18,
               ),
               const SizedBox(width: 12),
-              Text(currentRoom.title, style: const TextStyle(fontFamily: 'Frutiger', fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              Text(currentRoom.title,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      )),
             ],
           ),
         ),
@@ -100,25 +104,35 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 15),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
+        constraints:
+            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
         decoration: BoxDecoration(
-          color: isMe ? AppColors.textCyan.withOpacity(0.1) : Colors.white.withOpacity(0.05),
+          color: isMe
+              ? AppColors.textCyan.withOpacity(0.1)
+              : Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(15),
             topRight: const Radius.circular(15),
             bottomLeft: Radius.circular(isMe ? 15 : 0),
             bottomRight: Radius.circular(isMe ? 0 : 15),
           ),
-          border: Border.all(color: isMe ? AppColors.textCyan.withOpacity(0.2) : Colors.white.withOpacity(0.05)),
+          border: Border.all(
+              color: isMe
+                  ? AppColors.textCyan.withOpacity(0.2)
+                  : Colors.white.withOpacity(0.05)),
         ),
-        child: Text(msg.content, style: const TextStyle(fontFamily: 'Frutiger', color: Colors.white, fontSize: 14)),
+        child: Text(msg.content,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white,
+                )),
       ),
     );
   }
 
   Widget _buildInputArea() {
     return WaterGlass(
-      height: 90, borderRadius: 0,
+      height: 90,
+      borderRadius: 0,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Row(
@@ -126,17 +140,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             Expanded(
               child: TextField(
                 controller: _msgCtrl,
-                style: const TextStyle(fontFamily: 'Frutiger', color: Colors.white),
-                decoration: const InputDecoration(
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white,
+                    ),
+                decoration: InputDecoration(
                   hintText: "TRANSMIT MESSAGE...",
-                  hintStyle: TextStyle(color: Colors.white24, fontSize: 12, fontWeight: FontWeight.bold),
+                  hintStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white24,
+                        fontWeight: FontWeight.bold,
+                      ),
                   border: InputBorder.none,
                 ),
               ),
             ),
             IconButton(
               onPressed: _sendMessage,
-              icon: const Icon(FontAwesomeIcons.paperPlane, color: AppColors.textCyan, size: 20),
+              icon: const Icon(FontAwesomeIcons.paperPlane,
+                  color: AppColors.textCyan, size: 20),
             )
           ],
         ),

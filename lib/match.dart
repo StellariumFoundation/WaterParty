@@ -81,7 +81,7 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
           children: [
             const Icon(Icons.location_off, color: Colors.white24, size: 50),
             const SizedBox(height: 20),
-            Text(_locationError!, style: const TextStyle(color: Colors.white54, fontFamily: 'Frutiger')),
+            Text(_locationError!, style: const TextStyle(color: Colors.white54, )),
             TextButton(onPressed: _determinePosition, child: const Text("RETRY", style: TextStyle(color: AppColors.textCyan))),
           ],
         ),
@@ -176,33 +176,29 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
               children: [
                 Text(
                   party.title.toUpperCase(),
-                  style: const TextStyle(
-                    fontFamily: 'Frutiger',
-                    fontSize: 38,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    height: 1,
-                    letterSpacing: -1,
-                  ),
+                  style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        height: 1,
+                        letterSpacing: -1,
+                      ),
                 ),
                 const SizedBox(height: 15),
                 Row(
                   children: [
-                    _chip(party.city.toUpperCase(), AppColors.textCyan),
+                    _chip(context, party.city.toUpperCase(), AppColors.textCyan),
                     const SizedBox(width: 10),
-                    _chip("${party.maxCapacity - party.currentGuestCount} SLOTS", AppColors.gold),
+                    _chip(context, "${party.maxCapacity - party.currentGuestCount} SLOTS", AppColors.gold),
                   ],
                 ),
                 const SizedBox(height: 15),
                 Text(
                   party.vibeTags.take(3).join(" • ").toUpperCase(),
-                  style: const TextStyle(
-                    fontFamily: 'Frutiger',
-                    color: Colors.white54,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white54,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                      ),
                 ),
               ],
             ),
@@ -212,14 +208,19 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
     );
   }
 
-  Widget _chip(String text, Color color) {
+  Widget _chip(BuildContext context, String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         border: Border.all(color: color.withOpacity(0.5)),
         borderRadius: BorderRadius.circular(5),
       ),
-      child: Text(text, style: TextStyle(fontFamily: 'Frutiger', color: color, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1)),
+      child: Text(text,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+              )),
     );
   }
 
@@ -243,8 +244,18 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
         children: [
           const Icon(FontAwesomeIcons.water, color: AppColors.textCyan, size: 40),
           const SizedBox(height: 25),
-          const Text("SILENCE", style: TextStyle(fontFamily: 'Frutiger', fontSize: 20, color: Colors.white24, letterSpacing: 8, fontWeight: FontWeight.w900)),
-          const Text("NO VIBES NEARBY", style: TextStyle(fontFamily: 'Frutiger', color: Colors.white10, fontSize: 9, letterSpacing: 2, fontWeight: FontWeight.bold)),
+          Text("SILENCE",
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.white24,
+                    letterSpacing: 8,
+                    fontWeight: FontWeight.w900,
+                  )),
+          Text("NO VIBES NEARBY",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white10,
+                    letterSpacing: 2,
+                    fontWeight: FontWeight.bold,
+                  )),
         ],
       ),
     );
@@ -273,7 +284,8 @@ class PartyDetailScreen extends StatelessWidget {
                 backgroundColor: Colors.black,
                 leading: const SizedBox(),
                 flexibleSpace: FlexibleSpaceBar(
-                  background: Image.network(party.partyPhotos.first, fit: BoxFit.cover),
+                  background:
+                      Image.network(party.partyPhotos.first, fit: BoxFit.cover),
                 ),
               ),
               SliverToBoxAdapter(
@@ -282,44 +294,69 @@ class PartyDetailScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(party.title, style: const TextStyle(fontFamily: 'Frutiger', fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white)),
+                      Text(party.title,
+                          style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              )),
                       const SizedBox(height: 25),
-                      
                       Row(
                         children: [
-                          _detailStat(FontAwesomeIcons.clock, "STARTS", "${party.startTime.hour}:00"),
+                          _detailStat(context, FontAwesomeIcons.clock, "STARTS",
+                              "${party.startTime.hour}:00"),
                           const Spacer(),
-                          _detailStat(FontAwesomeIcons.locationDot, "CITY", party.city),
+                          _detailStat(
+                              context, FontAwesomeIcons.locationDot, "CITY", party.city),
                           const Spacer(),
-                          _detailStat(FontAwesomeIcons.userGroup, "LIMIT", "${party.maxCapacity}"),
+                          _detailStat(context, FontAwesomeIcons.userGroup, "LIMIT",
+                              "${party.maxCapacity}"),
                         ],
                       ),
-                      
                       const SizedBox(height: 40),
-                      const Text("PROTOCOL", style: TextStyle(fontFamily: 'Frutiger', color: AppColors.textPink, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 2)),
+                      Text("PROTOCOL",
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.textPink,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 2,
+                              )),
                       const SizedBox(height: 15),
-                      Text(party.description, style: const TextStyle(fontFamily: 'Frutiger', fontSize: 15, height: 1.6, color: Colors.white70)),
-                      
+                      Text(party.description,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                height: 1.6,
+                                color: Colors.white70,
+                              )),
                       if (party.rotationPool != null) ...[
                         const SizedBox(height: 40),
-                        const Text("ROTATION POOL", style: TextStyle(fontFamily: 'Frutiger', color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 2)),
+                        Text("ROTATION POOL",
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.gold,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 2,
+                                )),
                         const SizedBox(height: 15),
                         WaterGlass(
                           height: 80,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(FontAwesomeIcons.wallet, color: AppColors.gold, size: 18),
+                              const Icon(FontAwesomeIcons.wallet,
+                                  color: AppColors.gold, size: 18),
                               const SizedBox(width: 15),
                               Text(
                                 "\$${party.rotationPool!.currentAmount.toInt()} / \$${party.rotationPool!.targetAmount.toInt()}",
-                                style: const TextStyle(fontFamily: 'Frutiger', fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                    ),
                               )
                             ],
                           ),
                         ),
                       ],
-                      const SizedBox(height: 200), 
+                      const SizedBox(height: 200),
                     ],
                   ),
                 ),
@@ -328,20 +365,30 @@ class PartyDetailScreen extends StatelessWidget {
           ),
 
           Positioned(
-            top: 60, left: 20,
+            top: 60,
+            left: 20,
             child: GestureDetector(
               onTap: () => Navigator.pop(context),
-              child: WaterGlass(width: 50, height: 50, borderRadius: 25, child: const Icon(FontAwesomeIcons.xmark, color: Colors.white, size: 20)),
+              child: WaterGlass(
+                  width: 50,
+                  height: 50,
+                  borderRadius: 25,
+                  child: const Icon(FontAwesomeIcons.xmark,
+                      color: Colors.white, size: 20)),
             ),
           ),
 
           Positioned(
-            bottom: 40, left: 0, right: 0,
+            bottom: 40,
+            left: 0,
+            right: 0,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _decisionBtn(FontAwesomeIcons.xmark, AppColors.textPink, "SKIP", () => Navigator.pop(context)),
-                _decisionBtn(FontAwesomeIcons.bolt, AppColors.textCyan, "REQUEST", () => Navigator.pop(context)),
+                _decisionBtn(context, FontAwesomeIcons.xmark, AppColors.textPink,
+                    "SKIP", () => Navigator.pop(context)),
+                _decisionBtn(context, FontAwesomeIcons.bolt, AppColors.textCyan,
+                    "REQUEST", () => Navigator.pop(context)),
               ],
             ),
           ),
@@ -350,25 +397,48 @@ class PartyDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _detailStat(IconData icon, String label, String value) {
+  Widget _detailStat(
+      BuildContext context, IconData icon, String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [Icon(icon, size: 10, color: Colors.white38), const SizedBox(width: 5), Text(label, style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold))]),
+        Row(children: [
+          Icon(icon, size: 10, color: Colors.white38),
+          const SizedBox(width: 5),
+          Text(label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white38, fontWeight: FontWeight.bold))
+        ]),
         const SizedBox(height: 5),
-        Text(value, style: const TextStyle(fontFamily: 'Frutiger', fontWeight: FontWeight.w900, fontSize: 15, color: Colors.white)),
+        Text(value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                )),
       ],
     );
   }
 
-  Widget _decisionBtn(IconData icon, Color color, String label, VoidCallback onTap) {
+  Widget _decisionBtn(BuildContext context, IconData icon, Color color,
+      String label, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         children: [
-          WaterGlass(width: 80, height: 80, borderRadius: 40, borderColor: color, border: 2, child: Icon(icon, color: color, size: 24)),
+          WaterGlass(
+              width: 80,
+              height: 80,
+              borderRadius: 40,
+              borderColor: color,
+              border: 2,
+              child: Icon(icon, color: color, size: 24)),
           const SizedBox(height: 10),
-          Text(label, style: TextStyle(fontFamily: 'Frutiger', color: color, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 2)),
+          Text(label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                  )),
         ],
       ),
     );

@@ -185,7 +185,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         icon: Icon(isEditing ? Icons.check : Icons.edit, color: Colors.black),
         label: Text(
           isEditing ? "SAVE PROFILE" : "EDIT PROFILE",
-          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
         ),
       ),
     );
@@ -201,14 +204,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: Stack(
         children: [
           PageView.builder(
-            itemCount: photos.isEmpty && !isEditing ? 1 : photos.length + (isEditing ? 1 : 0),
+            itemCount: photos.isEmpty && !isEditing
+                ? 1
+                : photos.length + (isEditing ? 1 : 0),
             itemBuilder: (context, index) {
               if (index < photos.length) {
-                final photoUrl = photos[index].startsWith("http") ? photos[index] : "https://waterparty.onrender.com/assets/${photos[index]}";
+                final photoUrl = photos[index].startsWith("http")
+                    ? photos[index]
+                    : "https://waterparty.onrender.com/assets/${photos[index]}";
                 return Image.network(photoUrl, fit: BoxFit.cover);
               }
               if (isEditing) return _buildAddPhotoCard();
-              return Image.network("https://images.unsplash.com/photo-1500648767791-00dcc994a43e", fit: BoxFit.cover);
+              return Image.network(
+                  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
+                  fit: BoxFit.cover);
             },
           ),
           // Gradient Overlay
@@ -218,22 +227,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.black.withOpacity(0.1), Colors.transparent, Colors.black.withOpacity(0.8)],
+                  colors: [
+                    Colors.black.withOpacity(0.1),
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.8)
+                  ],
                 ),
               ),
             ),
           ),
           // Trust Score Badge
           Positioned(
-            top: 20, right: 20,
+            top: 20,
+            right: 20,
             child: WaterGlass(
-              width: 100, height: 35, borderRadius: 10,
+              width: 100,
+              height: 35,
+              borderRadius: 10,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.shield, color: AppColors.gold, size: 14),
                   const SizedBox(width: 5),
-                  Text("${user.trustScore} TRUST", style: const TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 10)),
+                  Text("${user.trustScore} TRUST",
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.gold,
+                            fontWeight: FontWeight.bold,
+                          )),
                 ],
               ),
             ),
@@ -249,16 +269,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: Container(
         color: Colors.white.withOpacity(0.05),
         child: Center(
-          child: _isUploading 
-            ? const CircularProgressIndicator(color: AppColors.textCyan)
-            : const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add_a_photo, color: Colors.white24, size: 50),
-                  SizedBox(height: 15),
-                  Text("UPLOAD VIBE", style: TextStyle(fontFamily: 'Frutiger', color: Colors.white24, fontWeight: FontWeight.bold, letterSpacing: 2)),
-                ],
-              ),
+          child: _isUploading
+              ? const CircularProgressIndicator(color: AppColors.textCyan)
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.add_a_photo,
+                        color: Colors.white24, size: 50),
+                    const SizedBox(height: 15),
+                    Text("UPLOAD VIBE",
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.white24,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 2,
+                            )),
+                  ],
+                ),
         ),
       ),
     );
@@ -272,31 +298,45 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         Row(
           children: [
             Expanded(
-              child: isEditing 
-                ? TextField(
-                    controller: _realNameCtrl,
-                    style: GoogleFonts.playfairDisplay(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
-                    decoration: const InputDecoration(hintText: "Your Name", border: InputBorder.none),
-                  )
-                : Text(
-                    "${user.realName}, $_age",
-                    style: GoogleFonts.playfairDisplay(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
+              child: isEditing
+                  ? TextField(
+                      controller: _realNameCtrl,
+                      style: Theme.of(context)
+                          .textTheme
+                          .displayMedium
+                          ?.copyWith(fontSize: 32),
+                      decoration: const InputDecoration(
+                          hintText: "Your Name", border: InputBorder.none),
+                    )
+                  : Text(
+                      "${user.realName}, $_age",
+                      style: Theme.of(context)
+                          .textTheme
+                          .displayMedium
+                          ?.copyWith(fontSize: 32),
+                    ),
             ),
             if (isEditing)
-               SizedBox(
-                 width: 60,
-                 child: TextField(
-                   keyboardType: TextInputType.number,
-                   onChanged: (v) => _age = int.tryParse(v) ?? _age,
-                   decoration: InputDecoration(hintText: "$_age", labelText: "Age", border: InputBorder.none),
-                   style: const TextStyle(color: Colors.white, fontSize: 20),
-                 ),
-               )
+              SizedBox(
+                width: 60,
+                child: TextField(
+                  keyboardType: TextInputType.number,
+                  onChanged: (v) => _age = int.tryParse(v) ?? _age,
+                  decoration: InputDecoration(
+                      hintText: "$_age",
+                      labelText: "Age",
+                      border: InputBorder.none),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              )
           ],
         ),
         if (!isEditing)
-          Text("@${user.username}", style: const TextStyle(color: AppColors.textCyan, fontSize: 14)),
+          Text("@${user.username}",
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppColors.textCyan)),
       ],
     );
   }
@@ -306,7 +346,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("ABOUT ME", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+        Text("ABOUT ME",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white38,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                )),
         const SizedBox(height: 5),
         isEditing
             ? WaterGlass(
@@ -314,11 +359,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: TextField(
                   controller: _bioCtrl,
                   maxLines: 4,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.all(15)),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white,
+                      ),
+                  decoration: const InputDecoration(
+                      border: InputBorder.none, contentPadding: EdgeInsets.all(15)),
                 ),
               )
-            : Text(_bioCtrl.text, style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.white70)),
+            : Text(_bioCtrl.text,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      height: 1.5,
+                      color: Colors.white70,
+                    )),
       ],
     );
   }
@@ -328,28 +380,46 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("LIFESTYLE", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+        Text("LIFESTYLE",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white38,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                )),
         const SizedBox(height: 10),
         Row(
           children: [
-            Expanded(child: _buildInfoTile(Icons.height, "Height", isEditing ? "$_heightCm cm" : "$_heightCm cm")), // Add slider logic if really building
+            Expanded(
+                child: _buildInfoTile(
+                    Icons.height,
+                    "Height",
+                    isEditing
+                        ? "$_heightCm cm"
+                        : "$_heightCm cm")), // Add slider logic if really building
             const SizedBox(width: 10),
-            Expanded(child: _buildDropdownTile(Icons.local_bar, "Drinks", _drinking, (v) => setState(() => _drinking = v))),
+            Expanded(
+                child: _buildDropdownTile(Icons.local_bar, "Drinks", _drinking,
+                    (v) => setState(() => _drinking = v))),
           ],
         ),
         const SizedBox(height: 10),
         Row(
           children: [
-            Expanded(child: _buildDropdownTile(Icons.smoking_rooms, "Smoke", _smoking, (v) => setState(() => _smoking = v))),
+            Expanded(
+                child: _buildDropdownTile(Icons.smoking_rooms, "Smoke",
+                    _smoking, (v) => setState(() => _smoking = v))),
             const SizedBox(width: 10),
-            Expanded(child: _buildDropdownTile(Icons.spa, "Weed", _cannabis, (v) => setState(() => _cannabis = v))),
+            Expanded(
+                child: _buildDropdownTile(Icons.spa, "Weed", _cannabis,
+                    (v) => setState(() => _cannabis = v))),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildDropdownTile(IconData icon, String label, String value, Function(String) onChanged) {
+  Widget _buildDropdownTile(
+      IconData icon, String label, String value, Function(String) onChanged) {
     if (!isEditing) {
       return _buildInfoTile(icon, label, value);
     }
@@ -365,11 +435,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             Expanded(
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: _habitOptions.contains(value) ? value : _habitOptions.first,
+                  value: _habitOptions.contains(value)
+                      ? value
+                      : _habitOptions.first,
                   dropdownColor: Colors.grey[900],
                   isDense: true,
-                  items: _habitOptions.map((opt) => DropdownMenuItem(value: opt, child: Text(opt, style: const TextStyle(color: Colors.white, fontSize: 12)))).toList(),
-                  onChanged: (v) { if (v != null) onChanged(v); },
+                  items: _habitOptions
+                      .map((opt) => DropdownMenuItem(
+                          value: opt,
+                          child: Text(opt,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: Colors.white))))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) onChanged(v);
+                  },
                 ),
               ),
             ),
@@ -381,7 +463,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildInfoTile(IconData icon, String label, String value) {
     return WaterGlass(
-      height: 60, borderRadius: 15,
+      height: 60,
+      borderRadius: 15,
       child: Row(
         children: [
           const SizedBox(width: 15),
@@ -391,8 +474,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 9, color: Colors.white38)),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(label,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Colors.white38, fontSize: 9)),
+              Text(value,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.bold, fontSize: 13)),
             ],
           )
         ],
@@ -404,32 +495,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildWorkEducationSection() {
     return Column(
       children: [
-        _buildListInput(Icons.work, _jobCtrl, "Job Title", "Add Job"),
+        _buildListInput(_jobCtrl, Icons.work, "Job Title", "Add Job"),
         const SizedBox(height: 10),
-        _buildListInput(Icons.business, _companyCtrl, "Company", "Add Company"),
+        _buildListInput(_companyCtrl, Icons.business, "Company", "Add Company"),
         const SizedBox(height: 10),
-        _buildListInput(Icons.school, _schoolCtrl, "School", "Add School"),
+        _buildListInput(_schoolCtrl, Icons.school, "School", "Add School"),
         const SizedBox(height: 10),
-        _buildListInput(Icons.camera_alt, _instaCtrl, "Instagram", "Add Handle"),
+        _buildListInput(
+            _instaCtrl, Icons.camera_alt, "Instagram", "Add Handle"),
       ],
     );
   }
 
-  Widget _buildListInput(IconData icon, TextEditingController ctrl, String hint, String emptyLabel) {
+  Widget _buildListInput(TextEditingController ctrl, IconData icon, String hint,
+      String emptyLabel) {
     if (!isEditing && ctrl.text.isEmpty) return const SizedBox();
 
     return WaterGlass(
-      height: 55, borderRadius: 15,
+      height: 55,
+      borderRadius: 15,
       child: TextField(
         controller: ctrl,
         enabled: isEditing,
-        style: const TextStyle(color: Colors.white, fontSize: 14),
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.white,
+            ),
         decoration: InputDecoration(
           prefixIcon: Icon(icon, color: AppColors.textCyan, size: 18),
           hintText: hint,
-          hintStyle: const TextStyle(color: Colors.white24),
+          hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.white24,
+              ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
         ),
       ),
     );
@@ -440,7 +539,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("MY VIBE", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+        Text("MY VIBE",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white38,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                )),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
@@ -448,19 +552,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           children: (isEditing ? _commonInterests : _interests).map((tag) {
             final isSelected = _interests.contains(tag);
             return GestureDetector(
-              onTap: isEditing ? () {
-                setState(() {
-                  isSelected ? _interests.remove(tag) : _interests.add(tag);
-                });
-              } : null,
+              onTap: isEditing
+                  ? () {
+                      setState(() {
+                        isSelected
+                            ? _interests.remove(tag)
+                            : _interests.add(tag);
+                      });
+                    }
+                  : null,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.textCyan.withOpacity(0.2) : Colors.white10,
-                  border: Border.all(color: isSelected ? AppColors.textCyan : Colors.transparent),
+                  color: isSelected
+                      ? AppColors.textCyan.withOpacity(0.2)
+                      : Colors.white10,
+                  border: Border.all(
+                      color: isSelected ? AppColors.textCyan : Colors.transparent),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(tag, style: TextStyle(color: isSelected ? Colors.white : Colors.white38, fontSize: 12)),
+                child: Text(tag,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isSelected ? Colors.white : Colors.white38)),
               ),
             );
           }).toList(),
@@ -468,4 +582,5 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ],
     );
   }
+}
 }

@@ -34,16 +34,71 @@ class AppColors {
 
 // --- Premium Typography Styles ---
 class AppTypography {
+  static const String fontFamily = 'Frutiger';
+
+  static const TextStyle title = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 24,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 1.2,
+    color: Colors.white,
+  );
+
+  static const TextStyle medium = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 16,
+    fontWeight: FontWeight.w500,
+    color: Colors.white,
+  );
+
+  static const TextStyle small = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 12,
+    fontWeight: FontWeight.normal,
+    color: Colors.white70,
+  );
+
   static const TextStyle heading = TextStyle(
-    fontFamily: AppColors.fontFamily,
+    fontFamily: fontFamily,
     fontWeight: FontWeight.bold,
     letterSpacing: 1.5,
   );
 
   static const TextStyle body = TextStyle(
-    fontFamily: AppColors.fontFamily,
+    fontFamily: fontFamily,
     fontWeight: FontWeight.normal,
   );
+
+  static TextStyle get titleStyle => title;
+  static TextStyle get mediumStyle => medium;
+  static TextStyle get smallStyle => small;
+
+  static TextTheme get textTheme => TextTheme(
+        displayLarge: title.copyWith(fontSize: 32),
+        displayMedium: title,
+        titleLarge: title,
+        bodyLarge: medium,
+        bodyMedium: medium,
+        bodySmall: small,
+      );
+}
+
+class AppTheme {
+  static ThemeData get darkTheme {
+    return ThemeData(
+      brightness: Brightness.dark,
+      primaryColor: AppColors.electricPurple,
+      scaffoldBackgroundColor: AppColors.deepBlack,
+      fontFamily: AppTypography.fontFamily,
+      textTheme: AppTypography.textTheme,
+      colorScheme: const ColorScheme.dark(
+        primary: AppColors.electricPurple,
+        secondary: AppColors.textCyan,
+        surface: AppColors.stellariumPurple,
+        background: AppColors.deepBlack,
+      ),
+    );
+  }
 }
 
 class WaterGlass extends StatelessWidget {

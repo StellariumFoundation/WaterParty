@@ -27,12 +27,7 @@ class WaterPartyApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Water Party',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.black,
-        useMaterial3: true,
-        fontFamily: 'Frutiger',
-      ),
+      theme: AppTheme.darkTheme,
       home: user != null 
           ? const MainScaffold() 
           : const AuthScreen(),
@@ -129,13 +124,13 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
             if (isSelected) ...[
               const SizedBox(height: 4),
               Text(
-                label, 
-                style: const TextStyle(
-                  fontSize: 10, 
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontSize: 10,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
               ),
             ]
           ],

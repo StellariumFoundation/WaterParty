@@ -174,28 +174,50 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text("HOST\nA VIBE", style: TextStyle(fontFamily: 'Frutiger', fontSize: 32, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: 2)),
+        Text("HOST\nA VIBE",
+            style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  height: 1.0,
+                  letterSpacing: 2,
+                )),
         GestureDetector(
           onTap: () {},
-          child: WaterGlass(width: 70, height: 70, borderRadius: 20, child: const Icon(FontAwesomeIcons.camera, color: Colors.white24, size: 24)),
+          child: WaterGlass(
+              width: 70,
+              height: 70,
+              borderRadius: 20,
+              child: const Icon(FontAwesomeIcons.camera,
+                  color: Colors.white24, size: 24)),
         ),
       ],
     );
   }
 
   Widget _sectionHeader(String text) => Padding(
-    padding: const EdgeInsets.only(left: 5, bottom: 12),
-    child: Text(text, style: const TextStyle(fontFamily: 'Frutiger', color: AppColors.textPink, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
-  );
+        padding: const EdgeInsets.only(left: 5, bottom: 12),
+        child: Text(text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textPink,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                )),
+      );
 
-  Widget _compactInput(TextEditingController ctrl, String hint, IconData icon, {int maxLines = 1}) {
+  Widget _compactInput(TextEditingController ctrl, String hint, IconData icon,
+      {int maxLines = 1}) {
     return TextField(
       controller: ctrl,
       maxLines: maxLines,
-      style: const TextStyle(fontFamily: 'Frutiger', color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white10, fontSize: 14),
+        hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.white10,
+              fontSize: 14,
+            ),
         border: InputBorder.none,
         prefixIcon: Icon(icon, color: AppColors.textCyan, size: 18),
         isDense: true,
@@ -205,7 +227,8 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
 
   Widget _inputField(TextEditingController ctrl, String hint, IconData icon) {
     return WaterGlass(
-      height: 65, borderRadius: 15,
+      height: 65,
+      borderRadius: 15,
       child: _compactInput(ctrl, hint, icon),
     );
   }
@@ -214,13 +237,18 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     return GestureDetector(
       onTap: onTap,
       child: WaterGlass(
-        height: 65, borderRadius: 15,
+        height: 65,
+        borderRadius: 15,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 16, color: AppColors.textCyan),
             const SizedBox(width: 10),
-            Text(label, style: const TextStyle(fontFamily: 'Frutiger', fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
+            Text(label,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    )),
           ],
         ),
       ),
@@ -231,23 +259,38 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontFamily: 'Frutiger', color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1)),
+        Text(title,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white38,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                )),
         const SizedBox(height: 10),
         Wrap(
-          spacing: 8, runSpacing: 8,
+          spacing: 8,
+          runSpacing: 8,
           children: options.map((opt) {
             final isSelected = selected.contains(opt);
             return GestureDetector(
-              onTap: () => setState(() => isSelected ? selected.remove(opt) : selected.add(opt)),
+              onTap: () => setState(
+                  () => isSelected ? selected.remove(opt) : selected.add(opt)),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.textCyan.withOpacity(0.1) : Colors.white.withOpacity(0.03),
+                  color: isSelected
+                      ? AppColors.textCyan.withOpacity(0.1)
+                      : Colors.white.withOpacity(0.03),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: isSelected ? AppColors.textCyan : Colors.white10),
+                  border: Border.all(
+                      color: isSelected ? AppColors.textCyan : Colors.white10),
                 ),
-                child: Text(opt, style: TextStyle(fontFamily: 'Frutiger', color: isSelected ? Colors.white : Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
+                child: Text(opt,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: isSelected ? Colors.white : Colors.white24,
+                          fontWeight: FontWeight.bold,
+                        )),
               ),
             );
           }).toList(),
@@ -261,26 +304,40 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       children: [
         Row(
           children: [
-            Expanded(child: _inputField(_ruleController, "ADD PROTOCOL...", FontAwesomeIcons.shieldHalved)),
+            Expanded(
+                child: _inputField(_ruleController, "ADD PROTOCOL...",
+                    FontAwesomeIcons.shieldHalved)),
             const SizedBox(width: 10),
             GestureDetector(
               onTap: () {
                 if (_ruleController.text.isNotEmpty) {
-                  setState(() { _rules.add(_ruleController.text.toUpperCase()); _ruleController.clear(); });
+                  setState(() {
+                    _rules.add(_ruleController.text.toUpperCase());
+                    _ruleController.clear();
+                  });
                 }
               },
-              child: WaterGlass(width: 65, height: 65, borderRadius: 15, child: const Icon(Icons.add, color: AppColors.textCyan)),
+              child: WaterGlass(
+                  width: 65,
+                  height: 65,
+                  borderRadius: 15,
+                  child: const Icon(Icons.add, color: AppColors.textCyan)),
             ),
           ],
         ),
         const SizedBox(height: 10),
         Wrap(
           spacing: 5,
-          children: _rules.map((r) => Chip(
-            label: Text(r, style: const TextStyle(fontSize: 9, color: Colors.white70)),
-            backgroundColor: Colors.white10,
-            onDeleted: () => setState(() => _rules.remove(r)),
-          )).toList(),
+          children: _rules
+              .map((r) => Chip(
+                    label: Text(r,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.white70,
+                            )),
+                    backgroundColor: Colors.white10,
+                    onDeleted: () => setState(() => _rules.remove(r)),
+                  ))
+              .toList(),
         )
       ],
     );
@@ -288,17 +345,29 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
 
   Widget _buildCapacitySlider() {
     return WaterGlass(
-      height: 100, borderRadius: 20,
+      height: 100,
+      borderRadius: 20,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text("MAX CAPACITY: ${_capacity.toInt()}", style: const TextStyle(fontFamily: 'Frutiger', fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+          Text("MAX CAPACITY: ${_capacity.toInt()}",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  )),
           Slider(
-            value: _capacity, min: 2, max: 200, 
-            activeColor: AppColors.textCyan, inactiveColor: Colors.white10,
+            value: _capacity,
+            min: 2,
+            max: 200,
+            activeColor: AppColors.textCyan,
+            inactiveColor: Colors.white10,
             onChanged: (v) => setState(() => _capacity = v),
           ),
-          Text(_autoLock ? "AUTO-LOCK ON FULL" : "MANUAL LOCK", style: TextStyle(fontFamily: 'Frutiger', fontSize: 9, color: _autoLock ? AppColors.textCyan : Colors.white38)),
+          Text(_autoLock ? "AUTO-LOCK ON FULL" : "MANUAL LOCK",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: _autoLock ? AppColors.textCyan : Colors.white38,
+                    fontSize: 9,
+                  )),
         ],
       ),
     );
@@ -308,12 +377,14 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     return GestureDetector(
       onTap: () => setState(() => _hasPool = !_hasPool),
       child: WaterGlass(
-        height: 80, borderRadius: 20,
+        height: 80,
+        borderRadius: 20,
         borderColor: _hasPool ? AppColors.gold : Colors.transparent,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(FontAwesomeIcons.wallet, color: _hasPool ? AppColors.gold : Colors.white24, size: 20),
+            Icon(FontAwesomeIcons.wallet,
+                color: _hasPool ? AppColors.gold : Colors.white24, size: 20),
             const SizedBox(width: 15),
             if (_hasPool)
               SizedBox(
@@ -321,12 +392,23 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                 child: TextField(
                   controller: _poolAmountController,
                   keyboardType: TextInputType.number,
-                  style: const TextStyle(fontFamily: 'Frutiger', color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 18),
-                  decoration: const InputDecoration(hintText: "$0", hintStyle: TextStyle(color: Colors.white10), border: InputBorder.none),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: AppColors.gold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                  decoration: const InputDecoration(
+                      hintText: "$0",
+                      hintStyle: TextStyle(color: Colors.white10),
+                      border: InputBorder.none),
                 ),
               )
             else
-              const Text("ENABLE ROTATION POOL", style: TextStyle(fontFamily: 'Frutiger', fontSize: 11, color: Colors.white24, fontWeight: FontWeight.bold)),
+              Text("ENABLE ROTATION POOL",
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white24,
+                        fontWeight: FontWeight.bold,
+                      )),
           ],
         ),
       ),
@@ -337,14 +419,27 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     return GestureDetector(
       onTap: _handleCreateParty,
       child: Container(
-        height: 65, width: double.infinity,
+        height: 65,
+        width: double.infinity,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(15),
-          gradient: const LinearGradient(colors: [AppColors.textCyan, AppColors.electricPurple]),
-          boxShadow: [BoxShadow(color: AppColors.textCyan.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 10))],
+          gradient: const LinearGradient(
+              colors: [AppColors.textCyan, AppColors.electricPurple]),
+          boxShadow: [
+            BoxShadow(
+                color: AppColors.textCyan.withOpacity(0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 10))
+          ],
         ),
         alignment: Alignment.center,
-        child: const Text("IGNITE VIBE", style: TextStyle(fontFamily: 'Frutiger', color: Colors.black, fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 16)),
+        child: Text("IGNITE VIBE",
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 3,
+                  fontSize: 16,
+                )),
       ),
     );
   }
