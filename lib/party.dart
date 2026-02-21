@@ -22,24 +22,51 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   final _addressController = TextEditingController();
   final _poolAmountController = TextEditingController();
   final _ruleController = TextEditingController();
+  final _partyTypeController = TextEditingController();
 
   double _capacity = 10;
   bool _autoLock = true;
   bool _hasPool = false;
+  double? _geoLat;
+  double? _geoLon;
   DateTime _date = DateTime.now();
   TimeOfDay _time = const TimeOfDay(hour: 22, minute: 0);
   
   final List<String> _selectedTags = [];
-  final List<String> _availableTags = ["#CHILL", "#RAVE", "#NETWORK", "#DINNER", "#ART", "#TECH"];
-  
-  final List<String> _selectedMusic = [];
-  final List<String> _availableMusic = ["TECHNO", "HOUSE", "HIPHOP", "JAZZ", "ROCK", "AMBIENT"];
+  final List<String> _availableTags = ["HOUSE PARTY", "RAVE", "ROOFTOP", "DINNER", "ART", "POOL PARTY"];
   
   final List<String> _rules = [];
   String _selectedMood = "CHILL";
 
   List<String> _partyPhotos = [];
   bool _isUploading = false;
+  bool _isGettingLocation = false;
+
+  Future<void> _useMyLocation() async {
+    setState(() => _isGettingLocation = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) throw 'Location services are disabled.';
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) throw 'Location permissions are denied';
+      }
+
+      final position = await Geolocator.getCurrentPosition();
+      setState(() {
+        _geoLat = position.latitude;
+        _geoLon = position.longitude;
+        _addressController.text = "MY CURRENT LOCATION";
+        _cityController.text = "DETECTED ON PUBLISH";
+      });
+    } catch (e) {
+      _showError(e.toString());
+    } finally {
+      setState(() => _isGettingLocation = false);
+    }
+  }
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
@@ -104,6 +131,12 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       );
     }
 
+    // Combine manual tags and text input
+    final List<String> finalTags = List.from(_selectedTags);
+    if (_partyTypeController.text.isNotEmpty) {
+      finalTags.add(_partyTypeController.text.toUpperCase());
+    }
+
     final newParty = Party(
       id: partyId,
       hostId: user.id,
@@ -116,14 +149,14 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       isLocationRevealed: false,
       address: _addressController.text,
       city: _cityController.text,
-      geoLat: 0.0,
-      geoLon: 0.0,
+      geoLat: _geoLat ?? 0.0,
+      geoLon: _geoLon ?? 0.0,
       maxCapacity: _capacity.toInt(),
       currentGuestCount: 0,
       slotRequirements: {},
       autoLockOnFull: _autoLock,
-      vibeTags: _selectedTags,
-      musicGenres: _selectedMusic,
+      vibeTags: finalTags,
+      musicGenres: [], // Removed as per request
       mood: _selectedMood,
       rules: _rules,
       rotationPool: pool,
@@ -187,12 +220,29 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
               const SizedBox(height: 15),
               _inputField(_cityController, "CITY (REQUIRED)", FontAwesomeIcons.locationDot),
               const SizedBox(height: 15),
-              _inputField(_addressController, "FULL ADDRESS (HIDDEN UNTIL LOCK)", FontAwesomeIcons.mapPin),
+              Row(
+                children: [
+                  Expanded(child: _inputField(_addressController, "FULL ADDRESS (HIDDEN)", FontAwesomeIcons.mapPin)),
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: _isGettingLocation ? null : _useMyLocation,
+                    child: WaterGlass(
+                      width: 65, height: 65,
+                      borderRadius: 15,
+                      child: _isGettingLocation 
+                        ? const CircularProgressIndicator(color: AppColors.textCyan, strokeWidth: 2)
+                        : const Icon(Icons.my_location, color: AppColors.textCyan),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 25),
               _sectionHeader("ATMOSPHERE"),
-              _chipSelect("VIBE TAGS", _availableTags, _selectedTags),
+              _buildVibeExplainer(),
               const SizedBox(height: 15),
-              _chipSelect("MUSIC GENRES", _availableMusic, _selectedMusic),
+              _chipSelect("KIND OF PARTY", _availableTags, _selectedTags),
+              const SizedBox(height: 15),
+              _inputField(_partyTypeController, "OR DESCRIBE THE TYPE...", Icons.edit_note),
               const SizedBox(height: 15),
               _buildMoodSelector(),
               const SizedBox(height: 25),
@@ -213,29 +263,26 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     );
   }
 
-  Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text("HOST\nA PARTY",
-            style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  height: 1.0,
-                  letterSpacing: 2,
-                )),
-        GestureDetector(
-          onTap: _isUploading ? null : _pickImage,
-          child: WaterGlass(
-              width: 70,
-              height: 70,
-              borderRadius: 20,
-              child: _isUploading 
-                ? const CircularProgressIndicator(color: AppColors.textCyan, strokeWidth: 2)
-                : Icon(FontAwesomeIcons.camera,
-                  color: _partyPhotos.isNotEmpty ? AppColors.textCyan : Colors.white24, 
-                  size: 24)),
-        ),
-      ],
+  Widget _buildVibeExplainer() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: AppColors.textCyan.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: AppColors.textCyan.withOpacity(0.1)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: AppColors.textCyan, size: 20),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Text(
+              "Define the nature of your event. Is it a cozy house party, a wild rooftop rave, or a sophisticated dinner?",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70, height: 1.4),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
