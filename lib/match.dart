@@ -219,13 +219,27 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
                   style: Theme.of(context).textTheme.displayLarge?.copyWith(
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
+                        fontSize: 32,
                         height: 1,
                         letterSpacing: -1,
                       ),
                 ),
+                const SizedBox(height: 10),
+                Text(
+                  party.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
                 const SizedBox(height: 15),
                 Row(
                   children: [
+                    _chip(context, "${party.startTime.day}/${party.startTime.month}", AppColors.textPink),
+                    const SizedBox(width: 10),
                     _chip(context, party.city.toUpperCase(), AppColors.textCyan),
                     const SizedBox(width: 10),
                     _chip(context, "${party.maxCapacity - party.currentGuestCount} SLOTS", AppColors.gold),
@@ -235,9 +249,10 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
                 Text(
                   party.vibeTags.take(3).join(" • ").toUpperCase(),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white54,
+                        color: Colors.white38,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 2,
+                        fontSize: 9,
                       ),
                 ),
               ],
