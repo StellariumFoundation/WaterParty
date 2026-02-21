@@ -306,12 +306,23 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
 // THE DETAILED "WHOLE CARD" VIEW
 // ==========================================
 
-class PartyDetailScreen extends StatelessWidget {
+class PartyDetailScreen extends StatefulWidget {
   final Party party;
   const PartyDetailScreen({required this.party, super.key});
 
   @override
+  State<PartyDetailScreen> createState() => _PartyDetailScreenState();
+}
+
+class _PartyDetailScreenState extends State<PartyDetailScreen> {
+  int _currentPhotoIndex = 0;
+  final PageController _pageController = PageController();
+
+  @override
   Widget build(BuildContext context) {
+    final party = widget.party;
+    final photos = party.partyPhotos.isNotEmpty ? party.partyPhotos : ["https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000"];
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -319,84 +330,160 @@ class PartyDetailScreen extends StatelessWidget {
           CustomScrollView(
             slivers: [
               SliverAppBar(
-                expandedHeight: 500,
+                expandedHeight: 550,
                 pinned: true,
                 backgroundColor: Colors.black,
                 leading: const SizedBox(),
                 flexibleSpace: FlexibleSpaceBar(
-                  background:
-                      Image.network(party.partyPhotos.first, fit: BoxFit.cover),
+                  background: Stack(
+                    children: [
+                      PageView.builder(
+                        controller: _pageController,
+                        itemCount: photos.length,
+                        onPageChanged: (idx) => setState(() => _currentPhotoIndex = idx),
+                        itemBuilder: (context, index) {
+                          final url = photos[index].startsWith("http") ? photos[index] : AppConstants.assetUrl(photos[index]);
+                          return Image.network(url, fit: BoxFit.cover);
+                        },
+                      ),
+                      // Tinder-style indicators
+                      Positioned(
+                        top: 60,
+                        left: 20,
+                        right: 20,
+                        child: Row(
+                          children: List.generate(photos.length, (index) {
+                            return Expanded(
+                              child: Container(
+                                height: 2,
+                                margin: const EdgeInsets.symmetric(horizontal: 2),
+                                decoration: BoxDecoration(
+                                  color: _currentPhotoIndex == index ? Colors.white : Colors.white24,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                      // Tap areas for navigation
+                      Positioned.fill(
+                        child: Row(
+                          children: [
+                            Expanded(child: GestureDetector(onTap: () => _pageController.previousPage(duration: const Duration(milliseconds: 200), curve: Curves.ease))),
+                            Expanded(child: GestureDetector(onTap: () => _pageController.nextPage(duration: const Duration(milliseconds: 200), curve: Curves.ease))),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.black.withOpacity(0.3), Colors.transparent, Colors.black],
+                            stops: const [0.0, 0.7, 1.0],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.all(30),
+                  padding: const EdgeInsets.fromLTRB(25, 10, 25, 30),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(party.title,
+                      Text(party.title.toUpperCase(),
                           style: Theme.of(context).textTheme.displayLarge?.copyWith(
                                 fontWeight: FontWeight.w900,
                                 color: Colors.white,
+                                fontSize: 36,
+                                letterSpacing: -1,
                               )),
-                      const SizedBox(height: 25),
-                      Row(
-                        children: [
-                          _detailStat(context, FontAwesomeIcons.clock, "STARTS",
-                              "${party.startTime.hour}:00"),
-                          const Spacer(),
-                          _detailStat(
-                              context, FontAwesomeIcons.locationDot, "CITY", party.city),
-                          const Spacer(),
-                          _detailStat(context, FontAwesomeIcons.userGroup, "LIMIT",
-                              "${party.maxCapacity}"),
-                        ],
+                      const SizedBox(height: 20),
+                      
+                      // Primary Logistics Row
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _miniStat(context, FontAwesomeIcons.calendar, "DATE", "${party.startTime.day}/${party.startTime.month}"),
+                            const SizedBox(width: 20),
+                            _miniStat(context, FontAwesomeIcons.clock, "START", "${party.startTime.hour}:${party.startTime.minute.toString().padLeft(2, '0')}"),
+                            const SizedBox(width: 20),
+                            _miniStat(context, FontAwesomeIcons.locationDot, "CITY", party.city.toUpperCase()),
+                            const SizedBox(width: 20),
+                            _miniStat(context, FontAwesomeIcons.users, "LIMIT", "${party.maxCapacity}"),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 40),
-                      Text("PROTOCOL",
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.textPink,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 2,
-                              )),
-                      const SizedBox(height: 15),
+
+                      const SizedBox(height: 35),
+                      _sectionLabel("THE VIBE"),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: party.vibeTags.map((tag) => _smallChip(tag, AppColors.textCyan)).toList(),
+                      ),
+
+                      const SizedBox(height: 30),
+                      _sectionLabel("DESCRIPTION"),
+                      const SizedBox(height: 10),
                       Text(party.description,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                height: 1.6,
-                                color: Colors.white70,
-                              )),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            height: 1.6,
+                            color: Colors.white70,
+                          )),
+
+                      if (party.rules.isNotEmpty) ...[
+                        const SizedBox(height: 30),
+                        _sectionLabel("BASIC RULES"),
+                        const SizedBox(height: 10),
+                        ...party.rules.map((rule) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.circle, size: 4, color: AppColors.textPink),
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(rule, style: const TextStyle(fontSize: 12, color: Colors.white54))),
+                            ],
+                          ),
+                        )),
+                      ],
+
+                      const SizedBox(height: 30),
+                      _sectionLabel("TECHNICAL LOGISTICS"),
+                      const SizedBox(height: 15),
+                      _infoLine("ADDRESS", party.isLocationRevealed ? party.address : "HIDDEN UNTIL ACCEPTED"),
+                      _infoLine("STATUS", party.status.toString().split('.').last),
+                      _infoLine("CAPACITY", "${party.currentGuestCount} / ${party.maxCapacity} GUESTS"),
+                      _infoLine("AUTO-LOCK", party.autoLockOnFull ? "ENABLED" : "DISABLED"),
+
                       if (party.rotationPool != null) ...[
                         const SizedBox(height: 40),
-                        Text("ROTATION POOL",
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.gold,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 2,
-                                )),
+                        _sectionLabel("ROTATION POOL"),
                         const SizedBox(height: 15),
                         WaterGlass(
-                          height: 80,
+                          height: 60,
+                          borderRadius: 15,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(FontAwesomeIcons.wallet,
-                                  color: AppColors.gold, size: 18),
-                              const SizedBox(width: 15),
+                              const Icon(FontAwesomeIcons.wallet, color: AppColors.gold, size: 14),
+                              const SizedBox(width: 12),
                               Text(
-                                "\$${party.rotationPool!.currentAmount.toInt()} / \$${party.rotationPool!.targetAmount.toInt()}",
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                    ),
+                                "\$${party.rotationPool!.currentAmount.toInt()} / \$${party.rotationPool!.targetAmount.toInt()} FUNDED",
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
                               )
                             ],
                           ),
                         ),
                       ],
-                      const SizedBox(height: 200),
+                      const SizedBox(height: 150),
                     ],
                   ),
                 ),
@@ -404,20 +491,7 @@ class PartyDetailScreen extends StatelessWidget {
             ],
           ),
 
-          Positioned(
-            top: 60,
-            left: 20,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: WaterGlass(
-                  width: 50,
-                  height: 50,
-                  borderRadius: 25,
-                  child: const Icon(FontAwesomeIcons.xmark,
-                      color: Colors.white, size: 20)),
-            ),
-          ),
-
+          // Action Buttons
           Positioned(
             bottom: 40,
             left: 0,
@@ -425,11 +499,19 @@ class PartyDetailScreen extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _decisionBtn(context, FontAwesomeIcons.xmark, AppColors.textPink,
-                    "SKIP", () => Navigator.pop(context)),
-                _decisionBtn(context, FontAwesomeIcons.bolt, AppColors.textCyan,
-                    "REQUEST", () => Navigator.pop(context)),
+                _decisionBtn(context, FontAwesomeIcons.xmark, AppColors.textPink, "SKIP", () => Navigator.pop(context)),
+                _decisionBtn(context, FontAwesomeIcons.bolt, AppColors.textCyan, "REQUEST", () => Navigator.pop(context)),
               ],
+            ),
+          ),
+          
+          // Back Button
+          Positioned(
+            top: 50,
+            left: 20,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+              onPressed: () => Navigator.pop(context),
             ),
           ),
         ],
@@ -437,48 +519,66 @@ class PartyDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _detailStat(
-      BuildContext context, IconData icon, String label, String value) {
+  Widget _sectionLabel(String text) => Text(text,
+      style: const TextStyle(
+        color: AppColors.textPink,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 2,
+        fontSize: 10,
+      ));
+
+  Widget _miniStat(BuildContext context, IconData icon, String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          Icon(icon, size: 10, color: Colors.white38),
+          Icon(icon, size: 8, color: Colors.white38),
           const SizedBox(width: 5),
-          Text(label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white38, fontWeight: FontWeight.bold))
+          Text(label, style: const TextStyle(color: Colors.white38, fontWeight: FontWeight.bold, fontSize: 8))
         ]),
-        const SizedBox(height: 5),
-        Text(value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                )),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 13)),
       ],
     );
   }
 
-  Widget _decisionBtn(BuildContext context, IconData icon, Color color,
-      String label, VoidCallback onTap) {
+  Widget _infoLine(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
+          Text(value, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _smallChip(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        border: Border.all(color: color.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 9)),
+    );
+  }
+
+  Widget _decisionBtn(BuildContext context, IconData icon, Color color, String label, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         children: [
           WaterGlass(
-              width: 80,
-              height: 80,
-              borderRadius: 40,
-              borderColor: color,
+              width: 70, height: 70,
+              borderRadius: 35,
+              borderColor: color.withOpacity(0.5),
               border: 2,
-              child: Icon(icon, color: color, size: 24)),
-          const SizedBox(height: 10),
-          Text(label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  )),
+              child: Icon(icon, color: color, size: 22)),
+          const SizedBox(height: 8),
+          Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 9)),
         ],
       ),
     );
