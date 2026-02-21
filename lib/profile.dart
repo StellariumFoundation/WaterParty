@@ -73,15 +73,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   // --- Controllers for Text Input ---
   late TextEditingController _realNameCtrl;
+  late TextEditingController _phoneCtrl;
   late TextEditingController _bioCtrl;
   late TextEditingController _jobCtrl;
   late TextEditingController _companyCtrl;
   late TextEditingController _schoolCtrl;
+  late TextEditingController _degreeCtrl;
   late TextEditingController _instaCtrl;
+  late TextEditingController _twitterCtrl;
+  late TextEditingController _linkedInCtrl;
+  late TextEditingController _xCtrl;
+  late TextEditingController _tiktokCtrl;
 
   // --- Local State for Non-Text Fields ---
   int _age = 18;
   int _heightCm = 170;
+  String _gender = "OTHER";
   String _drinking = "Social";
   String _smoking = "No";
   String _cannabis = "No";
@@ -89,6 +96,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   // Options for Dropdowns
   final List<String> _habitOptions = ["No", "Social", "Yes"];
+  final List<String> _genderOptions = ["MALE", "FEMALE", "OTHER"];
   final List<String> _commonInterests = ["#Techno", "#Jazz", "#Art", "#Hiking", "#Foodie", "#Travel", "#Gaming", "#Yoga"];
 
   @override
@@ -102,14 +110,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (user == null) return;
 
     _realNameCtrl = TextEditingController(text: user.realName);
+    _phoneCtrl = TextEditingController(text: user.phoneNumber);
     _bioCtrl = TextEditingController(text: user.bio);
     _jobCtrl = TextEditingController(text: user.jobTitle);
     _companyCtrl = TextEditingController(text: user.company);
     _schoolCtrl = TextEditingController(text: user.school);
+    _degreeCtrl = TextEditingController(text: user.degree);
     _instaCtrl = TextEditingController(text: user.instagramHandle);
+    _twitterCtrl = TextEditingController(text: user.twitterHandle);
+    _linkedInCtrl = TextEditingController(text: user.linkedinHandle);
+    _xCtrl = TextEditingController(text: user.xHandle);
+    _tiktokCtrl = TextEditingController(text: user.tiktokHandle);
     
     _age = user.age == 0 ? 18 : user.age;
     _heightCm = user.heightCm == 0 ? 170 : user.heightCm;
+    _gender = user.gender.isEmpty ? "OTHER" : user.gender;
     _drinking = user.drinkingPref.isEmpty ? "Social" : user.drinkingPref;
     _smoking = user.smokingPref.isEmpty ? "No" : user.smokingPref;
     _cannabis = user.cannabisPref.isEmpty ? "No" : user.cannabisPref;
@@ -119,11 +134,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   void dispose() {
     _realNameCtrl.dispose();
+    _phoneCtrl.dispose();
     _bioCtrl.dispose();
     _jobCtrl.dispose();
     _companyCtrl.dispose();
     _schoolCtrl.dispose();
+    _degreeCtrl.dispose();
     _instaCtrl.dispose();
+    _twitterCtrl.dispose();
+    _linkedInCtrl.dispose();
+    _xCtrl.dispose();
+    _tiktokCtrl.dispose();
     super.dispose();
   }
 
@@ -134,14 +155,44 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() => isEditing = !isEditing);
   }
 
-  void _saveChanges() {
+  void _saveChanges() async {
     final currentUser = ref.read(authProvider).value;
     if (currentUser == null) return;
 
-    ref.read(authProvider.notifier).updateUserProfile(
+    final updatedUser = currentUser.copyWith(
+      realName: _realNameCtrl.text,
+      bio: _bioCtrl.text,
+    );
+
+    // Update locally through the provider
+    await ref.read(authProvider.notifier).updateUserProfile(
       realName: _realNameCtrl.text, 
       bio: _bioCtrl.text, 
     );
+
+    // Update ALL fields on the backend via WebSocket
+    ref.read(socketServiceProvider).sendMessage('UPDATE_PROFILE', {
+      'ID': currentUser.id,
+      'RealName': _realNameCtrl.text,
+      'PhoneNumber': _phoneCtrl.text,
+      'Bio': _bioCtrl.text,
+      'JobTitle': _jobCtrl.text,
+      'Company': _compCtrl.text,
+      'School': _schoolCtrl.text,
+      'Degree': _degreeCtrl.text,
+      'InstagramHandle': _instaCtrl.text,
+      'TwitterHandle': _twitterCtrl.text,
+      'LinkedinHandle': _linkedInCtrl.text,
+      'XHandle': _xCtrl.text,
+      'TikTokHandle': _tiktokCtrl.text,
+      'Age': _age,
+      'HeightCm': _heightCm,
+      'Gender': _gender,
+      'DrinkingPref': _drinking,
+      'SmokingPref': _smoking,
+      'CannabisPref': _cannabis,
+      'Interests': _interests,
+    });
   }
 
   @override
@@ -196,7 +247,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           const SizedBox(height: 20),
                           _buildWorkEducationSection(),
                           const SizedBox(height: 20),
+                          _buildSocialHandlesSection(),
+                          const SizedBox(height: 20),
                           _buildInterestsSection(),
+                          const SizedBox(height: 40),
+                          _buildEditButton(),
                           const SizedBox(height: 100),
                         ],
                       ),
@@ -208,15 +263,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _toggleEdit,
-        backgroundColor: isEditing ? Colors.greenAccent : AppColors.textCyan,
-        icon: Icon(isEditing ? Icons.check : Icons.edit, color: Colors.black),
-        label: Text(
+    );
+  }
+
+  Widget _buildEditButton() {
+    return GestureDetector(
+      onTap: _toggleEdit,
+      child: Container(
+        height: 60,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+          gradient: LinearGradient(
+            colors: isEditing 
+              ? [Colors.greenAccent.withOpacity(0.8), Colors.tealAccent.withOpacity(0.8)]
+              : [AppColors.textCyan, AppColors.electricPurple],
+          ),
+          boxShadow: [
+            BoxShadow(color: (isEditing ? Colors.greenAccent : AppColors.textCyan).withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 8))
+          ],
+        ),
+        alignment: Alignment.center,
+        child: Text(
           isEditing ? "SAVE PROFILE" : "EDIT PROFILE",
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: Colors.black,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
               ),
         ),
       ),
@@ -484,20 +557,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("LIFESTYLE",
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white38,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                )),
-        const SizedBox(height: 10),
+        _sectionHeader("LIFESTYLE"),
+        if (isEditing) ...[
+          Text("GENDER", style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white54, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _genderEditChip("MALE"),
+              const SizedBox(width: 10),
+              _genderEditChip("FEMALE"),
+              const SizedBox(width: 10),
+              _genderEditChip("OTHER"),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
         Row(
           children: [
             Expanded(
-                child: _buildInfoTile(
-                    Icons.height,
-                    "Height",
-                    "$_heightCm cm")),
+                child: isEditing 
+                  ? _buildHeightEditTile()
+                  : _buildInfoTile(Icons.straighten, "Height", "$_heightCm cm")),
             const SizedBox(width: 10),
             Expanded(
                 child: _buildDropdownTile(Icons.local_bar, "Drinks", _drinking,
@@ -517,6 +597,49 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _genderEditChip(String label) {
+    bool active = _gender == label;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _gender = label),
+        child: Container(
+          height: 45,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: active ? AppColors.textCyan : Colors.white10),
+            color: active ? AppColors.textCyan.withOpacity(0.1) : Colors.transparent,
+          ),
+          alignment: Alignment.center,
+          child: Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: active ? Colors.white : Colors.white24, fontWeight: FontWeight.bold, fontSize: 10)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeightEditTile() {
+    return WaterGlass(
+      height: 60,
+      borderRadius: 15,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 15),
+        child: Row(
+          children: [
+            const Icon(Icons.straighten, color: Colors.white38, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                decoration: const InputDecoration(hintText: "Height", border: InputBorder.none, isDense: true),
+                onChanged: (v) => _heightCm = int.tryParse(v) ?? _heightCm,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -595,15 +718,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildWorkEducationSection() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildListInput(_jobCtrl, Icons.work, "Job Title", "Add Job"),
+        _sectionHeader("WORK & EDUCATION"),
+        _buildListInput(_jobCtrl, Icons.work_outline, "Job Title", "Add Job"),
         const SizedBox(height: 10),
-        _buildListInput(_companyCtrl, Icons.business, "Company", "Add Company"),
+        _buildListInput(_companyCtrl, Icons.business_outlined, "Company", "Add Company"),
         const SizedBox(height: 10),
-        _buildListInput(_schoolCtrl, Icons.school, "School", "Add School"),
+        _buildListInput(_schoolCtrl, Icons.school_outlined, "School", "Add School"),
         const SizedBox(height: 10),
-        _buildListInput(
-            _instaCtrl, Icons.camera_alt, "Instagram", "Add Handle"),
+        _buildListInput(_degreeCtrl, Icons.description_outlined, "Degree", "Add Degree"),
+        const SizedBox(height: 10),
+        _buildListInput(_phoneCtrl, Icons.phone_outlined, "Phone Number", "Add Phone"),
+      ],
+    );
+  }
+
+  Widget _buildSocialHandlesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader("SOCIAL ECOSYSTEM"),
+        _buildListInput(_instaCtrl, FontAwesomeIcons.instagram, "Instagram", "Add Instagram"),
+        const SizedBox(height: 10),
+        _buildListInput(_twitterCtrl, FontAwesomeIcons.twitter, "Twitter", "Add Twitter"),
+        const SizedBox(height: 10),
+        _buildListInput(_xCtrl, FontAwesomeIcons.xTwitter, "X (Twitter)", "Add X"),
+        const SizedBox(height: 10),
+        _buildListInput(_tiktokCtrl, FontAwesomeIcons.tiktok, "TikTok", "Add TikTok"),
+        const SizedBox(height: 10),
+        _buildListInput(_linkedInCtrl, FontAwesomeIcons.linkedin, "LinkedIn", "Add LinkedIn"),
       ],
     );
   }
