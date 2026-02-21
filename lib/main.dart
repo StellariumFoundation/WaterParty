@@ -22,15 +22,20 @@ class WaterPartyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authProvider);
+    final userAsync = ref.watch(authProvider);
 
     return MaterialApp(
       title: 'Water Party',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: user != null 
-          ? const MainScaffold() 
-          : const AuthScreen(),
+      home: userAsync.when(
+        data: (user) => user != null ? const MainScaffold() : const AuthScreen(),
+        loading: () => const Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(child: CircularProgressIndicator(color: AppColors.textCyan)),
+        ),
+        error: (e, st) => const AuthScreen(),
+      ),
     );
   }
 }
@@ -47,7 +52,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final user = ref.read(authProvider);
+      final user = ref.read(authProvider).value;
       if (user != null) {
         ref.read(socketServiceProvider).connect(user.id);
       }

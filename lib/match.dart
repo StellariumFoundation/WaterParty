@@ -18,20 +18,48 @@ class PartyFeedScreen extends ConsumerStatefulWidget {
 
 class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
   final CardSwiperController controller = CardSwiperController();
-  bool _locationLoading = true;
+  bool _isInitialLoading = true;
   String? _locationError;
 
   @override
   void initState() {
     super.initState();
-    _determinePosition();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndFetchLocation();
+    });
   }
 
-  Future<void> _determinePosition() async {
+  Future<void> _checkAndFetchLocation() async {
+    final existingLoc = ref.read(locationProvider);
+    
+    if (existingLoc != null) {
+      // We have a location! Start loading feed immediately
+      _fetchFeed(existingLoc.lat, existingLoc.lon);
+      if (mounted) setState(() => _isInitialLoading = false);
+      
+      // Still refresh location silently in background
+      _determinePosition(silent: true);
+    } else {
+      // No location yet, must fetch
+      _determinePosition();
+    }
+  }
+
+  Future<void> _fetchFeed(double lat, double lon) async {
+    ref.read(socketServiceProvider).sendMessage('GET_FEED', {
+      'Lat': lat,
+      'Lon': lon,
+      'RadiusKm': 50.0,
+    });
+  }
+
+  Future<void> _determinePosition({bool silent = false}) async {
     bool serviceEnabled;
     LocationPermission permission;
 
-    setState(() { _locationLoading = true; _locationError = null; });
+    if (!silent) {
+      setState(() { _isInitialLoading = true; _locationError = null; });
+    }
 
     try {
       serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -39,29 +67,31 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
 
       permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
+        // Only request if not silent
+        if (silent) return; 
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) throw 'Location permissions are denied';
       }
       
       if (permission == LocationPermission.deniedForever) {
+        if (silent) return;
         throw 'Location permissions are permanently denied.';
       }
 
-      final position = await Geolocator.getCurrentPosition();
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 10),
+      );
       
-      // Request parties nearby via WebSocket
-      ref.read(socketServiceProvider).sendMessage('GET_FEED', {
-        'Lat': position.latitude,
-        'Lon': position.longitude,
-        'RadiusKm': 50.0,
-      });
+      await ref.read(locationProvider.notifier).updateLocation(position.latitude, position.longitude);
+      _fetchFeed(position.latitude, position.longitude);
 
-      if (mounted) setState(() => _locationLoading = false);
+      if (mounted) setState(() => _isInitialLoading = false);
     } catch (e) {
-      if (mounted) {
+      if (mounted && !silent) {
         setState(() {
           _locationError = e.toString();
-          _locationLoading = false;
+          _isInitialLoading = false;
         });
       }
     }
@@ -70,12 +100,14 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
   @override
   Widget build(BuildContext context) {
     final parties = ref.watch(partyFeedProvider);
+    final currentLoc = ref.watch(locationProvider);
 
-    if (_locationLoading) {
+    // Only show loading if we have absolutely no location and we are currently fetching
+    if (_isInitialLoading && currentLoc == null) {
       return const Center(child: CircularProgressIndicator(color: AppColors.textCyan));
     }
 
-    if (_locationError != null) {
+    if (_locationError != null && currentLoc == null) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

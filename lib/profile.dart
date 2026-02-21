@@ -28,7 +28,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         final bytes = await image.readAsBytes();
         final hash = await ref.read(authProvider.notifier).uploadImage(bytes, "image/jpeg");
         
-        final user = ref.read(authProvider);
+        final user = ref.read(authProvider).value;
         if (user != null) {
           final updatedPhotos = [...user.profilePhotos, hash];
           await ref.read(authProvider.notifier).updateUserProfile(profilePhotos: updatedPhotos);
@@ -74,7 +74,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _initializeFields() {
-    final user = ref.read(authProvider);
+    final user = ref.read(authProvider).value;
     if (user == null) return;
 
     _realNameCtrl = TextEditingController(text: user.realName);
@@ -111,7 +111,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _saveChanges() {
-    final currentUser = ref.read(authProvider);
+    final currentUser = ref.read(authProvider).value;
     if (currentUser == null) return;
 
     ref.read(authProvider.notifier).updateUserProfile(
@@ -122,7 +122,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authProvider);
+    final user = ref.watch(authProvider).value;
     if (user == null) return const SizedBox();
 
     return Scaffold(

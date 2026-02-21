@@ -7,17 +7,16 @@ import 'package:path/path.dart' as p;
 import 'models.dart';
 import 'constants.dart';
 
-class AuthNotifier extends Notifier<User?> {
+class AuthNotifier extends AsyncNotifier<User?> {
   static const String apiBase = AppConstants.apiBase;
   Database? _db;
 
   @override
-  User? build() {
-    _initAndLoadSession();
-    return null;
+  Future<User?> build() async {
+    return _initAndLoadSession();
   }
 
-  Future<void> _initAndLoadSession() async {
+  Future<User?> _initAndLoadSession() async {
     final databasesPath = await getDatabasesPath();
     final path = p.join(databasesPath, 'waterparty.db');
 
@@ -30,11 +29,12 @@ class AuthNotifier extends Notifier<User?> {
     final List<Map<String, dynamic>> maps = await _db!.query('session');
     if (maps.isNotEmpty) {
       try {
-        state = User.fromMap(jsonDecode(maps.first['user_json']));
+        return User.fromMap(jsonDecode(maps.first['user_json']));
       } catch (e) {
         await _db!.delete('session');
       }
     }
+    return null;
   }
 
   Future<void> _saveSession(User user) async {
@@ -47,44 +47,56 @@ class AuthNotifier extends Notifier<User?> {
   }
 
   Future<void> register(User user, String password) async {
-    final response = await http.post(
-      Uri.parse("$apiBase/register"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "password": password,
-        ...user.toMap(),
-      }),
-    );
+    state = const AsyncValue.loading();
+    try {
+      final response = await http.post(
+        Uri.parse("$apiBase/register"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "password": password,
+          ...user.toMap(),
+        }),
+      );
 
-    if (response.statusCode == 200) {
-      final loggedInUser = User.fromMap(jsonDecode(response.body));
-      state = loggedInUser;
-      await _saveSession(loggedInUser);
-    } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error'] ?? "Registration failed");
+      if (response.statusCode == 200) {
+        final loggedInUser = User.fromMap(jsonDecode(response.body));
+        state = AsyncValue.data(loggedInUser);
+        await _saveSession(loggedInUser);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? "Registration failed");
+      }
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
 
   Future<void> login(String email, String password) async {
-    final response = await http.post(
-      Uri.parse("$apiBase/login"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"email": email, "password": password}),
-    );
+    state = const AsyncValue.loading();
+    try {
+      final response = await http.post(
+        Uri.parse("$apiBase/login"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email, "password": password}),
+      );
 
-    if (response.statusCode == 200) {
-      final loggedInUser = User.fromMap(jsonDecode(response.body));
-      state = loggedInUser;
-      await _saveSession(loggedInUser);
-    } else {
-      throw Exception("Invalid credentials");
+      if (response.statusCode == 200) {
+        final loggedInUser = User.fromMap(jsonDecode(response.body));
+        state = AsyncValue.data(loggedInUser);
+        await _saveSession(loggedInUser);
+      } else {
+        throw Exception("Invalid credentials");
+      }
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
 
   void logout() async {
     if (_db != null) await _db!.delete('session');
-    state = null;
+    state = const AsyncValue.data(null);
   }
 
   Future<String> uploadImage(List<int> bytes, String mime) async {
@@ -101,13 +113,14 @@ class AuthNotifier extends Notifier<User?> {
   }
 
   Future<void> updateUserProfile({String? realName, String? bio, List<String>? profilePhotos}) async {
-    if (state == null) return;
-    state = state!.copyWith(realName: realName, bio: bio, profilePhotos: profilePhotos);
-    await _saveSession(state!);
+    if (state.value == null) return;
+    final newUser = state.value!.copyWith(realName: realName, bio: bio, profilePhotos: profilePhotos);
+    state = AsyncValue.data(newUser);
+    await _saveSession(newUser);
   }
 }
 
-final authProvider = NotifierProvider<AuthNotifier, User?>(AuthNotifier.new);
+final authProvider = AsyncNotifierProvider<AuthNotifier, User?>(AuthNotifier.new);
 
 // --- CHAT SYSTEM ---
 
@@ -139,6 +152,52 @@ class ChatNotifier extends Notifier<List<ChatRoom>> {
 }
 
 final chatProvider = NotifierProvider<ChatNotifier, List<ChatRoom>>(ChatNotifier.new);
+
+// --- LOCATION SYSTEM ---
+
+class UserLocation {
+  final double lat;
+  final double lon;
+  final DateTime timestamp;
+  const UserLocation({required this.lat, required this.lon, required this.timestamp});
+
+  Map<String, dynamic> toMap() => {
+    'lat': lat,
+    'lon': lon,
+    'ts': timestamp.toIso8601String(),
+  };
+
+  factory UserLocation.fromMap(Map<String, dynamic> map) => UserLocation(
+    lat: map['lat'],
+    lon: map['lon'],
+    timestamp: DateTime.parse(map['ts']),
+  );
+}
+
+class LocationNotifier extends Notifier<UserLocation?> {
+  @override
+  UserLocation? build() {
+    _loadPersistedLocation();
+    return null;
+  }
+
+  Future<void> _loadPersistedLocation() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString('last_location');
+    if (data != null) {
+      state = UserLocation.fromMap(jsonDecode(data));
+    }
+  }
+
+  Future<void> updateLocation(double lat, double lon) async {
+    final loc = UserLocation(lat: lat, lon: lon, timestamp: DateTime.now());
+    state = loc;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('last_location', jsonEncode(loc.toMap()));
+  }
+}
+
+final locationProvider = NotifierProvider<LocationNotifier, UserLocation?>(LocationNotifier.new);
 
 class NavIndexNotifier extends Notifier<int> {
   @override

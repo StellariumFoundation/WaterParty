@@ -66,6 +66,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
   Future<void> _loadDraft() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
+      currentStep = prefs.getInt('reg_step') ?? 0;
       _realNameCtrl.text = prefs.getString('reg_name') ?? '';
       _emailCtrl.text = prefs.getString('reg_email') ?? '';
       _phoneCtrl.text = prefs.getString('reg_phone') ?? '';
@@ -90,6 +91,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
 
   Future<void> _saveDraft() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('reg_step', currentStep);
     await prefs.setString('reg_name', _realNameCtrl.text);
     await prefs.setString('reg_email', _emailCtrl.text);
     await prefs.setString('reg_phone', _phoneCtrl.text);
