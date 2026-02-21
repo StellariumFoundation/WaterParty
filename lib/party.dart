@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
+import 'package:geolocator/geolocator.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
 import 'websocket.dart';
+import 'constants.dart';
 
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong2.dart';
@@ -187,7 +189,6 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       geoLon: _geoLon ?? 0.0,
       maxCapacity: _capacity.toInt(),
       currentGuestCount: 0,
-      slotRequirements: {},
       autoLockOnFull: _autoLock,
       vibeTags: finalTags,
       musicGenres: [], // Removed as per request
@@ -760,7 +761,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       ],
     );
   }
-
+}
 
 class MapPickerScreen extends StatefulWidget {
   final LatLng initialLocation;
@@ -841,3 +842,5 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   }
 }
 
+
+}

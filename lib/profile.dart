@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
@@ -177,7 +178,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       'PhoneNumber': _phoneCtrl.text,
       'Bio': _bioCtrl.text,
       'JobTitle': _jobCtrl.text,
-      'Company': _compCtrl.text,
+      'Company': _companyCtrl.text,
       'School': _schoolCtrl.text,
       'Degree': _degreeCtrl.text,
       'InstagramHandle': _instaCtrl.text,
@@ -824,6 +825,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           }).toList(),
         ),
       ],
+    );
+  }
+
+  Widget _sectionHeader(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(text,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textPink,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+              )),
     );
   }
 }
