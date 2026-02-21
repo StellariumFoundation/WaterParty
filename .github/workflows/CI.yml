@@ -125,6 +125,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Extract Version from pubspec.yaml
+        id: get_version
+        run: |
+          VERSION=$(grep 'version: ' pubspec.yaml | sed 's/version: //')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Download all Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -141,10 +148,10 @@ jobs:
       - name: Update Static Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: release
-          name: Water Party Production Build
+          tag_name: v${{ env.VERSION }}
+          name: Water Party v${{ env.VERSION }}
           body: |
-            ## 🚀 Human Connection OS - Latest Build
+            ## 🚀 Human Connection OS - v${{ env.VERSION }}
             
             This is an automated production build of the Water Party ecosystem.
             
@@ -160,7 +167,7 @@ jobs:
             ### ⚡ Server
             - **Multi-Platform**: Binaries for Linux, Windows, and macOS.
             
-            *No new git tags were created for this release.*
+            *Release version synchronized with pubspec.yaml*
           files: |
             WaterParty-*.apk
             WaterParty.aab

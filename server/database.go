@@ -215,9 +215,21 @@ CREATE TABLE IF NOT EXISTS crowdfunding (
 -- ==========================================
 -- CHAT SYSTEM
 -- ==========================================
+CREATE TABLE IF NOT EXISTS chat_rooms (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    party_id UUID REFERENCES parties(id) ON DELETE CASCADE,
+    host_id UUID NOT NULL REFERENCES users(id),
+    title TEXT,
+    image_url TEXT,
+    is_group BOOLEAN DEFAULT TRUE,
+    participant_ids UUID[] DEFAULT '{}',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS chat_messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    chat_id UUID NOT NULL, -- Logical ID grouping messages for a specific party
+    chat_id UUID NOT NULL, -- References chat_rooms(id)
     sender_id UUID NOT NULL REFERENCES users(id),
     type TEXT NOT NULL DEFAULT 'TEXT', -- TEXT, IMAGE, VIDEO, AUDIO, SYSTEM, AI, PAYMENT
     content TEXT,
@@ -413,11 +425,26 @@ func CreateParty(p Party) (string, error) {
 		slotReq, p.VibeTags, p.MusicGenres, p.Mood, p.Rules, p.ChatRoomID,
 	).Scan(&id)
 
-	if err == nil && p.RotationPool != nil {
-		p.RotationPool.PartyID = id
-		_, poolErr := CreateRotationPool(*p.RotationPool)
-		if poolErr != nil {
-			log.Printf("Warning: Failed to create rotation pool for party: %v", poolErr)
+	if err == nil {
+		// Create ChatRoom for the party
+		_, chatErr := CreateChatRoom(ChatRoom{
+			ID:             p.ChatRoomID,
+			PartyID:        id,
+			HostID:         p.HostID,
+			Title:          p.Title,
+			IsGroup:        true,
+			ParticipantIDs: []string{p.HostID},
+		})
+		if chatErr != nil {
+			log.Printf("Warning: Failed to create chat room for party: %v", chatErr)
+		}
+
+		if p.RotationPool != nil {
+			p.RotationPool.PartyID = id
+			_, poolErr := CreateRotationPool(*p.RotationPool)
+			if poolErr != nil {
+				log.Printf("Warning: Failed to create rotation pool for party: %v", poolErr)
+			}
 		}
 	}
 
@@ -463,6 +490,25 @@ func UpdatePartyStatus(partyID string, status PartyStatus) error {
 func DeleteParty(id string) error {
 	_, err := db.Exec(context.Background(), "DELETE FROM parties WHERE id = $1", id)
 	return err
+}
+
+func CreateChatRoom(cr ChatRoom) (string, error) {
+	query := `INSERT INTO chat_rooms (id, party_id, host_id, title, image_url, is_group, participant_ids) 
+	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
+	
+	var id string
+	err := db.QueryRow(context.Background(), query, cr.ID, cr.PartyID, cr.HostID, cr.Title, cr.ImageUrl, cr.IsGroup, cr.ParticipantIDs).Scan(&id)
+	return id, err
+}
+
+func GetChatRoom(id string) (ChatRoom, error) {
+	var cr ChatRoom
+	query := `SELECT id, party_id, host_id, title, image_url, is_group, participant_ids, is_active, created_at 
+		FROM chat_rooms WHERE id = $1`
+	err := db.QueryRow(context.Background(), query, id).Scan(
+		&cr.ID, &cr.PartyID, &cr.HostID, &cr.Title, &cr.ImageUrl, &cr.IsGroup, &cr.ParticipantIDs, &cr.IsActive, &cr.CreatedAt,
+	)
+	return cr, err
 }
 
 // ==========================================

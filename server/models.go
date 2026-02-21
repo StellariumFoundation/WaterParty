@@ -120,6 +120,18 @@ type Party struct {
 	UpdatedAt          *time.Time     `json:"UpdatedAt,omitempty" db:"updated_at"`
 }
 
+type ChatRoom struct {
+	ID             string        `json:"ID" db:"id"`
+	PartyID        string        `json:"PartyID" db:"party_id"`
+	HostID         string        `json:"HostID" db:"host_id"`
+	Title          string        `json:"Title" db:"title"`
+	ImageUrl       string        `json:"ImageUrl" db:"image_url"`
+	IsGroup        bool          `json:"IsGroup" db:"is_group"`
+	ParticipantIDs []string      `json:"ParticipantIDs" db:"participant_ids"`
+	IsActive       bool          `json:"IsActive" db:"is_active"`
+	CreatedAt      time.Time     `json:"CreatedAt" db:"created_at"`
+}
+
 type ChatMessage struct {
 	ID           string                 `json:"ID" db:"id"`
 	ChatID       string                 `json:"ChatID" db:"chat_id"`
