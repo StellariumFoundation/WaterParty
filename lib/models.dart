@@ -218,7 +218,7 @@ class User {
       'Email': email,
       'ProfilePhotos': profilePhotos,
       'Age': age,
-      'DateOfBirth': dateOfBirth?.toIso8601String(),
+      'DateOfBirth': dateOfBirth?.toUtc().toIso8601String(),
       'HeightCm': heightCm,
       'Gender': gender,
       'LookingFor': lookingFor,

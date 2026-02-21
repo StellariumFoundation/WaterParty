@@ -114,13 +114,15 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		log.Printf("Registration JSON decode error: %v", err)
+		http.Error(w, "Invalid request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	
 	u := req.User
+	u.Email = strings.ToLower(strings.TrimSpace(u.Email))
 	
 	// Extrapolate Age and CreatedAt
 	now := time.Now()
@@ -178,9 +180,12 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		log.Printf("Login JSON decode error: %v", err)
+		http.Error(w, "Invalid request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	user, hash, err := GetUserByEmail(req.Email)
 	if err != nil {

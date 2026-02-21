@@ -290,7 +290,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -305,7 +305,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
                   Expanded(
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(30, 20, 30, 180),
+                      padding: const EdgeInsets.fromLTRB(30, 20, 30, 150),
                       child: Column(
                         children: [
                           _buildErrorBanner(),
@@ -392,8 +392,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
   Widget _buildLoginFields() {
     return Column(
       children: [
-        const SizedBox(height: 50),
-        const Icon(Icons.login_rounded, color: Colors.white12, size: 100),
         const SizedBox(height: 40),
         _input(_emailCtrl, "EMAIL", Icons.alternate_email_rounded),
         const SizedBox(height: 20),
