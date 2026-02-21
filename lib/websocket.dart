@@ -53,13 +53,24 @@ class SocketService {
       case 'LOCATION_REVEALED':
         // Logic for location reveal
         break;
+      case 'APPLICANTS_LIST':
+        final List<dynamic> appsRaw = payload['Applicants'];
+        final apps = appsRaw.map((a) => PartyApplication.fromMap(a)).toList();
+        ref.read(partyApplicantsProvider.notifier).setApplicants(apps);
+        break;
+      case 'APPLICATION_UPDATED':
+        final status = ApplicantStatus.values.firstWhere(
+          (e) => e.toString().split('.').last == payload['Status']
+        );
+        ref.read(partyApplicantsProvider.notifier).updateStatus(payload['UserID'], status);
+        break;
     }
   }
 
   // Send message to Go Backend
   void sendMessage(String event, dynamic payload) {
     if (_channel != null) {
-      final user = ref.read(authProvider);
+      final user = ref.read(authProvider).value;
       final msg = jsonEncode({
         'Event': event,
         'Payload': payload,

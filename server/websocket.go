@@ -323,6 +323,52 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			Payload: parties,
 		})
 		c.send <- response
+
+	case "GET_APPLICANTS":
+		// Payload: {"PartyID": "uuid"}
+		partyID, _ := wsMsg.Payload.(map[string]interface{})["PartyID"].(string)
+		if partyID == "" {
+			return
+		}
+
+		apps, err := GetApplicantsForParty(partyID)
+		if err != nil {
+			log.Printf("Get Applicants DB Error: %v", err)
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "APPLICANTS_LIST",
+			Payload: map[string]interface{}{
+				"PartyID":    partyID,
+				"Applicants": apps,
+			},
+		})
+		c.send <- response
+
+	case "UPDATE_APPLICATION":
+		// Payload: {"PartyID": "uuid", "UserID": "uuid", "Status": "ACCEPTED/DECLINED"}
+		var req struct {
+			PartyID string `json:"PartyID"`
+			UserID  string `json:"UserID"`
+			Status  string `json:"Status"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		err := UpdateApplicationStatus(req.PartyID, req.UserID, req.Status)
+		if err != nil {
+			log.Printf("Update Application DB Error: %v", err)
+			return
+		}
+
+		// Broadcast update to the host (self) and maybe the user?
+		// For now just notify host success
+		response, _ := json.Marshal(WSMessage{
+			Event:   "APPLICATION_UPDATED",
+			Payload: req,
+		})
+		c.send <- response
 	
 	case "ADD_CONTRIBUTION":
 		// Handle financial updates, save to DB, broadcast pool update to room

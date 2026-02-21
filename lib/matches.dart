@@ -114,11 +114,13 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
 
   Widget _buildChatTile(ChatRoom room) {
     String timeLabel = _formatDateTime(room.lastMessageAt);
+    final currentUser = ref.read(authProvider).value;
+    final bool isHost = currentUser != null && room.hostId == currentUser.id;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: WaterGlass(
-        height: 90,
+        height: 100,
         borderRadius: 20,
         child: ListTile(
           onTap: () {
@@ -126,7 +128,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
               MaterialPageRoute(builder: (context) => ChatScreen(room: room)),
             );
           },
-          contentPadding: const EdgeInsets.symmetric(horizontal: 15),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
           leading: Stack(
             children: [
               ClipRRect(
@@ -141,7 +143,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                 const Positioned(
                     bottom: 0,
                     right: 0,
-                    child: Icon(Icons.lock, color: AppColors.gold, size: 18)),
+                    child: Icon(Icons.celebration, color: AppColors.gold, size: 18)),
             ],
           ),
           title: Row(
@@ -161,29 +163,41 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                       ?.copyWith(color: Colors.white30, fontSize: 11)),
             ],
           ),
-          subtitle: Row(
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(room.lastMessageContent,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: room.unreadCount > 0
-                            ? Colors.white
-                            : Colors.white54)),
-              ),
-              if (room.unreadCount > 0)
-                Container(
-                  margin: const EdgeInsets.only(left: 10),
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                      color: AppColors.textCyan, shape: BoxShape.circle),
-                  child: Text(room.unreadCount.toString(),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.black, fontWeight: FontWeight.bold)),
-                )
+              Text(room.lastMessageContent,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: room.unreadCount > 0
+                          ? Colors.white
+                          : Colors.white54)),
+              if (isHost && room.isGroup)
+                Padding(
+                  padding: const EdgeInsets.only(top: 5),
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => GuestManagementScreen(partyId: room.partyId, partyTitle: room.title),
+                        ),
+                      );
+                    },
+                    child: const Text("MANAGE GUESTS", 
+                      style: TextStyle(color: AppColors.textCyan, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  ),
+                ),
             ],
           ),
+          trailing: room.unreadCount > 0 ? Container(
+            padding: const EdgeInsets.all(6),
+            decoration: const BoxDecoration(
+                color: AppColors.textCyan, shape: BoxShape.circle),
+            child: Text(room.unreadCount.toString(),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.black, fontWeight: FontWeight.bold)),
+          ) : null,
         ),
       ),
     );
@@ -195,5 +209,278 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     if (diff.inMinutes < 60) return "${diff.inMinutes}m ago";
     if (diff.inHours < 24) return "${diff.inHours}h ago";
     return "${diff.inDays}d ago";
+  }
+}
+
+// ==========================================
+// GUEST MANAGEMENT SCREEN
+// ==========================================
+
+class GuestManagementScreen extends ConsumerStatefulWidget {
+  final String partyId;
+  final String partyTitle;
+  const GuestManagementScreen({required this.partyId, required this.partyTitle, super.key});
+
+  @override
+  ConsumerState<GuestManagementScreen> createState() => _GuestManagementScreenState();
+}
+
+class _GuestManagementScreenState extends ConsumerState<GuestManagementScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(socketServiceProvider).sendMessage('GET_APPLICANTS', {'PartyID': widget.partyId});
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final applicants = ref.watch(partyApplicantsProvider);
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("GUEST LIST", style: TextStyle(fontSize: 12, color: AppColors.textPink, fontWeight: FontWeight.bold, letterSpacing: 2)),
+            Text(widget.partyTitle.toUpperCase(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
+          ],
+        ),
+      ),
+      body: applicants.isEmpty 
+        ? const Center(child: Text("NO APPLICATIONS YET", style: TextStyle(color: Colors.white10, fontWeight: FontWeight.bold, letterSpacing: 2)))
+        : ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: applicants.length,
+            itemBuilder: (context, index) {
+              final app = applicants[index];
+              return _buildApplicantCard(app);
+            },
+          ),
+    );
+  }
+
+  Widget _buildApplicantCard(PartyApplication app) {
+    final user = app.user;
+    if (user == null) return const SizedBox();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 15),
+      child: WaterGlass(
+        height: 120,
+        borderRadius: 20,
+        child: InkWell(
+          onTap: () {
+             Navigator.push(context, MaterialPageRoute(builder: (context) => ExternalProfileScreen(user: user)));
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(15),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: Image.network(
+                    user.profilePhotos.isNotEmpty ? AppConstants.assetUrl(user.profilePhotos.first) : "https://images.unsplash.com/photo-1511367461989-f85a21fda167?q=80&w=1000",
+                    width: 90, height: 90, fit: BoxFit.cover),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text("${user.realName}, ${user.age}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          const Icon(Icons.flash_on, color: AppColors.gold, size: 14),
+                          Text(" ${user.eloScore.toInt()} ELO", style: const TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 10)),
+                          const SizedBox(width: 10),
+                          const Icon(Icons.shield, color: AppColors.textCyan, size: 14),
+                          Text(" ${user.trustScore.toInt()}", style: const TextStyle(color: AppColors.textCyan, fontWeight: FontWeight.bold, fontSize: 10)),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(user.bio, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                if (app.status == ApplicantStatus.PENDING)
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _actionButton(Icons.check, Colors.greenAccent, () => _handleUpdate(app, "ACCEPTED")),
+                      _actionButton(Icons.close, Colors.redAccent, () => _handleUpdate(app, "DECLINED")),
+                    ],
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: app.status == ApplicantStatus.ACCEPTED ? Colors.greenAccent : Colors.redAccent),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text(app.status.toString().split('.').last, 
+                      style: TextStyle(color: app.status == ApplicantStatus.ACCEPTED ? Colors.greenAccent : Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _actionButton(IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+        child: Icon(icon, color: color, size: 20),
+      ),
+    );
+  }
+
+  void _handleUpdate(PartyApplication app, String status) {
+    ref.read(socketServiceProvider).sendMessage('UPDATE_APPLICATION', {
+      'PartyID': app.partyId,
+      'UserID': app.userId,
+      'Status': status,
+    });
+  }
+}
+
+// ==========================================
+// EXTERNAL PROFILE VIEW
+// ==========================================
+
+class ExternalProfileScreen extends StatelessWidget {
+  final User user;
+  const ExternalProfileScreen({required this.user, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // Basic reuse of the profile UI components or a simplified version
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 500,
+            pinned: true,
+            backgroundColor: Colors.black,
+            flexibleSpace: FlexibleSpaceBar(
+              background: _buildPhotoCarousel(user),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(25),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("${user.realName}, ${user.age}", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _statTile("ELO", user.eloScore.toInt().toString(), AppColors.gold),
+                      const SizedBox(width: 15),
+                      _statTile("TRUST", user.trustScore.toInt().toString(), AppColors.textCyan),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  const Text("BIO", style: TextStyle(color: Colors.white38, fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 12)),
+                  const SizedBox(height: 10),
+                  Text(user.bio, style: const TextStyle(color: Colors.white70, fontSize: 16, height: 1.5)),
+                  
+                  const SizedBox(height: 30),
+                  _infoRow(Icons.work_outline, "JOB", user.jobTitle),
+                  _infoRow(Icons.business_outlined, "COMPANY", user.company),
+                  _infoRow(Icons.school_outlined, "EDUCATION", "${user.school} (${user.degree})"),
+                  
+                  const SizedBox(height: 30),
+                  const Text("LIFESTYLE", style: TextStyle(color: Colors.white38, fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 12)),
+                  const SizedBox(height: 15),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      _habitChip(Icons.straighten, "${user.heightCm}cm"),
+                      _habitChip(Icons.local_bar, "Drinks: ${user.drinkingPref}"),
+                      _habitChip(Icons.smoking_rooms, "Smoke: ${user.smokingPref}"),
+                      _habitChip(Icons.spa, "Weed: ${user.cannabisPref}"),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 100),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoCarousel(User user) {
+    return PageView.builder(
+      itemCount: user.profilePhotos.length,
+      itemBuilder: (context, index) {
+        return Image.network(AppConstants.assetUrl(user.profilePhotos[index]), fit: BoxFit.cover);
+      },
+    );
+  }
+
+  Widget _statTile(String label, String val, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withOpacity(0.3))),
+      child: Row(
+        children: [
+          Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 10)),
+          const SizedBox(width: 8),
+          Text(val, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String val) {
+    if (val.isEmpty || val == " ()") return const SizedBox();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 15),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white24, size: 20),
+          const SizedBox(width: 15),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(color: Colors.white24, fontSize: 9, fontWeight: FontWeight.bold)),
+              Text(val, style: const TextStyle(color: Colors.white, fontSize: 14)),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _habitChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(10)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white38, size: 14),
+          const SizedBox(width: 8),
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        ],
+      ),
+    );
   }
 }

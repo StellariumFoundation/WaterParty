@@ -496,6 +496,59 @@ func DeleteParty(id string) error {
 	return err
 }
 
+func GetApplicantsForParty(partyID string) ([]map[string]interface{}, error) {
+	query := `SELECT pa.party_id, pa.user_id, pa.status, pa.applied_at,
+		u.real_name, u.profile_photos, u.age, u.elo_score, u.bio, u.trust_score
+		FROM party_applications pa
+		JOIN users u ON pa.user_id = u.id
+		WHERE pa.party_id = $1
+		ORDER BY u.elo_score DESC`
+	
+	rows, err := db.Query(context.Background(), query, partyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var apps []map[string]interface{}
+	for rows.Next() {
+		var appID, userID, status, realName, bio string
+		var appliedAt time.Time
+		var profilePhotos []string
+		var age int
+		var eloScore, trustScore float64
+		
+		err := rows.Scan(&appID, &userID, &status, &appliedAt, &realName, &profilePhotos, &age, &eloScore, &bio, &trustScore)
+		if err != nil {
+			return nil, err
+		}
+		
+		apps = append(apps, map[string]interface{}{
+			"PartyID":   appID,
+			"UserID":    userID,
+			"Status":    status,
+			"AppliedAt": appliedAt,
+			"User": map[string]interface{}{
+				"ID":            userID,
+				"RealName":      realName,
+				"ProfilePhotos": profilePhotos,
+				"Age":           age,
+				"EloScore":      eloScore,
+				"Bio":           bio,
+				"TrustScore":    trustScore,
+			},
+		})
+	}
+	return apps, nil
+}
+
+func UpdateApplicationStatus(partyID, userID, status string) error {
+	_, err := db.Exec(context.Background(), 
+		"UPDATE party_applications SET status = $1 WHERE party_id = $2 AND user_id = $3",
+		status, partyID, userID)
+	return err
+}
+
 func CreateChatRoom(cr ChatRoom) (string, error) {
 	query := `INSERT INTO chat_rooms (id, party_id, host_id, title, image_url, is_group, participant_ids) 
 	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`

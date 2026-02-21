@@ -247,3 +247,28 @@ class PartyFeedNotifier extends Notifier<List<Party>> {
 }
 
 final partyFeedProvider = NotifierProvider<PartyFeedNotifier, List<Party>>(PartyFeedNotifier.new);
+
+class PartyApplicantsNotifier extends Notifier<List<PartyApplication>> {
+  @override
+  List<PartyApplication> build() => [];
+  
+  void setApplicants(List<PartyApplication> apps) => state = apps;
+  
+  void updateStatus(String userId, ApplicantStatus status) {
+    state = [
+      for (final app in state)
+        if (app.userId == userId)
+          PartyApplication(
+            partyId: app.partyId,
+            userId: app.userId,
+            status: status,
+            appliedAt: app.appliedAt,
+            user: app.user,
+          )
+        else
+          app
+    ];
+  }
+}
+
+final partyApplicantsProvider = NotifierProvider<PartyApplicantsNotifier, List<PartyApplication>>(PartyApplicantsNotifier.new);

@@ -521,3 +521,32 @@ class Contribution {
     );
   }
 }
+
+class PartyApplication {
+  final String partyId;
+  final String userId;
+  final ApplicantStatus status;
+  final DateTime appliedAt;
+  final User? user; // Optional: include user details for UI
+
+  const PartyApplication({
+    required this.partyId,
+    required this.userId,
+    required this.status,
+    required this.appliedAt,
+    this.user,
+  });
+
+  factory PartyApplication.fromMap(Map<String, dynamic> map) {
+    return PartyApplication(
+      partyId: map['PartyID'] ?? '',
+      userId: map['UserID'] ?? '',
+      status: ApplicantStatus.values.firstWhere(
+        (e) => e.toString().split('.').last == map['Status'],
+        orElse: () => ApplicantStatus.PENDING,
+      ),
+      appliedAt: DateTime.parse(map['AppliedAt']),
+      user: map['User'] != null ? User.fromMap(map['User']) : null,
+    );
+  }
+}
