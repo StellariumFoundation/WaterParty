@@ -18,6 +18,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
   bool isLogin = true;
   bool isLoading = false;
   int currentStep = 0;
+  String? errorMessage;
 
   // Controllers for all fields
   final _emailCtrl = TextEditingController();
@@ -57,7 +58,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
       _linkedInCtrl, _walletTypeCtrl, _walletDataCtrl
     ];
     for (var c in ctrls) {
-      c.addListener(_saveDraft);
+      c.addListener(() {
+        if (errorMessage != null) setState(() => errorMessage = null);
+        _saveDraft();
+      });
     }
     
     _loadDraft();
@@ -150,7 +154,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
   }
 
   bool _isPasswordStrong(String pass) {
-    // 8 characters, at least one letter and one number
     if (pass.length < 8) return false;
     bool hasLetter = pass.contains(RegExp(r'[a-zA-Z]'));
     bool hasNumber = pass.contains(RegExp(r'[0-9]'));
@@ -167,6 +170,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
   }
 
   Future<void> _handleAuth() async {
+    setState(() => errorMessage = null);
     if (isLogin) {
       if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
         _showError("Credentials required");
@@ -180,7 +184,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
       try {
         await ref.read(authProvider.notifier).login(_emailCtrl.text, _passCtrl.text);
       } catch (e) {
-        _showError(e.toString().replaceAll("Exception: ", ""));
+        if (mounted) _showError(e.toString().replaceAll("Exception: ", ""));
       } finally {
         if (mounted) setState(() => isLoading = false);
       }
@@ -222,7 +226,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
       setState(() => isLoading = true);
       try {
         final newUser = User(
-          id: "", // Server generates
+          id: "", 
           realName: _realNameCtrl.text,
           email: _emailCtrl.text,
           phoneNumber: _phoneCtrl.text,
@@ -254,6 +258,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
         final keys = prefs.getKeys().where((k) => k.startsWith('reg_'));
         for (var k in keys) { await prefs.remove(k); }
 
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Registration Successful! Welcome!"), backgroundColor: Colors.green),
+        );
+
         // On success, switch to profile tab
         ref.read(navIndexProvider.notifier).setIndex(3);
       } catch (e) {
@@ -265,14 +273,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
   }
 
   void _showError(String m) {
+    setState(() => errorMessage = m);
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(m, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white)),
-        backgroundColor: Colors.redAccent.withOpacity(0.8),
+        content: Text(m, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.redAccent.withOpacity(0.9),
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(bottom: 120, left: 20, right: 20),
+        margin: const EdgeInsets.only(bottom: 30, left: 20, right: 20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 4),
       ),
     );
   }
@@ -280,7 +290,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -296,7 +306,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(30, 20, 30, 180),
-                      child: isLogin ? _buildLoginFields() : _buildRegisterStepper(),
+                      child: Column(
+                        children: [
+                          _buildErrorBanner(),
+                          if (isLogin) _buildLoginFields() else _buildRegisterStepper(),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -314,21 +329,62 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
     );
   }
 
+  Widget _buildErrorBanner() {
+    if (errorMessage == null) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 25),
+      decoration: BoxDecoration(
+        color: Colors.redAccent.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.4), width: 1.5),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              errorMessage!,
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => setState(() => errorMessage = null),
+            child: const Icon(Icons.close_rounded, color: Colors.white54, size: 20),
+          )
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     return Column(
       children: [
+        const Icon(Icons.waves_rounded, color: AppColors.textCyan, size: 60),
+        const SizedBox(height: 12),
         Text("WATER PARTY",
             style: Theme.of(context).textTheme.displayMedium?.copyWith(
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 4,
+                  letterSpacing: 6,
                   color: Colors.white,
                 )),
-        Text("MATCH YOUR PARTY",
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textPink,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                )),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.textPink.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text("SWIPE AND MATCH YOUR PARTY AROUND",
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textPink,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                    fontSize: 10,
+                  )),
+        ),
       ],
     );
   }
@@ -336,10 +392,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
   Widget _buildLoginFields() {
     return Column(
       children: [
-        const SizedBox(height: 100),
-        _input(_emailCtrl, "EMAIL", Icons.email_outlined),
+        const SizedBox(height: 50),
+        const Icon(Icons.login_rounded, color: Colors.white12, size: 100),
+        const SizedBox(height: 40),
+        _input(_emailCtrl, "EMAIL", Icons.alternate_email_rounded),
         const SizedBox(height: 20),
-        _input(_passCtrl, "PASSWORD", Icons.lock_outline, obscure: true),
+        _input(_passCtrl, "PASSWORD", Icons.fingerprint_rounded, obscure: true),
+        const SizedBox(height: 20),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () {},
+            child: Text("FORGOT PASSWORD?", 
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textCyan.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.bold)),
+          ),
+        ),
       ],
     );
   }
@@ -349,19 +416,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
       case 0:
         return Column(
           children: [
-            _stepHeader("STEP 1: CORE IDENTITY"),
-            _input(_realNameCtrl, "FULL NAME", Icons.badge_outlined),
+            _stepHeader("STEP 1: IDENTITY"),
+            _input(_realNameCtrl, "FULL NAME", Icons.badge_rounded),
             const SizedBox(height: 15),
-            _input(_emailCtrl, "EMAIL", Icons.email_outlined),
+            _input(_emailCtrl, "EMAIL", Icons.alternate_email_rounded),
             const SizedBox(height: 15),
-            _input(_passCtrl, "PASSWORD", Icons.lock_outline, obscure: true),
+            _input(_passCtrl, "PASSWORD", Icons.fingerprint_rounded, obscure: true),
           ],
         );
       case 1:
         return Column(
           children: [
-            _stepHeader("STEP 2: DETAILS"),
-            _input(_phoneCtrl, "PHONE NUMBER (OPTIONAL)", Icons.phone_outlined),
+            _stepHeader("STEP 2: BIOMETRICS"),
+            _input(_phoneCtrl, "PHONE NUMBER", Icons.phone_android_rounded),
             const SizedBox(height: 15),
             Row(
               children: [
@@ -373,19 +440,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
                         initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
                         firstDate: DateTime(1900),
                         lastDate: DateTime.now(),
-                        builder: (context, child) {
-                          return Theme(
-                            data: Theme.of(context).copyWith(
-                              colorScheme: const ColorScheme.dark(
+                        builder: (context, child) => Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: const ColorScheme.dark(
                                 primary: AppColors.textCyan,
                                 onPrimary: Colors.black,
                                 surface: Color(0xFF111111),
-                                onSurface: Colors.white,
-                              ),
-                            ),
-                            child: child!,
-                          );
-                        },
+                                onSurface: Colors.white),
+                          ),
+                          child: child!,
+                        ),
                       );
                       if (date != null) setState(() => _selectedBirthDate = date);
                     },
@@ -398,8 +462,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
                               ? "BIRTHDAY"
                               : DateFormat('MMM d, yyyy').format(_selectedBirthDate!),
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: _selectedBirthDate == null ? Colors.white24 : Colors.white,
-                              ),
+                              color: _selectedBirthDate == null ? Colors.white24 : Colors.white,
+                              fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -407,14 +471,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
                 ),
                 const SizedBox(width: 15),
                 Expanded(
-                  child: _input(_heightCtrl, "HEIGHT (CM)", Icons.straighten_outlined,
+                  child: _input(_heightCtrl, "HEIGHT (CM)", Icons.height_rounded,
                       type: TextInputType.number),
                 ),
               ],
             ),
-            const SizedBox(height: 15),
-            Text("GENDER", style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white54, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
+            const SizedBox(height: 20),
+            Text("GENDER",
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white54, fontWeight: FontWeight.w900, letterSpacing: 1)),
+            const SizedBox(height: 12),
             Row(
               children: [
                 _genderChip("MALE"),
@@ -430,47 +496,36 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
         return Column(
           children: [
             _stepHeader("STEP 3: LIFESTYLE"),
-            _input(_bioCtrl, "BIO / MANIFESTO", Icons.notes, maxLines: 3),
+            _input(_bioCtrl, "BIO / MANIFESTO", Icons.auto_awesome_rounded, maxLines: 3),
             const SizedBox(height: 15),
-            _input(_jobCtrl, "JOB TITLE", Icons.work_outline),
+            _input(_jobCtrl, "JOB TITLE", Icons.work_rounded),
             const SizedBox(height: 15),
-            _input(_compCtrl, "COMPANY", Icons.business_outlined),
-            const SizedBox(height: 15),
+            _input(_compCtrl, "COMPANY", Icons.business_center_rounded),
+            const SizedBox(height: 25),
+            _stepHeader("SOCIAL HANDLES"),
             _input(_instaCtrl, "INSTAGRAM", FontAwesomeIcons.instagram),
-            const SizedBox(height: 15),
-            _input(_twitterCtrl, "TWITTER", FontAwesomeIcons.twitter),
-            const SizedBox(height: 15),
-            _input(_xCtrl, "X", FontAwesomeIcons.xTwitter),
             const SizedBox(height: 15),
             _input(_tiktokCtrl, "TIKTOK", FontAwesomeIcons.tiktok),
             const SizedBox(height: 15),
-            _input(_linkedInCtrl, "LINKEDIN", FontAwesomeIcons.linkedin),
+            _input(_linkedInCtrl, "LINKEDIN", FontAwesomeIcons.linkedinIn),
           ],
         );
       case 3:
         return Column(
           children: [
             _stepHeader("FINAL: ECOSYSTEM"),
-            Text("WAYS TO RECEIVE PAYMENT", 
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white54, fontWeight: FontWeight.bold)),
+            Text("PAYMENT RECEPTION",
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white54, fontWeight: FontWeight.w900, letterSpacing: 1)),
             const SizedBox(height: 15),
-            _input(_walletTypeCtrl, "PAYMENT FORM (PAYPAL, ZELLE, BANK, ETC...)", FontAwesomeIcons.creditCard),
-            const SizedBox(height: 5),
-            Text("Specify your preferred method of receiving funds.", 
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white24, fontSize: 10)),
+            _input(_walletTypeCtrl, "METHOD (PAYPAL, ZELLE, ETC)",
+                Icons.account_balance_wallet_rounded),
             const SizedBox(height: 15),
-            _input(_walletDataCtrl, "PAYMENT DATA (IBAN, USERNAME, WALLET ADDRESS)", FontAwesomeIcons.wallet),
-            const SizedBox(height: 5),
-            Text("Provide the details required for the method specified above.", 
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white24, fontSize: 10)),
-            const SizedBox(height: 30),
+            _input(_walletDataCtrl, "DATA (USERNAME, IBAN)", Icons.qr_code_rounded),
+            const SizedBox(height: 35),
             Text("WHAT KIND OF PARTIES DO YOU LIKE?",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textCyan,
-                      fontWeight: FontWeight.bold,
-                    )),
+                    color: AppColors.textCyan, fontWeight: FontWeight.w900, letterSpacing: 1)),
             const SizedBox(height: 15),
             _interestChips(),
           ],
@@ -485,44 +540,36 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _selectedGender = label),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
           height: 50,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: active ? AppColors.textCyan : Colors.white10),
-            color: active ? AppColors.textCyan.withOpacity(0.1) : Colors.transparent,
+            border:
+                Border.all(color: active ? AppColors.textCyan : Colors.white10, width: 2),
+            color: active ? AppColors.textCyan.withOpacity(0.15) : Colors.black12,
           ),
           alignment: Alignment.center,
-          child: Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: active ? Colors.white : Colors.white24, fontWeight: FontWeight.bold)),
+          child: Text(label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: active ? Colors.white : Colors.white24,
+                  fontWeight: FontWeight.w900)),
         ),
-      ),
-    );
-  }
-
-  Widget _paymentTypeChip(String label) {
-    bool active = _selectedPaymentType == label;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedPaymentType = label),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: active ? AppColors.textCyan : Colors.white10),
-          color: active ? AppColors.textCyan.withOpacity(0.1) : Colors.transparent,
-        ),
-        child: Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: active ? Colors.white : Colors.white24, fontWeight: FontWeight.bold)),
       ),
     );
   }
 
   Widget _stepHeader(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 30),
-        child: Text(text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white54,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                )),
+        padding: const EdgeInsets.only(bottom: 25, top: 10),
+        child: Row(
+          children: [
+            Container(width: 4, height: 20, color: AppColors.textCyan),
+            const SizedBox(width: 10),
+            Text(text,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white70, fontWeight: FontWeight.w900, letterSpacing: 2)),
+          ],
+        ),
       );
 
   Widget _input(TextEditingController c, String h, IconData i,
@@ -539,14 +586,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
         keyboardType: type,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Colors.white,
+              fontWeight: FontWeight.bold,
             ),
         decoration: InputDecoration(
           hintText: h,
           hintStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Colors.white10,
                 fontSize: 11,
+                fontWeight: FontWeight.bold,
               ),
-          prefixIcon: Icon(i, color: Colors.white24, size: 20),
+          prefixIcon: Icon(i, color: AppColors.textCyan.withOpacity(0.4), size: 22),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.all(20),
         ),
@@ -571,20 +620,22 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
         return GestureDetector(
           onTap: () =>
               setState(() => active ? _interests.remove(v) : _interests.add(v)),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(25),
               border: Border.all(
-                  color: active ? AppColors.textCyan : Colors.white10),
+                  color: active ? AppColors.electricPurple : Colors.white10, width: 2),
               color: active
-                  ? AppColors.textCyan.withOpacity(0.1)
+                  ? AppColors.electricPurple.withOpacity(0.15)
                   : Colors.transparent,
             ),
             child: Text(v,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: active ? Colors.white : Colors.white24,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 10,
                     )),
           ),
         );
@@ -601,8 +652,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
           end: Alignment.bottomCenter,
           colors: [
             Colors.black.withOpacity(0),
-            Colors.black.withOpacity(0.8),
-            Colors.black.withOpacity(0.9),
+            Colors.black.withOpacity(0.95),
           ],
         ),
       ),
@@ -612,16 +662,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
           GestureDetector(
             onTap: isLoading ? null : _handleAuth,
             child: Container(
-              height: 60,
+              height: 65,
               width: double.infinity,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(20),
                 gradient: const LinearGradient(
                     colors: [AppColors.textCyan, AppColors.electricPurple]),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.textCyan.withOpacity(0.3),
-                    blurRadius: 20,
+                    color: AppColors.textCyan.withOpacity(0.4),
+                    blurRadius: 25,
                     offset: const Offset(0, 10),
                   )
                 ],
@@ -629,10 +679,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
               alignment: Alignment.center,
               child: isLoading
                   ? const SizedBox(
-                      height: 24,
-                      width: 24,
+                      height: 28,
+                      width: 28,
                       child: CircularProgressIndicator(
-                          color: Colors.black, strokeWidth: 2))
+                          color: Colors.black, strokeWidth: 3))
                   : Text(
                       isLogin
                           ? "ENTER THE VIBE"
@@ -642,23 +692,32 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Colors.black,
                             fontWeight: FontWeight.w900,
-                            letterSpacing: 2,
+                            letterSpacing: 3,
                           ),
                     ),
             ),
           ),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () => setState(() {
+          const SizedBox(height: 25),
+          GestureDetector(
+            onTap: () => setState(() {
               isLogin = !isLogin;
               currentStep = 0;
+              errorMessage = null;
             }),
-            child: Text(
-                isLogin ? "NO ACCOUNT? CREATE ONE" : "ALREADY ENROLLED? SIGN IN",
+            child: RichText(
+              text: TextSpan(
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white24,
+                      color: Colors.white38,
                       fontWeight: FontWeight.bold,
-                    )),
+                    ),
+                children: [
+                  TextSpan(text: isLogin ? "NO ACCOUNT? " : "ALREADY ENROLLED? "),
+                  TextSpan(
+                      text: isLogin ? "CREATE ONE" : "SIGN IN",
+                      style: const TextStyle(color: AppColors.textCyan)),
+                ],
+              ),
+            ),
           ),
         ],
       ),
