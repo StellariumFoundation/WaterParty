@@ -289,7 +289,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
               const SizedBox(height: 15),
               _buildMoodSelector(),
               const SizedBox(height: 25),
-              _sectionHeader("GUEST POLICY"),
+              _sectionHeader("BASIC RULES"),
               _buildRuleInput(),
               const SizedBox(height: 25),
               _sectionHeader("CAPACITY & FUNDING"),
@@ -407,7 +407,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
           Slider(
             value: _capacity,
             min: 2,
-            max: 200,
+            max: 1000,
             activeColor: AppColors.textCyan,
             inactiveColor: Colors.white10,
             onChanged: (v) => setState(() => _capacity = v),
@@ -423,44 +423,61 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   }
 
   Widget _buildPoolToggle() {
-    return GestureDetector(
-      onTap: () => setState(() => _hasPool = !_hasPool),
-      child: WaterGlass(
-        height: 80,
-        borderRadius: 20,
-        borderColor: _hasPool ? AppColors.gold : Colors.transparent,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(FontAwesomeIcons.wallet,
-                color: _hasPool ? AppColors.gold : Colors.white24, size: 20),
-            const SizedBox(width: 15),
-            if (_hasPool)
-              SizedBox(
-                width: 100,
-                child: TextField(
-                  controller: _poolAmountController,
-                  keyboardType: TextInputType.number,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppColors.gold,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                  decoration: const InputDecoration(
-                      hintText: "GOAL \$",
-                      hintStyle: TextStyle(color: Colors.white10),
-                      border: InputBorder.none),
-                ),
-              )
-            else
-              Text("CROWDFUND PARTY",
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white24,
-                        fontWeight: FontWeight.bold,
-                      )),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_hasPool)
+          Padding(
+            padding: const EdgeInsets.only(left: 5, bottom: 10),
+            child: Text(
+              "HOW MUCH DO YOU NEED IN ADDITIONAL FUNDING?",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white38,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+          ),
+        GestureDetector(
+          onTap: () => setState(() => _hasPool = !_hasPool),
+          child: WaterGlass(
+            height: 80,
+            borderRadius: 20,
+            borderColor: _hasPool ? AppColors.gold : Colors.transparent,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(FontAwesomeIcons.wallet,
+                    color: _hasPool ? AppColors.gold : Colors.white24, size: 20),
+                const SizedBox(width: 15),
+                if (_hasPool)
+                  SizedBox(
+                    width: 100,
+                    child: TextField(
+                      controller: _poolAmountController,
+                      keyboardType: TextInputType.number,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: AppColors.gold,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                      decoration: const InputDecoration(
+                          hintText: "GOAL \$",
+                          hintStyle: TextStyle(color: Colors.white10),
+                          border: InputBorder.none),
+                    ),
+                  )
+                else
+                  Text("ENABLE CROWD-FUND WITH WALLET",
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.white24,
+                            fontWeight: FontWeight.bold,
+                          )),
+              ],
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
