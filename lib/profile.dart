@@ -136,6 +136,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            if (user.profilePhotos.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                color: Colors.redAccent.withOpacity(0.8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Text(
+                        "PLEASE UPLOAD AT LEAST ONE PHOTO TO ACCESS THE FEED",
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
