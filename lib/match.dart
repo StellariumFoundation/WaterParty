@@ -30,15 +30,17 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
   }
 
   Future<void> _checkAndFetchLocation() async {
-    final existingLoc = ref.read(locationProvider);
+    final existingLoc = ref.read(locationProvider).value;
     
     if (existingLoc != null) {
       // We have a location! Start loading feed immediately
       _fetchFeed(existingLoc.lat, existingLoc.lon);
       if (mounted) setState(() => _isInitialLoading = false);
       
-      // Still refresh location silently in background
-      _determinePosition(silent: true);
+      // Still refresh location silently in background, but only if it's "old" (e.g. > 5 mins)
+      if (DateTime.now().difference(existingLoc.timestamp).inMinutes > 5) {
+        _determinePosition(silent: true);
+      }
     } else {
       // No location yet, must fetch
       _determinePosition();
@@ -63,11 +65,15 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
 
     try {
       serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) throw 'Location services are disabled.';
+      if (!serviceEnabled) {
+        if (silent) return;
+        throw 'Location services are disabled.';
+      }
 
       permission = await Geolocator.checkPermission();
+      
+      // If we already have permission, don't ask again
       if (permission == LocationPermission.denied) {
-        // Only request if not silent
         if (silent) return; 
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) throw 'Location permissions are denied';
@@ -100,7 +106,8 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
   @override
   Widget build(BuildContext context) {
     final parties = ref.watch(partyFeedProvider);
-    final currentLoc = ref.watch(locationProvider);
+    final locationAsync = ref.watch(locationProvider);
+    final currentLoc = locationAsync.value;
 
     // Only show loading if we have absolutely no location and we are currently fetching
     if (_isInitialLoading && currentLoc == null) {

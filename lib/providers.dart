@@ -174,30 +174,26 @@ class UserLocation {
   );
 }
 
-class LocationNotifier extends Notifier<UserLocation?> {
+class LocationNotifier extends AsyncNotifier<UserLocation?> {
   @override
-  UserLocation? build() {
-    _loadPersistedLocation();
-    return null;
-  }
-
-  Future<void> _loadPersistedLocation() async {
+  Future<UserLocation?> build() async {
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getString('last_location');
     if (data != null) {
-      state = UserLocation.fromMap(jsonDecode(data));
+      return UserLocation.fromMap(jsonDecode(data));
     }
+    return null;
   }
 
   Future<void> updateLocation(double lat, double lon) async {
     final loc = UserLocation(lat: lat, lon: lon, timestamp: DateTime.now());
-    state = loc;
+    state = AsyncValue.data(loc);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('last_location', jsonEncode(loc.toMap()));
   }
 }
 
-final locationProvider = NotifierProvider<LocationNotifier, UserLocation?>(LocationNotifier.new);
+final locationProvider = AsyncNotifierProvider<LocationNotifier, UserLocation?>(LocationNotifier.new);
 
 class NavIndexNotifier extends Notifier<int> {
   @override
