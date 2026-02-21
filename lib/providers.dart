@@ -63,8 +63,18 @@ class AuthNotifier extends AsyncNotifier<User?> {
         state = AsyncValue.data(loggedInUser);
         await _saveSession(loggedInUser);
       } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['error'] ?? "Registration failed");
+        String errorMsg = "Registration failed";
+        try {
+          if (response.headers['content-type']?.contains('application/json') ?? false) {
+            final error = jsonDecode(response.body);
+            errorMsg = error['error'] ?? errorMsg;
+          } else {
+            errorMsg = response.body;
+          }
+        } catch (_) {
+          errorMsg = "Server error (${response.statusCode})";
+        }
+        throw Exception(errorMsg);
       }
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -86,7 +96,18 @@ class AuthNotifier extends AsyncNotifier<User?> {
         state = AsyncValue.data(loggedInUser);
         await _saveSession(loggedInUser);
       } else {
-        throw Exception("Invalid credentials");
+        String errorMsg = "Invalid credentials";
+        try {
+          if (response.headers['content-type']?.contains('application/json') ?? false) {
+            final error = jsonDecode(response.body);
+            errorMsg = error['error'] ?? errorMsg;
+          } else {
+            errorMsg = response.body;
+          }
+        } catch (_) {
+          errorMsg = "Login failed (${response.statusCode})";
+        }
+        throw Exception(errorMsg);
       }
     } catch (e, st) {
       state = AsyncValue.error(e, st);
