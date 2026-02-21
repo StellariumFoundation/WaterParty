@@ -839,5 +839,3 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     );
   }
 }
-
-
