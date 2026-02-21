@@ -267,11 +267,8 @@ class Party {
   final double geoLon;
   final int maxCapacity;
   final int currentGuestCount;
-  final Map<String, int> slotRequirements;
   final bool autoLockOnFull;
   final List<String> vibeTags;
-  final List<String> musicGenres;
-  final String mood;
   final List<String> rules;
   final Crowdfunding? rotationPool;
   final String chatRoomId;
@@ -294,11 +291,8 @@ class Party {
     this.geoLon = 0.0,
     this.maxCapacity = 0,
     this.currentGuestCount = 0,
-    this.slotRequirements = const {},
     this.autoLockOnFull = false,
     this.vibeTags = const [],
-    this.musicGenres = const [],
-    this.mood = '',
     this.rules = const [],
     this.rotationPool,
     this.chatRoomId = '',
@@ -323,11 +317,8 @@ class Party {
       geoLon: (map['GeoLon'] ?? 0.0).toDouble(),
       maxCapacity: map['MaxCapacity'] ?? 0,
       currentGuestCount: map['CurrentGuestCount'] ?? 0,
-      slotRequirements: Map<String, int>.from(map['SlotRequirements'] ?? {}),
       autoLockOnFull: map['AutoLockOnFull'] ?? false,
       vibeTags: List<String>.from(map['VibeTags'] ?? []),
-      musicGenres: List<String>.from(map['MusicGenres'] ?? []),
-      mood: map['Mood'] ?? '',
       rules: List<String>.from(map['Rules'] ?? []),
       rotationPool: map['RotationPool'] != null ? Crowdfunding.fromMap(map['RotationPool']) : null,
       chatRoomId: map['ChatRoomID'] ?? '',
@@ -353,11 +344,8 @@ class Party {
       'GeoLon': geoLon,
       'MaxCapacity': maxCapacity,
       'CurrentGuestCount': currentGuestCount,
-      'SlotRequirements': slotRequirements,
       'AutoLockOnFull': autoLockOnFull,
       'VibeTags': vibeTags,
-      'MusicGenres': musicGenres,
-      'Mood': mood,
       'Rules': rules,
       'RotationPool': rotationPool?.toMap(),
       'ChatRoomID': chatRoomId,

@@ -19,6 +19,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _isUploading = false;
 
   Future<void> _pickAndUploadPhoto() async {
+    final user = ref.read(authProvider).value;
+    if (user != null && user.profilePhotos.length >= 12) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Maximum 12 profile photos allowed")));
+      return;
+    }
+    
     final picker = ImagePicker();
     final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
     
@@ -188,7 +194,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           PageView.builder(
             itemCount: photos.isEmpty && !isEditing
                 ? 1
-                : photos.length + (isEditing ? 1 : 0),
+                : (photos.length + (isEditing && photos.length < 12 ? 1 : 0)),
             itemBuilder: (context, index) {
               if (index < photos.length) {
                 final photoUrl = photos[index].startsWith("http")

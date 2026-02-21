@@ -170,14 +170,10 @@ CREATE TABLE IF NOT EXISTS parties (
     -- Slot Mechanics
     max_capacity INTEGER DEFAULT 0,
     current_guest_count INTEGER DEFAULT 0,
-    -- JSONB for map[string]int (e.g., {"girls": 10, "guys": 5})
-    slot_requirements JSONB DEFAULT '{}', 
     auto_lock_on_full BOOLEAN DEFAULT FALSE,
     
     -- Curation
     vibe_tags TEXT[] DEFAULT '{}',
-    music_genres TEXT[] DEFAULT '{}',
-    mood TEXT,
     rules TEXT[] DEFAULT '{}',
     
     -- Social
@@ -186,6 +182,20 @@ CREATE TABLE IF NOT EXISTS parties (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Drop obsolete party columns
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='parties' AND column_name='slot_requirements') THEN
+        ALTER TABLE parties DROP COLUMN slot_requirements;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='parties' AND column_name='music_genres') THEN
+        ALTER TABLE parties DROP COLUMN music_genres;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='parties' AND column_name='mood') THEN
+        ALTER TABLE parties DROP COLUMN mood;
+    END IF;
+END $$;
 
 -- ==========================================
 -- PARTY APPLICATIONS (The Swipe logic)
@@ -410,19 +420,18 @@ func DeleteUser(id string) error {
 // ==========================================
 
 func CreateParty(p Party) (string, error) {
-	slotReq, _ := json.Marshal(p.SlotRequirements)
 	query := `INSERT INTO parties (
 		host_id, title, description, party_photos, start_time, end_time, status,
 		is_location_revealed, address, city, geo_lat, geo_lon, max_capacity,
-		slot_requirements, vibe_tags, music_genres, mood, rules, chat_room_id
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
+		vibe_tags, rules, chat_room_id
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) 
 	RETURNING id`
 
 	var id string
 	err := db.QueryRow(context.Background(), query,
 		p.HostID, p.Title, p.Description, p.PartyPhotos, p.StartTime, p.EndTime, p.Status,
 		p.IsLocationRevealed, p.Address, p.City, p.GeoLat, p.GeoLon, p.MaxCapacity,
-		slotReq, p.VibeTags, p.MusicGenres, p.Mood, p.Rules, p.ChatRoomID,
+		p.VibeTags, p.Rules, p.ChatRoomID,
 	).Scan(&id)
 
 	if err == nil {
@@ -453,32 +462,27 @@ func CreateParty(p Party) (string, error) {
 
 func GetParty(id string) (Party, error) {
 	var p Party
-	var slotReq []byte
 	query := `SELECT id, host_id, title, description, party_photos, start_time, end_time, status,
 		is_location_revealed, address, city, geo_lat, geo_lon, max_capacity, current_guest_count,
-		slot_requirements, auto_lock_on_full, vibe_tags, music_genres, mood, rules, chat_room_id,
+		auto_lock_on_full, vibe_tags, rules, chat_room_id,
 		created_at, updated_at FROM parties WHERE id = $1`
 
 	err := db.QueryRow(context.Background(), query, id).Scan(
 		&p.ID, &p.HostID, &p.Title, &p.Description, &p.PartyPhotos, &p.StartTime, &p.EndTime, 
 		&p.Status, &p.IsLocationRevealed, &p.Address, &p.City, &p.GeoLat, &p.GeoLon, 
-		&p.MaxCapacity, &p.CurrentGuestCount, &slotReq, &p.AutoLockOnFull, &p.VibeTags, 
-		&p.MusicGenres, &p.Mood, &p.Rules, &p.ChatRoomID, &p.CreatedAt, &p.UpdatedAt,
+		&p.MaxCapacity, &p.CurrentGuestCount, &p.AutoLockOnFull, &p.VibeTags, 
+		&p.Rules, &p.ChatRoomID, &p.CreatedAt, &p.UpdatedAt,
 	)
-	if err == nil {
-		json.Unmarshal(slotReq, &p.SlotRequirements)
-	}
 	return p, err
 }
 
 func UpdateParty(p Party) error {
-	slotReq, _ := json.Marshal(p.SlotRequirements)
 	query := `UPDATE parties SET 
 		title=$1, description=$2, status=$3, is_location_revealed=$4, address=$5,
-		city=$6, max_capacity=$7, slot_requirements=$8, updated_at=NOW()
-		WHERE id=$9`
+		city=$6, max_capacity=$7, updated_at=NOW()
+		WHERE id=$8`
 	_, err := db.Exec(context.Background(), query, p.Title, p.Description, p.Status, 
-		p.IsLocationRevealed, p.Address, p.City, p.MaxCapacity, slotReq, p.ID)
+		p.IsLocationRevealed, p.Address, p.City, p.MaxCapacity, p.ID)
 	return err
 }
 

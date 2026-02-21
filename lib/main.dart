@@ -29,7 +29,14 @@ class WaterPartyApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: userAsync.when(
-        data: (user) => user != null ? const MainScaffold() : const AuthScreen(),
+        data: (user) {
+          if (user == null) return const AuthScreen();
+          // If no photos, force redirect to Profile (Index 3)
+          if (user.profilePhotos.isEmpty) {
+            return const MainScaffold(initialIndex: 3);
+          }
+          return const MainScaffold();
+        },
         loading: () => const Scaffold(
           backgroundColor: Colors.black,
           body: Center(child: CircularProgressIndicator(color: AppColors.textCyan)),
@@ -41,7 +48,8 @@ class WaterPartyApp extends ConsumerWidget {
 }
 
 class MainScaffold extends ConsumerStatefulWidget {
-  const MainScaffold({super.key});
+  final int initialIndex;
+  const MainScaffold({this.initialIndex = 0, super.key});
 
   @override
   ConsumerState<MainScaffold> createState() => _MainScaffoldState();
@@ -52,6 +60,9 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.initialIndex != 0) {
+        ref.read(navIndexProvider.notifier).setIndex(widget.initialIndex);
+      }
       final user = ref.read(authProvider).value;
       if (user != null) {
         ref.read(socketServiceProvider).connect(user.id);

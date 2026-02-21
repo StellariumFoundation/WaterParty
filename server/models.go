@@ -108,11 +108,8 @@ type Party struct {
 	GeoLon             float64        `json:"GeoLon" db:"geo_lon"`
 	MaxCapacity        int            `json:"MaxCapacity" db:"max_capacity"`
 	CurrentGuestCount  int            `json:"CurrentGuestCount" db:"current_guest_count"`
-	SlotRequirements   map[string]int `json:"SlotRequirements" db:"slot_requirements"` // Use JSONB in DB
 	AutoLockOnFull     bool           `json:"AutoLockOnFull" db:"auto_lock_on_full"`
 	VibeTags           []string       `json:"VibeTags" db:"vibe_tags"`
-	MusicGenres        []string       `json:"MusicGenres" db:"music_genres"`
-	Mood               string         `json:"Mood" db:"mood"`
 	Rules              []string       `json:"Rules" db:"rules"`
 	RotationPool       *Crowdfunding  `json:"RotationPool" db:"rotation_pool"` // Nested or separate table
 	ChatRoomID         string         `json:"ChatRoomID" db:"chat_room_id"`
