@@ -40,7 +40,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       });
     } else {
       // Logic for DM
-      final recipientId = widget.room.participantIds.firstWhere((id) => id != ref.read(authProvider)?.id);
+      final myId = ref.read(authProvider).value?.id;
+      final recipientId = widget.room.participantIds.firstWhere((id) => id != myId);
       ref.read(socketServiceProvider).sendMessage('SEND_DM', {
         'RecipientID': recipientId,
         'Content': _msgCtrl.text,
@@ -54,7 +55,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final allChatRooms = ref.watch(chatProvider);
     final currentRoom = allChatRooms.firstWhere((r) => r.id == widget.room.id, orElse: () => widget.room);
-    final user = ref.watch(authProvider);
+    final user = ref.watch(authProvider).value;
 
     return Container(
       decoration: const BoxDecoration(gradient: AppColors.stellariumGradient),

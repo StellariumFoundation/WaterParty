@@ -191,8 +191,6 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       currentGuestCount: 0,
       autoLockOnFull: _autoLock,
       vibeTags: finalTags,
-      musicGenres: [], // Removed as per request
-      mood: _selectedMood,
       rules: _rules,
       rotationPool: pool,
       chatRoomId: const Uuid().v4(),
@@ -843,4 +841,3 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 }
 
 
-}
