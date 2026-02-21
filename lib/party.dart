@@ -8,6 +8,9 @@ import 'providers.dart';
 import 'models.dart';
 import 'websocket.dart';
 
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong2.dart';
+
 class CreatePartyScreen extends ConsumerStatefulWidget {
   const CreatePartyScreen({super.key});
 
@@ -65,6 +68,33 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       _showError(e.toString());
     } finally {
       setState(() => _isGettingLocation = false);
+    }
+  }
+
+  Future<void> _openMapPicker() async {
+    LatLng initial = LatLng(_geoLat ?? 0, _geoLon ?? 0);
+    if (_geoLat == null || _geoLon == null) {
+      // Default to current position if possible
+      try {
+        final pos = await Geolocator.getCurrentPosition();
+        initial = LatLng(pos.latitude, pos.longitude);
+      } catch (_) {}
+    }
+
+    final LatLng? picked = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MapPickerScreen(initialLocation: initial),
+      ),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _geoLat = picked.latitude;
+        _geoLon = picked.longitude;
+        _addressController.text = "PINNED ON MAP";
+        _cityController.text = "DETECTED ON PUBLISH";
+      });
     }
   }
 
@@ -218,7 +248,20 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
               const SizedBox(height: 15),
               _buildDurationSlider(),
               const SizedBox(height: 15),
-              _inputField(_cityController, "CITY (REQUIRED)", FontAwesomeIcons.locationDot),
+              Row(
+                children: [
+                  Expanded(child: _inputField(_cityController, "CITY (REQUIRED)", FontAwesomeIcons.locationDot)),
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: _openMapPicker,
+                    child: WaterGlass(
+                      width: 65, height: 65,
+                      borderRadius: 15,
+                      child: const Icon(FontAwesomeIcons.mapLocationDot, color: AppColors.textCyan),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 15),
               Row(
                 children: [
@@ -460,3 +503,83 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     if (t != null) setState(() => _time = t);
   }
 }
+
+class MapPickerScreen extends StatefulWidget {
+  final LatLng initialLocation;
+  const MapPickerScreen({super.key, required this.initialLocation});
+
+  @override
+  State<MapPickerScreen> createState() => _MapPickerScreenState();
+}
+
+class _MapPickerScreenState extends State<MapPickerScreen> {
+  late LatLng _selectedLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedLocation = widget.initialLocation;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text("PINPOINT LOCATION", 
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: AppColors.textCyan, 
+            fontWeight: FontWeight.bold, 
+            letterSpacing: 2
+          )
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, _selectedLocation),
+            child: const Text("CONFIRM", style: TextStyle(color: AppColors.textCyan, fontWeight: FontWeight.bold)),
+          )
+        ],
+      ),
+      body: FlutterMap(
+        options: MapOptions(
+          initialCenter: _selectedLocation,
+          initialZoom: 15,
+          onTap: (tapPosition, point) => setState(() => _selectedLocation = point),
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.waterparty.app',
+            tileBuilder: (context, tileWidget, tile) {
+              return ColorFiltered(
+                colorFilter: const ColorFilter.matrix([
+                  -0.9, 0, 0, 0, 255,
+                  0, -0.9, 0, 0, 255,
+                  0, 0, -0.9, 0, 255,
+                  0, 0, 0, 1, 0,
+                ]),
+                child: tileWidget,
+              );
+            },
+          ),
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: _selectedLocation,
+                width: 80,
+                height: 80,
+                child: const Icon(Icons.location_on, color: AppColors.textPink, size: 40),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
