@@ -31,16 +31,23 @@ class WaterPartyApp extends ConsumerWidget {
       home: userAsync.when(
         data: (user) {
           if (user == null) return const AuthScreen();
-          // If no photos, force redirect to Profile (Index 3)
           if (user.profilePhotos.isEmpty) {
             return const MainScaffold(initialIndex: 3);
           }
           return const MainScaffold();
         },
-        loading: () => const Scaffold(
-          backgroundColor: Colors.black,
-          body: Center(child: CircularProgressIndicator(color: AppColors.textCyan)),
-        ),
+        loading: () {
+          // Check if we already have a user in the previous state (not likely on first load)
+          // or just show the splash if it's the very first load.
+          // If we want to avoid unmounting AuthScreen during login, 
+          // we need to return AuthScreen if we are in the process of logging in.
+          // Since userAsync.value is null initially, we return AuthScreen.
+          if (userAsync.value == null) return const AuthScreen();
+          return const Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(child: CircularProgressIndicator(color: AppColors.textCyan)),
+          );
+        },
         error: (e, st) => const AuthScreen(),
       ),
     );

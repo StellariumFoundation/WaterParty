@@ -48,14 +48,13 @@ class AuthNotifier extends AsyncNotifier<User?> {
   }
 
   Future<void> register(User user, String password) async {
-    state = const AsyncValue.loading();
     try {
       final response = await http.post(
         Uri.parse("$apiBase/register"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "password": password,
-          ...user.toMap(),
+          "user": user.toMap(),
         }),
       );
 
@@ -77,14 +76,12 @@ class AuthNotifier extends AsyncNotifier<User?> {
         }
         throw Exception(errorMsg);
       }
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+    } catch (e) {
       rethrow;
     }
   }
 
   Future<void> login(String email, String password) async {
-    state = const AsyncValue.loading();
     try {
       final response = await http.post(
         Uri.parse("$apiBase/login"),
@@ -110,8 +107,7 @@ class AuthNotifier extends AsyncNotifier<User?> {
         }
         throw Exception(errorMsg);
       }
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+    } catch (e) {
       rethrow;
     }
   }

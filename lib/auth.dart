@@ -247,6 +247,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
         
         await ref.read(authProvider.notifier).register(newUser, _passCtrl.text);
         
+        if (!mounted) return;
+
         // Clear draft on success
         final prefs = await SharedPreferences.getInstance();
         final keys = prefs.getKeys().where((k) => k.startsWith('reg_'));
@@ -255,7 +257,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
         // On success, switch to profile tab
         ref.read(navIndexProvider.notifier).setIndex(3);
       } catch (e) {
-        _showError(e.toString().replaceAll("Exception: ", ""));
+        if (mounted) _showError(e.toString().replaceAll("Exception: ", ""));
       } finally {
         if (mounted) setState(() => isLoading = false);
       }
