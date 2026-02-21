@@ -358,66 +358,119 @@ class _GuestManagementScreenState extends ConsumerState<GuestManagementScreen> {
 // EXTERNAL PROFILE VIEW
 // ==========================================
 
-class ExternalProfileScreen extends StatelessWidget {
+class ExternalProfileScreen extends ConsumerWidget {
   final User user;
   const ExternalProfileScreen({required this.user, super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Basic reuse of the profile UI components or a simplified version
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 500,
-            pinned: true,
-            backgroundColor: Colors.black,
-            flexibleSpace: FlexibleSpaceBar(
-              background: _buildPhotoCarousel(user),
+      body: Stack(
+        children: [
+          CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 500,
+                pinned: true,
+                backgroundColor: Colors.black,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: _buildPhotoCarousel(user),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(25),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("${user.realName}, ${user.age}", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white)),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          _statTile("ELO", user.eloScore.toInt().toString(), AppColors.gold),
+                          const SizedBox(width: 15),
+                          _statTile("TRUST", user.trustScore.toInt().toString(), AppColors.textCyan),
+                        ],
+                      ),
+                      const SizedBox(height: 30),
+                      const Text("BIO", style: TextStyle(color: Colors.white38, fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 12)),
+                      const SizedBox(height: 10),
+                      Text(user.bio, style: const TextStyle(color: Colors.white70, fontSize: 16, height: 1.5)),
+                      
+                      const SizedBox(height: 30),
+                      _infoRow(Icons.work_outline, "JOB", user.jobTitle),
+                      _infoRow(Icons.business_outlined, "COMPANY", user.company),
+                      _infoRow(Icons.school_outlined, "EDUCATION", "${user.school} (${user.degree})"),
+                      
+                      const SizedBox(height: 30),
+                      const Text("LIFESTYLE", style: TextStyle(color: Colors.white38, fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 12)),
+                      const SizedBox(height: 15),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          _habitChip(Icons.straighten, "${user.heightCm}cm"),
+                          _habitChip(Icons.local_bar, "Drinks: ${user.drinkingPref}"),
+                          _habitChip(Icons.smoking_rooms, "Smoke: ${user.smokingPref}"),
+                          _habitChip(Icons.spa, "Weed: ${user.cannabisPref}"),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 150),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          // Back Button
+          Positioned(
+            top: 50,
+            left: 20,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+              onPressed: () => Navigator.pop(context),
             ),
           ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(25),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("${user.realName}, ${user.age}", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white)),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      _statTile("ELO", user.eloScore.toInt().toString(), AppColors.gold),
-                      const SizedBox(width: 15),
-                      _statTile("TRUST", user.trustScore.toInt().toString(), AppColors.textCyan),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
-                  const Text("BIO", style: TextStyle(color: Colors.white38, fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 12)),
-                  const SizedBox(height: 10),
-                  Text(user.bio, style: const TextStyle(color: Colors.white70, fontSize: 16, height: 1.5)),
-                  
-                  const SizedBox(height: 30),
-                  _infoRow(Icons.work_outline, "JOB", user.jobTitle),
-                  _infoRow(Icons.business_outlined, "COMPANY", user.company),
-                  _infoRow(Icons.school_outlined, "EDUCATION", "${user.school} (${user.degree})"),
-                  
-                  const SizedBox(height: 30),
-                  const Text("LIFESTYLE", style: TextStyle(color: Colors.white38, fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 12)),
-                  const SizedBox(height: 15),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      _habitChip(Icons.straighten, "${user.heightCm}cm"),
-                      _habitChip(Icons.local_bar, "Drinks: ${user.drinkingPref}"),
-                      _habitChip(Icons.smoking_rooms, "Smoke: ${user.smokingPref}"),
-                      _habitChip(Icons.spa, "Weed: ${user.cannabisPref}"),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 100),
-                ],
+
+          // Message Button
+          Positioned(
+            bottom: 40,
+            left: 30,
+            right: 30,
+            child: GestureDetector(
+              onTap: () {
+                final myUser = ref.read(authProvider).value;
+                if (myUser == null) return;
+                
+                // Create deterministic DM ID
+                final u1 = myUser.id;
+                final u2 = user.id;
+                final dmId = u1.compareTo(u2) < 0 ? "${u1}_$u2" : "${u2}_$u1";
+                
+                final dmRoom = ChatRoom(
+                  id: dmId,
+                  partyId: "",
+                  hostId: u1,
+                  title: user.realName,
+                  imageUrl: user.profilePhotos.isNotEmpty ? AppConstants.assetUrl(user.profilePhotos.first) : "",
+                  isGroup: false,
+                  participantIds: [u1, u2],
+                );
+                
+                Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen(room: dmRoom)));
+              },
+              child: Container(
+                height: 60,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(15),
+                  gradient: const LinearGradient(colors: [AppColors.textCyan, AppColors.electricPurple]),
+                  boxShadow: [BoxShadow(color: AppColors.textCyan.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))],
+                ),
+                alignment: Alignment.center,
+                child: const Text("SEND MESSAGE", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, letterSpacing: 2)),
               ),
             ),
           ),

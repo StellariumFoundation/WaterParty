@@ -5,6 +5,8 @@ import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
 import 'websocket.dart';
+import 'matches.dart'; // To access ExternalProfileScreen
+import 'constants.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final ChatRoom room;
@@ -61,21 +63,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         appBar: AppBar(
           backgroundColor: Colors.black.withOpacity(0.5),
           elevation: 0,
-          leading: BackButton(color: AppColors.textCyan),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+            onPressed: () => Navigator.pop(context),
+          ),
           title: Row(
             children: [
               CircleAvatar(
-                backgroundImage: NetworkImage(currentRoom.imageUrl),
+                backgroundImage: NetworkImage(currentRoom.imageUrl.isNotEmpty ? currentRoom.imageUrl : "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000"),
                 radius: 18,
               ),
               const SizedBox(width: 12),
-              Text(currentRoom.title,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      )),
+              Expanded(
+                child: Text(currentRoom.title,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        )),
+              ),
             ],
           ),
+          actions: [
+            if (currentRoom.isGroup)
+              IconButton(
+                icon: const Icon(Icons.people_outline, color: AppColors.textCyan),
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => RoomParticipantsScreen(room: currentRoom)));
+                },
+              ),
+          ],
         ),
         body: Column(
           children: [
@@ -161,6 +178,73 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ==========================================
+// ROOM PARTICIPANTS LIST
+// ==========================================
+
+class RoomParticipantsScreen extends ConsumerStatefulWidget {
+  final ChatRoom room;
+  const RoomParticipantsScreen({required this.room, super.key});
+
+  @override
+  ConsumerState<RoomParticipantsScreen> createState() => _RoomParticipantsScreenState();
+}
+
+class _RoomParticipantsScreenState extends ConsumerState<RoomParticipantsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(socketServiceProvider).sendMessage('GET_APPLICANTS', {'PartyID': widget.room.partyId});
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // We reuse the partyApplicantsProvider here because participants are just accepted applicants
+    final members = ref.watch(partyApplicantsProvider).where((a) => a.status == ApplicantStatus.ACCEPTED).toList();
+    final myId = ref.read(authProvider).value?.id;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        title: const Text("ECOSYSTEM MEMBERS", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2)),
+      ),
+      body: members.isEmpty 
+        ? const Center(child: Text("ONLY YOU IN THIS VIBE", style: TextStyle(color: Colors.white10, fontWeight: FontWeight.bold)))
+        : ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: members.length,
+            itemBuilder: (context, index) {
+              final m = members[index];
+              final user = m.user;
+              if (user == null || user.id == myId) return const SizedBox();
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 15),
+                child: WaterGlass(
+                  height: 80,
+                  borderRadius: 15,
+                  child: ListTile(
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => ExternalProfileScreen(user: user)));
+                    },
+                    leading: CircleAvatar(
+                      backgroundImage: NetworkImage(user.profilePhotos.isNotEmpty ? AppConstants.assetUrl(user.profilePhotos.first) : "https://images.unsplash.com/photo-1511367461989-f85a21fda167?q=80&w=1000"),
+                    ),
+                    title: Text(user.realName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    subtitle: Text("${user.jobTitle} @ ${user.company}", style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                    trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white10, size: 14),
+                  ),
+                ),
+              );
+            },
+          ),
     );
   }
 }
