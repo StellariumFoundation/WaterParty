@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -244,6 +245,19 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		p.CreatedAt = &now
 		p.UpdatedAt = &now
 
+		// Auto-extrapolate address/city from coordinates if using "My Location"
+		if p.GeoLat != 0 && p.GeoLon != 0 && (p.Address == "MY CURRENT LOCATION" || p.City == "DETECTED ON PUBLISH") {
+			addr, city, err := ReverseGeocode(p.GeoLat, p.GeoLon)
+			if err == nil {
+				if p.Address == "MY CURRENT LOCATION" {
+					p.Address = addr
+				}
+				if p.City == "DETECTED ON PUBLISH" {
+					p.City = city
+				}
+			}
+		}
+
 		id, err := CreateParty(p)
 		if err != nil {
 			log.Printf("Create Party DB Error: %v", err)
@@ -389,3 +403,46 @@ func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	go client.writePump()
 	go client.readPump()
 }
+
+// ReverseGeocode uses Nominatim (OpenStreetMap) to convert coordinates to an address and city.
+func ReverseGeocode(lat, lon float64) (string, string, error) {
+	url := fmt.Sprintf("https://nominatim.openstreetmap.org/reverse?format=json&lat=%f&lon=%f", lat, lon)
+	
+	client := &http.Client{Timeout: 5 * time.Second}
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "WaterParty-App") // Required by Nominatim policy
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		DisplayName string `json:"display_name"`
+		Address     struct {
+			City    string `json:"city"`
+			Town    string `json:"town"`
+			Village string `json:"village"`
+			Suburb  string `json:"suburb"`
+		} `json:"address"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", "", err
+	}
+
+	city := result.Address.City
+	if city == "" {
+		city = result.Address.Town
+	}
+	if city == "" {
+		city = result.Address.Village
+	}
+	if city == "" {
+		city = result.Address.Suburb
+	}
+
+	return result.DisplayName, city, nil
+}
+
