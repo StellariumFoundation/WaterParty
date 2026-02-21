@@ -17,6 +17,8 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool isEditing = false;
   bool _isUploading = false;
+  int _currentPhotoIndex = 0;
+  final PageController _pageController = PageController();
 
   Future<void> _pickAndUploadPhoto() async {
     final user = ref.read(authProvider).value;
@@ -51,6 +53,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         if (mounted) setState(() => _isUploading = false);
       }
     }
+  }
+
+  void _deletePhoto(int index) async {
+    final user = ref.read(authProvider).value;
+    if (user == null) return;
+    
+    final updatedPhotos = List<String>.from(user.profilePhotos);
+    updatedPhotos.removeAt(index);
+    
+    await ref.read(authProvider.notifier).updateUserProfile(profilePhotos: updatedPhotos);
+    
+    ref.read(socketServiceProvider).sendMessage('UPDATE_PROFILE', {
+      'ID': user.id,
+      'ProfilePhotos': updatedPhotos,
+    });
+    setState(() {});
   }
 
   // --- Controllers for Text Input ---
@@ -163,7 +181,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildPhotoCarousel(user),
+                    isEditing ? _buildPhotoGrid(user) : _buildTinderCarousel(user),
                     const SizedBox(height: 20),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -205,61 +223,109 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _buildPhotoCarousel(User user) {
+  Widget _buildTinderCarousel(User user) {
     final photos = user.profilePhotos;
+    if (photos.isEmpty) {
+      return SizedBox(
+        height: 400,
+        child: Image.network("https://images.unsplash.com/photo-1511367461989-f85a21fda167?q=80&w=1000", fit: BoxFit.cover),
+      );
+    }
 
     return SizedBox(
-      height: 400,
+      height: 500,
       width: double.infinity,
       child: Stack(
         children: [
           PageView.builder(
-            itemCount: photos.isEmpty && !isEditing
-                ? 1
-                : (photos.length + (isEditing && photos.length < 12 ? 1 : 0)),
+            controller: _pageController,
+            itemCount: photos.length,
+            onPageChanged: (idx) => setState(() => _currentPhotoIndex = idx),
             itemBuilder: (context, index) {
-              if (index < photos.length) {
-                final photoUrl = photos[index].startsWith("http")
-                    ? photos[index]
-                    : AppConstants.assetUrl(photos[index]);
-                return Image.network(photoUrl, fit: BoxFit.cover);
-              }
-              if (isEditing) return _buildAddPhotoCard();
-              return Image.network("https://images.unsplash.com/photo-1511367461989-f85a21fda167?q=80&w=1000", fit: BoxFit.cover); 
+              final photoUrl = photos[index].startsWith("http")
+                  ? photos[index]
+                  : AppConstants.assetUrl(photos[index]);
+              return Image.network(photoUrl, fit: BoxFit.cover);
             },
           ),
+          
+          // Tinder-style Progress Indicators
+          Positioned(
+            top: 15,
+            left: 10,
+            right: 10,
+            child: Row(
+              children: List.generate(photos.length, (index) {
+                return Expanded(
+                  child: Container(
+                    height: 3,
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: _currentPhotoIndex == index ? Colors.white : Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+
+          // Tap Areas for Navigation
           Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.1),
-                    Colors.transparent,
-                    Colors.black.withOpacity(0.8)
-                  ],
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_currentPhotoIndex > 0) {
+                        _pageController.previousPage(duration: const Duration(milliseconds: 200), curve: Curves.easeInOut);
+                      }
+                    },
+                    child: Container(color: Colors.transparent),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_currentPhotoIndex < photos.length - 1) {
+                        _pageController.nextPage(duration: const Duration(milliseconds: 200), curve: Curves.easeInOut);
+                      }
+                    },
+                    child: Container(color: Colors.transparent),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Bottom Gradient Overlay
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.black.withOpacity(0.2), Colors.transparent, Colors.black.withOpacity(0.8)],
+                  ),
                 ),
               ),
             ),
           ),
+
+          // Trust Badge
           Positioned(
-            top: 20,
+            bottom: 20,
             right: 20,
             child: WaterGlass(
-              width: 100,
-              height: 35,
+              width: 100, height: 35,
               borderRadius: 10,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.shield, color: AppColors.gold, size: 14),
                   const SizedBox(width: 5),
-                  Text("${user.trustScore} TRUST",
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.gold,
-                            fontWeight: FontWeight.bold,
-                          )),
+                  Text("${user.trustScore} TRUST", style: const TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 10)),
                 ],
               ),
             ),
@@ -269,29 +335,70 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _buildAddPhotoCard() {
-    return GestureDetector(
-      onTap: _isUploading ? null : _pickAndUploadPhoto,
-      child: Container(
-        color: Colors.white.withOpacity(0.05),
-        child: Center(
-          child: _isUploading
-              ? const CircularProgressIndicator(color: AppColors.textCyan)
-              : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildPhotoGrid(User user) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("PROFILE PHOTOS", style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textPink, fontWeight: FontWeight.bold, letterSpacing: 2)),
+              Text("${user.profilePhotos.length}/12", style: const TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 20),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 0.8,
+            ),
+            itemCount: 12,
+            itemBuilder: (context, index) {
+              if (index < user.profilePhotos.length) {
+                return Stack(
                   children: [
-                    const Icon(Icons.add_a_photo,
-                        color: Colors.white24, size: 50),
-                    const SizedBox(height: 15),
-                    Text("UPLOAD VIBE",
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white24,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 2,
-                            )),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: Image.network(
+                        AppConstants.assetUrl(user.profilePhotos[index]),
+                        fit: BoxFit.cover,
+                        width: double.infinity, height: double.infinity,
+                      ),
+                    ),
+                    Positioned(
+                      top: 5, right: 5,
+                      child: GestureDetector(
+                        onTap: () => _deletePhoto(index),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                          child: const Icon(Icons.close, color: Colors.white, size: 12),
+                        ),
+                      ),
+                    ),
                   ],
-                ),
-        ),
+                );
+              } else {
+                bool isNext = index == user.profilePhotos.length;
+                return GestureDetector(
+                  onTap: isNext ? (_isUploading ? null : _pickAndUploadPhoto) : null,
+                  child: WaterGlass(
+                    borderRadius: 15,
+                    child: (isNext && _isUploading)
+                      ? const Center(child: CircularProgressIndicator(color: AppColors.textCyan, strokeWidth: 2))
+                      : Icon(Icons.add_a_photo, color: isNext ? Colors.white24 : Colors.white.withOpacity(0.02)),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
       ),
     );
   }
