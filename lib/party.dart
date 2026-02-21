@@ -99,6 +99,10 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   }
 
   Future<void> _pickImage() async {
+    if (_partyPhotos.length >= 16) {
+      _showError("Maximum 16 photos allowed");
+      return;
+    }
     final picker = ImagePicker();
     final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
     
@@ -236,6 +240,8 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 25),
+              _buildPhotoGrid(),
               const SizedBox(height: 25),
               _sectionHeader("LOGISTICS"),
               Row(
@@ -519,7 +525,242 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     final t = await showTimePicker(context: context, initialTime: _time);
     if (t != null) setState(() => _time = t);
   }
-}
+
+  Widget _buildHeader() {
+    return Text("HOST\nA PARTY",
+        style: Theme.of(context).textTheme.displayMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+              height: 1.0,
+              letterSpacing: 2,
+            ));
+  }
+
+  Widget _buildPhotoGrid() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _sectionHeader("GALLERY"),
+            Text("${_partyPhotos.length}/16", 
+              style: const TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+          ),
+          itemCount: 16, // Maximum slots
+          itemBuilder: (context, index) {
+            if (index < _partyPhotos.length) {
+              return Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: Image.network(
+                      AppConstants.assetUrl(_partyPhotos[index]),
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                    ),
+                  ),
+                  Positioned(
+                    top: 5,
+                    right: 5,
+                    child: GestureDetector(
+                      onTap: () => setState(() => _partyPhotos.removeAt(index)),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                        child: const Icon(Icons.close, color: Colors.white, size: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            } else if (index == _partyPhotos.length || index < 6) {
+              // Show add button for the next slot OR for the first 6 slots if they are empty
+              bool isNextSlot = index == _partyPhotos.length;
+              return GestureDetector(
+                onTap: isNextSlot ? (_isUploading ? null : _pickImage) : null,
+                child: WaterGlass(
+                  borderRadius: 15,
+                  child: (isNextSlot && _isUploading)
+                    ? const Center(child: CircularProgressIndicator(color: AppColors.textCyan, strokeWidth: 2))
+                    : Icon(Icons.add_a_photo, 
+                        color: isNextSlot ? Colors.white24 : Colors.white.withOpacity(0.02)),
+                ),
+              );
+            }
+            return const SizedBox.shrink(); // Hide the remaining slots until needed
+          },
+        ),
+        if (_partyPhotos.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text("ADD AT LEAST ONE PHOTO TO DEFINE THE VIBE",
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white10, fontSize: 9)),
+          ),
+      ],
+    );
+  }
+
+  Widget _sectionHeader(String text) => Padding(
+        padding: const EdgeInsets.only(left: 5, bottom: 12),
+        child: Text(text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textPink,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                )),
+      );
+
+  Widget _compactInput(TextEditingController ctrl, String hint, IconData icon,
+      {int maxLines = 1}) {
+    return TextField(
+      controller: ctrl,
+      maxLines: maxLines,
+      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.white10,
+              fontSize: 14,
+            ),
+        border: InputBorder.none,
+        prefixIcon: Icon(icon, color: AppColors.textCyan, size: 18),
+        isDense: true,
+      ),
+    );
+  }
+
+  Widget _inputField(TextEditingController ctrl, String hint, IconData icon) {
+    return WaterGlass(
+      height: 65,
+      borderRadius: 15,
+      child: _compactInput(ctrl, hint, icon),
+    );
+  }
+
+  Widget _actionTile(IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: WaterGlass(
+        height: 65,
+        borderRadius: 15,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: AppColors.textCyan),
+            const SizedBox(width: 10),
+            Text(label,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _chipSelect(String title, List<String> options, List<String> selected) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white38,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                )),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((opt) {
+            final isSelected = selected.contains(opt);
+            return GestureDetector(
+              onTap: () => setState(
+                  () => isSelected ? selected.remove(opt) : selected.add(opt)),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.textCyan.withOpacity(0.1)
+                      : Colors.white.withOpacity(0.03),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: isSelected ? AppColors.textCyan : Colors.white10),
+                ),
+                child: Text(opt,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: isSelected ? Colors.white : Colors.white24,
+                          fontWeight: FontWeight.bold,
+                        )),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRuleInput() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+                child: _inputField(_ruleController, "ADD PROTOCOL...",
+                    FontAwesomeIcons.shieldHalved)),
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: () {
+                if (_ruleController.text.isNotEmpty) {
+                  setState(() {
+                    _rules.add(_ruleController.text.toUpperCase());
+                    _ruleController.clear();
+                  });
+                }
+              },
+              child: WaterGlass(
+                  width: 65,
+                  height: 65,
+                  borderRadius: 15,
+                  child: const Icon(Icons.add, color: AppColors.textCyan)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 5,
+          children: _rules
+              .map((r) => Chip(
+                    label: Text(r,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.white70,
+                            )),
+                    backgroundColor: Colors.white10,
+                    onDeleted: () => setState(() => _rules.remove(r)),
+                  ))
+              .toList(),
+        )
+      ],
+    );
+  }
+
 
 class MapPickerScreen extends StatefulWidget {
   final LatLng initialLocation;
