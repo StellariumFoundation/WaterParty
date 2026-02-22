@@ -101,21 +101,32 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   }
 
   Future<void> _pickImage() async {
-    if (_partyPhotos.length >= 16) {
+    int remaining = 16 - _partyPhotos.length;
+    if (remaining <= 0) {
       _showError("Maximum 16 photos allowed");
       return;
     }
-    final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
     
-    if (image != null) {
+    final picker = ImagePicker();
+    final images = await picker.pickMultiImage(imageQuality: 70);
+    
+    if (images.isNotEmpty) {
       setState(() => _isUploading = true);
       try {
-        final bytes = await image.readAsBytes();
-        final hash = await ref.read(authProvider.notifier).uploadImage(bytes, "image/jpeg");
-        setState(() {
-          _partyPhotos.add(hash);
-        });
+        // Limit to remaining capacity
+        final toUpload = images.length > remaining ? images.sublist(0, remaining) : images;
+        
+        for (var img in toUpload) {
+          final bytes = await img.readAsBytes();
+          final hash = await ref.read(authProvider.notifier).uploadImage(bytes, "image/jpeg");
+          setState(() {
+            _partyPhotos.add(hash);
+          });
+        }
+        
+        if (images.length > remaining) {
+          _showError("Only $remaining photos were added (max 16 reached)");
+        }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Upload failed: $e")));
       } finally {
