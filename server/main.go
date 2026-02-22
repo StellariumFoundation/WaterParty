@@ -39,6 +39,7 @@ func main() {
 	http.HandleFunc("/register", corsMiddleware(handleRegister))
 	http.HandleFunc("/login", corsMiddleware(handleLogin))
 	http.HandleFunc("/upload", corsMiddleware(handleUpload))
+	http.HandleFunc("/profile", corsMiddleware(handleGetProfile))
 
 	// 5. Image/Asset Handler
 	http.HandleFunc("/assets/", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
@@ -144,9 +145,9 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		music_genres, top_artists, job_title, company, school, degree,
 		instagram_handle, twitter_handle, linkedin_handle, x_handle, tiktok_handle,
 		is_verified, trust_score, elo_score, parties_hosted, flake_count,
-		wallet_data, location_lat, location_lon, bio, interests, last_active_at, created_at
+		wallet_data, location_lat, location_lon, bio, last_active_at, created_at
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 
-		$19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36) 
+		$19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35) 
 	RETURNING id, last_active_at`
 
 	var lastActiveAt time.Time
@@ -156,7 +157,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		u.MusicGenres, u.TopArtists, u.JobTitle, u.Company, u.School, u.Degree,
 		u.InstagramHandle, u.TwitterHandle, u.LinkedinHandle, u.XHandle, u.TikTokHandle,
 		u.IsVerified, u.TrustScore, u.EloScore, u.PartiesHosted, u.FlakeCount,
-		walletJSON, u.LocationLat, u.LocationLon, u.Bio, u.Interests, now, now,
+		walletJSON, u.LocationLat, u.LocationLon, u.Bio, now, now,
 	).Scan(&u.ID, &lastActiveAt)
 
 	if err != nil {
@@ -203,6 +204,28 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user.PasswordHash = "" // Clear hash before sending
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+}
+
+func handleGetProfile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "User ID required", http.StatusBadRequest)
+		return
+	}
+
+	user, err := GetUser(id)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
 }

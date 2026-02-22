@@ -73,7 +73,6 @@ CREATE TABLE IF NOT EXISTS users (
     gender TEXT,
     
     -- Vibe & Matching
-    looking_for TEXT[] DEFAULT '{}',
     drinking_pref TEXT,
     smoking_pref TEXT,
     cannabis_pref TEXT,
@@ -107,7 +106,6 @@ CREATE TABLE IF NOT EXISTS users (
     
     -- Bio
     bio TEXT,
-    interests TEXT[] DEFAULT '{}',
     
     last_active_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -323,24 +321,24 @@ func CreateUser(u User) (string, error) {
 	walletJSON, _ := json.Marshal(u.WalletData)
 	query := `INSERT INTO users (
 		real_name, phone_number, email, profile_photos, age, date_of_birth,
-		height_cm, gender, looking_for, drinking_pref, smoking_pref, cannabis_pref,
+		height_cm, gender, drinking_pref, smoking_pref, cannabis_pref,
 		music_genres, top_artists, job_title, company, school, degree,
 		instagram_handle, twitter_handle, linkedin_handle, x_handle, tiktok_handle,
 		is_verified, trust_score, elo_score, parties_hosted, flake_count,
-		wallet_data, location_lat, location_lon, bio, interests, last_active_at
+		wallet_data, location_lat, location_lon, bio, last_active_at
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 
-		$19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34) 
+		$19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32) 
 	RETURNING id`
 
 	var id string
 	now := time.Now()
 	err := db.QueryRow(context.Background(), query,
 		u.RealName, u.PhoneNumber, u.Email, u.ProfilePhotos, u.Age, u.DateOfBirth,
-		u.HeightCm, u.Gender, u.LookingFor, u.DrinkingPref, u.SmokingPref, u.CannabisPref,
+		u.HeightCm, u.Gender, u.DrinkingPref, u.SmokingPref, u.CannabisPref,
 		u.MusicGenres, u.TopArtists, u.JobTitle, u.Company, u.School, u.Degree,
 		u.InstagramHandle, u.TwitterHandle, u.LinkedinHandle, u.XHandle, u.TikTokHandle,
 		u.IsVerified, u.TrustScore, u.EloScore, u.PartiesHosted, u.FlakeCount,
-		walletJSON, u.LocationLat, u.LocationLon, u.Bio, u.Interests, &now,
+		walletJSON, u.LocationLat, u.LocationLon, u.Bio, &now,
 	).Scan(&id)
 	return id, err
 }
@@ -349,19 +347,19 @@ func GetUser(id string) (User, error) {
 	var u User
 	var walletJSON []byte
 	query := `SELECT id, real_name, phone_number, email, profile_photos, age, date_of_birth,
-		height_cm, gender, looking_for, drinking_pref, smoking_pref, cannabis_pref, music_genres,
+		height_cm, gender, drinking_pref, smoking_pref, cannabis_pref, music_genres,
 		top_artists, job_title, company, school, degree, instagram_handle, twitter_handle,
 		linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, elo_score,
 		parties_hosted, flake_count, wallet_data, location_lat, location_lon, bio,
-		interests, last_active_at, created_at FROM users WHERE id = $1`
+		last_active_at, created_at FROM users WHERE id = $1`
 
 	err := db.QueryRow(context.Background(), query, id).Scan(
 		&u.ID, &u.RealName, &u.PhoneNumber, &u.Email, &u.ProfilePhotos, &u.Age, &u.DateOfBirth,
-		&u.HeightCm, &u.Gender, &u.LookingFor, &u.DrinkingPref, &u.SmokingPref, &u.CannabisPref, &u.MusicGenres,
+		&u.HeightCm, &u.Gender, &u.DrinkingPref, &u.SmokingPref, &u.CannabisPref, &u.MusicGenres,
 		&u.TopArtists, &u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle, &u.TwitterHandle,
 		&u.LinkedinHandle, &u.XHandle, &u.TikTokHandle, &u.IsVerified, &u.TrustScore, &u.EloScore,
 		&u.PartiesHosted, &u.FlakeCount, &walletJSON, &u.LocationLat, &u.LocationLon, &u.Bio,
-		&u.Interests, &u.LastActiveAt, &u.CreatedAt,
+		&u.LastActiveAt, &u.CreatedAt,
 	)
 	if err == nil {
 		json.Unmarshal(walletJSON, &u.WalletData)
@@ -378,7 +376,7 @@ func GetUserByEmail(email string) (User, string, error) {
 		music_genres, top_artists, job_title, company, school, degree, instagram_handle, 
 		twitter_handle, linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, 
 		elo_score, parties_hosted, flake_count, wallet_data, location_lat, location_lon, 
-		last_active_at, created_at, bio, interests 
+		last_active_at, created_at, bio 
 		FROM users WHERE email = $1`
 
 	err := db.QueryRow(context.Background(), query, email).Scan(
@@ -387,7 +385,7 @@ func GetUserByEmail(email string) (User, string, error) {
 		&u.MusicGenres, &u.TopArtists, &u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle,
 		&u.TwitterHandle, &u.LinkedinHandle, &u.XHandle, &u.TikTokHandle, &u.IsVerified, &u.TrustScore,
 		&u.EloScore, &u.PartiesHosted, &u.FlakeCount, &walletJSON, &u.LocationLat, &u.LocationLon,
-		&u.LastActiveAt, &u.CreatedAt, &u.Bio, &u.Interests,
+		&u.LastActiveAt, &u.CreatedAt, &u.Bio,
 	)
 	if err == nil {
 		json.Unmarshal(walletJSON, &u.WalletData)
@@ -400,13 +398,34 @@ func UpdateUser(u User) error {
 	query := `UPDATE users SET 
 		real_name=$1, phone_number=$2, profile_photos=$3, bio=$4, 
 		location_lat=$5, location_lon=$6, last_active_at=$7, 
-		interests=$8, instagram_handle=$9, twitter_handle=$10, 
-		linkedin_handle=$11, x_handle=$12, tiktok_handle=$13, wallet_data=$14
-		WHERE id=$15`
+		instagram_handle=$8, twitter_handle=$9, 
+		linkedin_handle=$10, x_handle=$11, tiktok_handle=$12, wallet_data=$13
+		WHERE id=$14`
 	_, err := db.Exec(context.Background(), query, u.RealName, u.PhoneNumber, u.ProfilePhotos, 
-		u.Bio, u.LocationLat, u.LocationLon, time.Now(), u.Interests, 
+		u.Bio, u.LocationLat, u.LocationLon, time.Now(), 
 		u.InstagramHandle, u.TwitterHandle, u.LinkedinHandle, u.XHandle, 
 		u.TikTokHandle, walletJSON, u.ID)
+	return err
+}
+
+func UpdateUserFull(u User) error {
+	walletJSON, _ := json.Marshal(u.WalletData)
+	query := `UPDATE users SET 
+		real_name=$1, phone_number=$2, profile_photos=$3, bio=$4, 
+		location_lat=$5, location_lon=$6, last_active_at=$7, 
+		instagram_handle=$8, twitter_handle=$9, 
+		linkedin_handle=$10, x_handle=$11, tiktok_handle=$12, wallet_data=$13,
+		job_title=$14, company=$15, school=$16, degree=$17, age=$18,
+		height_cm=$19, gender=$20, drinking_pref=$21, smoking_pref=$22,
+		cannabis_pref=$23
+		WHERE id=$24`
+	_, err := db.Exec(context.Background(), query, 
+		u.RealName, u.PhoneNumber, u.ProfilePhotos, u.Bio, 
+		u.LocationLat, u.LocationLon, time.Now(), 
+		u.InstagramHandle, u.TwitterHandle, u.LinkedinHandle, u.XHandle, 
+		u.TikTokHandle, walletJSON, u.JobTitle, u.Company, u.School, 
+		u.Degree, u.Age, u.HeightCm, u.Gender, u.DrinkingPref, 
+		u.SmokingPref, u.CannabisPref, u.ID)
 	return err
 }
 
@@ -566,6 +585,62 @@ func GetChatRoom(id string) (ChatRoom, error) {
 		&cr.ID, &cr.PartyID, &cr.HostID, &cr.Title, &cr.ImageUrl, &cr.IsGroup, &cr.ParticipantIDs, &cr.IsActive, &cr.CreatedAt,
 	)
 	return cr, err
+}
+
+func GetChatRoomsForUser(userID string) ([]map[string]interface{}, error) {
+	query := `
+		SELECT cr.id, cr.party_id, cr.host_id, cr.title, cr.image_url, cr.is_group, cr.participant_ids, cr.is_active, cr.created_at,
+		       (SELECT content FROM chat_messages WHERE chat_id = cr.id ORDER BY created_at DESC LIMIT 1) as last_message_content,
+		       (SELECT created_at FROM chat_messages WHERE chat_id = cr.id ORDER BY created_at DESC LIMIT 1) as last_message_at
+		FROM chat_rooms cr
+		WHERE $1 = ANY(cr.participant_ids)
+		ORDER BY last_message_at DESC NULLS LAST, cr.created_at DESC`
+
+	rows, err := db.Query(context.Background(), query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rooms []map[string]interface{}
+	for rows.Next() {
+		var id, partyID, hostID, title, imageURL string
+		var isGroup, isActive bool
+		var participantIDs []string
+		var createdAt time.Time
+		var lastMsgContent *string
+		var lastMsgAt *time.Time
+
+		err := rows.Scan(&id, &partyID, &hostID, &title, &imageURL, &isGroup, &participantIDs, &isActive, &createdAt, &lastMsgContent, &lastMsgAt)
+		if err != nil {
+			return nil, err
+		}
+
+		room := map[string]interface{}{
+			"ID":             id,
+			"PartyID":        partyID,
+			"HostID":         hostID,
+			"Title":          title,
+			"ImageUrl":       imageURL,
+			"IsGroup":        isGroup,
+			"ParticipantIDs": participantIDs,
+			"IsActive":       isActive,
+			"CreatedAt":      createdAt,
+			"RecentMessages": []interface{}{}, // Initial list empty
+			"UnreadCount":    0,               // Placeholder
+		}
+		if lastMsgContent != nil {
+			room["LastMessageContent"] = *lastMsgContent
+		} else {
+			room["LastMessageContent"] = "No messages yet"
+		}
+		if lastMsgAt != nil {
+			room["LastMessageAt"] = *lastMsgAt
+		}
+
+		rooms = append(rooms, room)
+	}
+	return rooms, nil
 }
 
 // ==========================================

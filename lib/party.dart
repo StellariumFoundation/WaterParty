@@ -4,6 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
@@ -21,13 +22,13 @@ class CreatePartyScreen extends ConsumerStatefulWidget {
 }
 
 class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
-  final _titleController = TextEditingController();
-  final _descController = TextEditingController();
-  final _cityController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _poolAmountController = TextEditingController();
-  final _ruleController = TextEditingController();
-  final _partyTypeController = TextEditingController();
+  late TextEditingController _titleController;
+  late TextEditingController _descController;
+  late TextEditingController _cityController;
+  late TextEditingController _addressController;
+  late TextEditingController _poolAmountController;
+  late TextEditingController _ruleController;
+  late TextEditingController _partyTypeController;
 
   double _capacity = 10;
   bool _autoLock = true;
@@ -37,15 +38,85 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   DateTime _date = DateTime.now();
   TimeOfDay _time = const TimeOfDay(hour: 22, minute: 0);
   
-  final List<String> _selectedTags = [];
+  List<String> _selectedTags = [];
   final List<String> _availableTags = ["HOUSE PARTY", "RAVE", "ROOFTOP", "DINNER", "ART", "POOL PARTY"];
   
-  final List<String> _rules = [];
-  String _selectedMood = "CHILL";
+  List<String> _rules = [];
 
   List<String> _partyPhotos = [];
   bool _isUploading = false;
   bool _isGettingLocation = false;
+  double _durationHours = 6;
+
+  @override
+  void initState() {
+    super.initState();
+    final draft = ref.read(draftPartyProvider);
+    
+    _titleController = TextEditingController(text: draft.title);
+    _descController = TextEditingController(text: draft.description);
+    _cityController = TextEditingController(text: draft.city);
+    _addressController = TextEditingController(text: draft.address);
+    _poolAmountController = TextEditingController(text: draft.poolAmount);
+    _ruleController = TextEditingController();
+    _partyTypeController = TextEditingController(text: draft.partyType);
+
+    _capacity = draft.capacity;
+    _autoLock = draft.autoLock;
+    _hasPool = draft.hasPool;
+    _geoLat = draft.geoLat;
+    _geoLon = draft.geoLon;
+    if (draft.date != null) _date = draft.date!;
+    if (draft.hour != null && draft.minute != null) {
+      _time = TimeOfDay(hour: draft.hour!, minute: draft.minute!);
+    }
+    _selectedTags = List.from(draft.selectedTags);
+    _rules = List.from(draft.rules);
+    _partyPhotos = List.from(draft.photos);
+    _durationHours = draft.durationHours;
+
+    _titleController.addListener(_updateDraft);
+    _descController.addListener(_updateDraft);
+    _cityController.addListener(_updateDraft);
+    _addressController.addListener(_updateDraft);
+    _poolAmountController.addListener(_updateDraft);
+    _partyTypeController.addListener(_updateDraft);
+  }
+
+  void _updateDraft() {
+    ref.read(draftPartyProvider.notifier).update(DraftParty(
+      title: _titleController.text,
+      description: _descController.text,
+      city: _cityController.text,
+      address: _addressController.text,
+      photos: _partyPhotos,
+      capacity: _capacity,
+      autoLock: _autoLock,
+      hasPool: _hasPool,
+      poolAmount: _poolAmountController.text,
+      selectedTags: _selectedTags,
+      partyType: _partyTypeController.text,
+      rules: _rules,
+      geoLat: _geoLat,
+      geoLon: _geoLon,
+      date: _date,
+      hour: _time.hour,
+      minute: _time.minute,
+      durationHours: _durationHours,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    _cityController.dispose();
+    _addressController.dispose();
+    _poolAmountController.dispose();
+    _ruleController.dispose();
+    _partyTypeController.dispose();
+    super.dispose();
+  }
 
   Future<void> _useMyLocation() async {
     setState(() => _isGettingLocation = true);
@@ -66,6 +137,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
         _addressController.text = "MY CURRENT LOCATION";
         _cityController.text = "DETECTED ON PUBLISH";
       });
+      _updateDraft();
     } catch (e) {
       _showError(e.toString());
     } finally {
@@ -97,6 +169,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
         _addressController.text = "PINNED ON MAP";
         _cityController.text = "DETECTED ON PUBLISH";
       });
+      _updateDraft();
     }
   }
 
@@ -123,6 +196,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
             _partyPhotos.add(hash);
           });
         }
+        _updateDraft();
         
         if (images.length > remaining) {
           _showError("Only $remaining photos were added (max 16 reached)");
@@ -159,6 +233,8 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       _showError("At least one photo is required");
       return;
     }
+
+    ref.read(partyCreationProvider.notifier).setLoading();
 
     final String partyId = const Uuid().v4();
     final DateTime startDateTime = DateTime(
@@ -208,7 +284,6 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     );
 
     ref.read(socketServiceProvider).sendMessage('CREATE_PARTY', newParty.toMap());
-    ref.read(navIndexProvider.notifier).setIndex(0);
   }
 
   void _showError(String m) {
@@ -221,104 +296,167 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     );
   }
 
-  double _durationHours = 6;
+  void _showSuccess(String m) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(m),
+        backgroundColor: AppColors.textCyan,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 30),
-              _sectionHeader("DETAILS"),
-              WaterGlass(
-                height: 180,
-                borderRadius: 20,
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
+    final creationState = ref.watch(partyCreationProvider);
+
+    ref.listen(partyCreationProvider, (previous, next) {
+      if (next.status == CreationStatus.success) {
+        _showSuccess("PARTY IGNITED SUCCESSFULLY!");
+        ref.read(draftPartyProvider.notifier).clear();
+        ref.read(navIndexProvider.notifier).setIndex(0);
+        ref.read(partyCreationProvider.notifier).reset();
+      } else if (next.status == CreationStatus.error) {
+        _showError(next.errorMessage ?? "Failed to create party");
+      }
+    });
+
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: Colors.transparent,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+                  const SizedBox(height: 30),
+                  _sectionHeader("DETAILS"),
+                  WaterGlass(
+                    height: 220,
+                    borderRadius: 20,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          _compactInput(
+                            _titleController, 
+                            "PARTY TITLE (REQUIRED)", 
+                            FontAwesomeIcons.bolt,
+                            maxLines: 2,
+                            style: TextStyle(
+                              color: Colors.white, 
+                              fontSize: AppTypography.titleStyle.fontSize, 
+                              fontWeight: FontWeight.normal
+                            ),
+                          ),
+                          const Divider(color: Colors.white10, height: 20),
+                          Expanded(
+                            child: _compactInput(
+                              _descController, 
+                              "DESCRIPTION (REQUIRED)", 
+                              Icons.notes, 
+                              maxLines: 5,
+                              style: TextStyle(
+                                color: Colors.white70, 
+                                fontSize: AppTypography.smallStyle.fontSize! + 1, 
+                                fontWeight: FontWeight.normal
+                              ),
+                              hintStyle: TextStyle(
+                                color: Colors.white10, 
+                                fontSize: AppTypography.smallStyle.fontSize
+                              ),
+                            )
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 25),
+                  _buildPhotoGrid(),
+                  const SizedBox(height: 10),
+                  _sectionHeader("LOGISTICS"),
+                  Row(
                     children: [
-                      _compactInput(_titleController, "PARTY TITLE (REQUIRED)", FontAwesomeIcons.bolt),
-                      const Divider(color: Colors.white10, height: 30),
-                      Expanded(child: _compactInput(_descController, "DESCRIPTION (REQUIRED)", Icons.notes, maxLines: 3)),
+                      Expanded(child: _actionTile(FontAwesomeIcons.calendarDay, "${_date.day}/${_date.month}", _pickDate)),
+                      const SizedBox(width: 15),
+                      Expanded(child: _actionTile(FontAwesomeIcons.clock, _time.format(context), _pickTime)),
                     ],
                   ),
-                ),
-              ),
-              const SizedBox(height: 25),
-              _buildPhotoGrid(),
-              const SizedBox(height: 25),
-              _sectionHeader("LOGISTICS"),
-              Row(
-                children: [
-                  Expanded(child: _actionTile(FontAwesomeIcons.calendarDay, "${_date.day}/${_date.month}", _pickDate)),
-                  const SizedBox(width: 15),
-                  Expanded(child: _actionTile(FontAwesomeIcons.clock, _time.format(context), _pickTime)),
-                ],
-              ),
-              const SizedBox(height: 15),
-              _buildDurationSlider(),
-              const SizedBox(height: 15),
-              Row(
-                children: [
-                  Expanded(child: _inputField(_cityController, "CITY (REQUIRED)", FontAwesomeIcons.locationDot)),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: _openMapPicker,
-                    child: WaterGlass(
-                      width: 65, height: 65,
-                      borderRadius: 15,
-                      child: const Icon(FontAwesomeIcons.mapLocationDot, color: AppColors.textCyan),
-                    ),
+                  const SizedBox(height: 15),
+                  _buildDurationSlider(),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      Expanded(child: _inputField(_cityController, "CITY (REQUIRED)", FontAwesomeIcons.locationDot)),
+                      const SizedBox(width: 10),
+                      GestureDetector(
+                        onTap: _openMapPicker,
+                        child: WaterGlass(
+                          width: 65, height: 65,
+                          borderRadius: 15,
+                          child: const Icon(FontAwesomeIcons.mapLocationDot, color: AppColors.textCyan),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 15),
-              Row(
-                children: [
-                  Expanded(child: _inputField(_addressController, "FULL ADDRESS (HIDDEN)", FontAwesomeIcons.mapPin)),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: _isGettingLocation ? null : _useMyLocation,
-                    child: WaterGlass(
-                      width: 65, height: 65,
-                      borderRadius: 15,
-                      child: _isGettingLocation 
-                        ? const CircularProgressIndicator(color: AppColors.textCyan, strokeWidth: 2)
-                        : const Icon(Icons.my_location, color: AppColors.textCyan),
-                    ),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      Expanded(child: _inputField(_addressController, "FULL ADDRESS (HIDDEN)", FontAwesomeIcons.mapPin)),
+                      const SizedBox(width: 10),
+                      GestureDetector(
+                        onTap: _isGettingLocation ? null : _useMyLocation,
+                        child: WaterGlass(
+                          width: 65, height: 65,
+                          borderRadius: 15,
+                          child: _isGettingLocation 
+                            ? const CircularProgressIndicator(color: AppColors.textCyan, strokeWidth: 2)
+                            : const Icon(Icons.my_location, color: AppColors.textCyan),
+                        ),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 25),
+                  _sectionHeader("ATMOSPHERE"),
+                  _buildVibeExplainer(),
+                  const SizedBox(height: 15),
+                  _chipSelect("KIND OF PARTY", _availableTags, _selectedTags),
+                  const SizedBox(height: 15),
+                  _inputField(_partyTypeController, "OR DESCRIBE THE TYPE...", Icons.edit_note),
+                  const SizedBox(height: 25),
+                  _sectionHeader("BASIC RULES"),
+                  _buildRuleInput(),
+                  const SizedBox(height: 25),
+                  _sectionHeader("CAPACITY & FUNDING"),
+                  _buildCapacitySlider(),
+                  const SizedBox(height: 15),
+                  _buildPoolToggle(),
+                  const SizedBox(height: 50),
+                  _buildIgniteButton(),
+                  const SizedBox(height: 100),
                 ],
               ),
-              const SizedBox(height: 25),
-              _sectionHeader("ATMOSPHERE"),
-              _buildVibeExplainer(),
-              const SizedBox(height: 15),
-              _chipSelect("KIND OF PARTY", _availableTags, _selectedTags),
-              const SizedBox(height: 15),
-              _inputField(_partyTypeController, "OR DESCRIBE THE TYPE...", Icons.edit_note),
-              const SizedBox(height: 15),
-              _buildMoodSelector(),
-              const SizedBox(height: 25),
-              _sectionHeader("BASIC RULES"),
-              _buildRuleInput(),
-              const SizedBox(height: 25),
-              _sectionHeader("CAPACITY & FUNDING"),
-              _buildCapacitySlider(),
-              const SizedBox(height: 15),
-              _buildPoolToggle(),
-              const SizedBox(height: 50),
-              _buildIgniteButton(),
-              const SizedBox(height: 100),
-            ],
+            ),
           ),
         ),
-      ),
+        if (creationState.status == CreationStatus.loading)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black54,
+              child: const Center(
+                child: WaterGlass(
+                  width: 100,
+                  height: 100,
+                  borderRadius: 20,
+                  child: CircularProgressIndicator(color: AppColors.textCyan),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -345,43 +483,6 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     );
   }
 
-  Widget _buildMoodSelector() {
-    final moods = ["CHILL", "WILD", "CLASSY", "DARK", "VIBRANT"];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("MOOD",
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white38,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1,
-                )),
-        const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: moods.map((m) {
-              final isSelected = _selectedMood == m;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedMood = m),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 10),
-                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.textCyan.withOpacity(0.1) : Colors.white.withOpacity(0.03),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: isSelected ? AppColors.textCyan : Colors.white10),
-                  ),
-                  child: Text(m, style: TextStyle(color: isSelected ? Colors.white : Colors.white24, fontWeight: FontWeight.bold, fontSize: 10)),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildDurationSlider() {
     return WaterGlass(
       height: 70,
@@ -392,14 +493,23 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
           children: [
             const Icon(FontAwesomeIcons.hourglassHalf, color: AppColors.textCyan, size: 16),
             const SizedBox(width: 15),
-            Text("DURATION: ${_durationHours.toInt()}H", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+            Text("DURATION: ${_durationHours.toInt()}H", 
+              style: TextStyle(
+                color: Colors.white, 
+                fontWeight: FontWeight.bold, 
+                fontSize: AppTypography.smallStyle.fontSize! - 2
+              )
+            ),
             Expanded(
               child: Slider(
                 value: _durationHours,
                 min: 1,
-                max: 24,
+                max: 12,
                 activeColor: AppColors.textCyan,
-                onChanged: (v) => setState(() => _durationHours = v),
+                onChanged: (v) {
+                  setState(() => _durationHours = v);
+                  _updateDraft();
+                },
               ),
             ),
           ],
@@ -426,7 +536,10 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
             max: 1000,
             activeColor: AppColors.textCyan,
             inactiveColor: Colors.white10,
-            onChanged: (v) => setState(() => _capacity = v),
+            onChanged: (v) {
+              setState(() => _capacity = v);
+              _updateDraft();
+            },
           ),
           Text(_autoLock ? "AUTO-LOCK WHEN FULL" : "MANUAL LOCKING",
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -455,7 +568,10 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
             ),
           ),
         GestureDetector(
-          onTap: () => setState(() => _hasPool = !_hasPool),
+          onTap: () {
+            setState(() => _hasPool = !_hasPool);
+            _updateDraft();
+          },
           child: WaterGlass(
             height: 80,
             borderRadius: 20,
@@ -528,12 +644,18 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
 
   Future<void> _pickDate() async {
     final d = await showDatePicker(context: context, initialDate: _date, firstDate: DateTime.now(), lastDate: DateTime(2030));
-    if (d != null) setState(() => _date = d);
+    if (d != null) {
+      setState(() => _date = d);
+      _updateDraft();
+    }
   }
 
   Future<void> _pickTime() async {
     final t = await showTimePicker(context: context, initialTime: _time);
-    if (t != null) setState(() => _time = t);
+    if (t != null) {
+      setState(() => _time = t);
+      _updateDraft();
+    }
   }
 
   Widget _buildHeader() {
@@ -566,25 +688,30 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
             crossAxisSpacing: 10,
             mainAxisSpacing: 10,
           ),
-          itemCount: 16, // Maximum slots
+          itemCount: (_partyPhotos.length + 1).clamp(3, 16),
           itemBuilder: (context, index) {
             if (index < _partyPhotos.length) {
               return Stack(
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(15),
-                    child: Image.network(
-                      AppConstants.assetUrl(_partyPhotos[index]),
+                    child: CachedNetworkImage(
+                      imageUrl: AppConstants.assetUrl(_partyPhotos[index]),
                       fit: BoxFit.cover,
                       width: double.infinity,
                       height: double.infinity,
+                      placeholder: (context, url) => Container(color: Colors.black12),
+                      errorWidget: (context, url, error) => const Icon(Icons.error),
                     ),
                   ),
                   Positioned(
                     top: 5,
                     right: 5,
                     child: GestureDetector(
-                      onTap: () => setState(() => _partyPhotos.removeAt(index)),
+                      onTap: () {
+                        setState(() => _partyPhotos.removeAt(index));
+                        _updateDraft();
+                      },
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
@@ -594,21 +721,18 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                   ),
                 ],
               );
-            } else if (index == _partyPhotos.length || index < 6) {
-              // Show add button for the next slot OR for the first 6 slots if they are empty
-              bool isNextSlot = index == _partyPhotos.length;
+            } else if (index == _partyPhotos.length) {
               return GestureDetector(
-                onTap: isNextSlot ? (_isUploading ? null : _pickImage) : null,
+                onTap: _isUploading ? null : _pickImage,
                 child: WaterGlass(
                   borderRadius: 15,
-                  child: (isNextSlot && _isUploading)
+                  child: _isUploading
                     ? const Center(child: CircularProgressIndicator(color: AppColors.textCyan, strokeWidth: 2))
-                    : Icon(Icons.add_a_photo, 
-                        color: isNextSlot ? Colors.white24 : Colors.white.withOpacity(0.02)),
+                    : const Icon(Icons.add_a_photo, color: Colors.white24),
                 ),
               );
             }
-            return const SizedBox.shrink(); // Hide the remaining slots until needed
+            return const SizedBox.shrink(); 
           },
         ),
         if (_partyPhotos.isEmpty)
@@ -632,17 +756,17 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       );
 
   Widget _compactInput(TextEditingController ctrl, String hint, IconData icon,
-      {int maxLines = 1}) {
+      {int maxLines = 1, TextStyle? style, TextStyle? hintStyle}) {
     return TextField(
       controller: ctrl,
       maxLines: maxLines,
-      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+      style: style ?? Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        hintStyle: hintStyle ?? Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Colors.white10,
               fontSize: 14,
             ),
@@ -657,7 +781,13 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     return WaterGlass(
       height: 65,
       borderRadius: 15,
-      child: _compactInput(ctrl, hint, icon),
+      child: _compactInput(
+        ctrl, 
+        hint, 
+        icon,
+        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+        hintStyle: const TextStyle(color: Colors.white10, fontSize: 11),
+      ),
     );
   }
 
@@ -673,9 +803,10 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
             Icon(icon, size: 16, color: AppColors.textCyan),
             const SizedBox(width: 10),
             Text(label,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
+                      fontSize: AppTypography.smallStyle.fontSize! - 1,
                     )),
           ],
         ),
@@ -700,8 +831,10 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
           children: options.map((opt) {
             final isSelected = selected.contains(opt);
             return GestureDetector(
-              onTap: () => setState(
-                  () => isSelected ? selected.remove(opt) : selected.add(opt)),
+              onTap: () {
+                setState(() => isSelected ? selected.remove(opt) : selected.add(opt));
+                _updateDraft();
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding:
@@ -743,6 +876,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                     _rules.add(_ruleController.text.toUpperCase());
                     _ruleController.clear();
                   });
+                  _updateDraft();
                 }
               },
               child: WaterGlass(
@@ -763,7 +897,10 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                               color: Colors.white70,
                             )),
                     backgroundColor: Colors.white10,
-                    onDeleted: () => setState(() => _rules.remove(r)),
+                    onDeleted: () {
+                      setState(() => _rules.remove(r));
+                      _updateDraft();
+                    },
                   ))
               .toList(),
         )

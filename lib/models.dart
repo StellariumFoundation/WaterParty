@@ -51,7 +51,6 @@ class User {
   final DateTime? dateOfBirth;
   final int heightCm;
   final String gender;
-  final List<String> lookingFor;
   final String drinkingPref;
   final String smokingPref;
   final String cannabisPref;
@@ -77,7 +76,6 @@ class User {
   final DateTime? lastActiveAt;
   final DateTime? createdAt;
   final String bio;
-  final List<String> interests;
 
   const User({
     required this.id,
@@ -89,7 +87,6 @@ class User {
     this.dateOfBirth,
     this.heightCm = 0,
     this.gender = '',
-    this.lookingFor = const [],
     this.drinkingPref = '',
     this.smokingPref = '',
     this.cannabisPref = '',
@@ -115,7 +112,6 @@ class User {
     this.lastActiveAt,
     this.createdAt,
     this.bio = '',
-    this.interests = const [],
   });
 
   factory User.fromMap(Map<String, dynamic> map) {
@@ -129,7 +125,6 @@ class User {
       dateOfBirth: map['DateOfBirth'] != null ? DateTime.parse(map['DateOfBirth']) : null,
       heightCm: map['HeightCm'] ?? 0,
       gender: map['Gender'] ?? '',
-      lookingFor: List<String>.from(map['LookingFor'] ?? []),
       drinkingPref: map['DrinkingPref'] ?? '',
       smokingPref: map['SmokingPref'] ?? '',
       cannabisPref: map['CannabisPref'] ?? '',
@@ -155,7 +150,6 @@ class User {
       lastActiveAt: map['LastActiveAt'] != null ? DateTime.parse(map['LastActiveAt']) : null,
       createdAt: map['CreatedAt'] != null ? DateTime.parse(map['CreatedAt']) : null,
       bio: map['Bio'] ?? '',
-      interests: List<String>.from(map['Interests'] ?? []),
     );
   }
 
@@ -169,27 +163,39 @@ class User {
     String? linkedinHandle,
     String? xHandle,
     String? tiktokHandle,
+    String? phoneNumber,
+    int? age,
+    int? heightCm,
+    String? gender,
+    String? drinkingPref,
+    String? smokingPref,
+    String? cannabisPref,
+    String? jobTitle,
+    String? company,
+    String? school,
+    String? degree,
+    List<String>? musicGenres,
+    List<String>? topArtists,
   }) {
     return User(
       id: id,
       realName: realName ?? this.realName,
-      phoneNumber: phoneNumber,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
       email: email,
       profilePhotos: profilePhotos ?? this.profilePhotos,
-      age: age,
+      age: age ?? this.age,
       dateOfBirth: dateOfBirth,
-      heightCm: heightCm,
-      gender: gender,
-      lookingFor: lookingFor,
-      drinkingPref: drinkingPref,
-      smokingPref: smokingPref,
-      cannabisPref: cannabisPref,
-      musicGenres: musicGenres,
-      topArtists: topArtists,
-      jobTitle: jobTitle,
-      company: company,
-      school: school,
-      degree: degree,
+      heightCm: heightCm ?? this.heightCm,
+      gender: gender ?? this.gender,
+      drinkingPref: drinkingPref ?? this.drinkingPref,
+      smokingPref: smokingPref ?? this.smokingPref,
+      cannabisPref: cannabisPref ?? this.cannabisPref,
+      musicGenres: musicGenres ?? this.musicGenres,
+      topArtists: topArtists ?? this.topArtists,
+      jobTitle: jobTitle ?? this.jobTitle,
+      company: company ?? this.company,
+      school: school ?? this.school,
+      degree: degree ?? this.degree,
       instagramHandle: instagramHandle ?? this.instagramHandle,
       twitterHandle: twitterHandle ?? this.twitterHandle,
       linkedinHandle: linkedinHandle ?? this.linkedinHandle,
@@ -206,7 +212,6 @@ class User {
       lastActiveAt: lastActiveAt,
       createdAt: createdAt,
       bio: bio ?? this.bio,
-      interests: interests,
     );
   }
 
@@ -221,7 +226,6 @@ class User {
       'DateOfBirth': dateOfBirth?.toUtc().toIso8601String(),
       'HeightCm': heightCm,
       'Gender': gender,
-      'LookingFor': lookingFor,
       'DrinkingPref': drinkingPref,
       'SmokingPref': smokingPref,
       'CannabisPref': cannabisPref,
@@ -245,7 +249,6 @@ class User {
       'LocationLat': locationLat,
       'LocationLon': locationLon,
       'Bio': bio,
-      'Interests': interests,
     };
   }
 }
@@ -547,6 +550,137 @@ class PartyApplication {
       ),
       appliedAt: DateTime.parse(map['AppliedAt']),
       user: map['User'] != null ? User.fromMap(map['User']) : null,
+    );
+  }
+}
+
+@immutable
+class DraftParty {
+  final String title;
+  final String description;
+  final String city;
+  final String address;
+  final List<String> photos;
+  final double capacity;
+  final bool autoLock;
+  final bool hasPool;
+  final String poolAmount;
+  final List<String> selectedTags;
+  final String partyType;
+  final List<String> rules;
+  final double? geoLat;
+  final double? geoLon;
+  final DateTime? date;
+  final int? hour;
+  final int? minute;
+  final double durationHours;
+
+  const DraftParty({
+    this.title = '',
+    this.description = '',
+    this.city = '',
+    this.address = '',
+    this.photos = const [],
+    this.capacity = 10,
+    this.autoLock = true,
+    this.hasPool = false,
+    this.poolAmount = '',
+    this.selectedTags = const [],
+    this.partyType = '',
+    this.rules = const [],
+    this.geoLat,
+    this.geoLon,
+    this.date,
+    this.hour,
+    this.minute,
+    this.durationHours = 6,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title,
+      'description': description,
+      'city': city,
+      'address': address,
+      'photos': photos,
+      'capacity': capacity,
+      'autoLock': autoLock,
+      'hasPool': hasPool,
+      'poolAmount': poolAmount,
+      'selectedTags': selectedTags,
+      'partyType': partyType,
+      'rules': rules,
+      'geoLat': geoLat,
+      'geoLon': geoLon,
+      'date': date?.toIso8601String(),
+      'hour': hour,
+      'minute': minute,
+      'durationHours': durationHours,
+    };
+  }
+
+  factory DraftParty.fromMap(Map<String, dynamic> map) {
+    return DraftParty(
+      title: map['title'] ?? '',
+      description: map['description'] ?? '',
+      city: map['city'] ?? '',
+      address: map['address'] ?? '',
+      photos: List<String>.from(map['photos'] ?? []),
+      capacity: (map['capacity'] ?? 10.0).toDouble(),
+      autoLock: map['autoLock'] ?? true,
+      hasPool: map['hasPool'] ?? false,
+      poolAmount: map['poolAmount'] ?? '',
+      selectedTags: List<String>.from(map['selectedTags'] ?? []),
+      partyType: map['partyType'] ?? '',
+      rules: List<String>.from(map['rules'] ?? []),
+      geoLat: map['geoLat'],
+      geoLon: map['geoLon'],
+      date: map['date'] != null ? DateTime.parse(map['date']) : null,
+      hour: map['hour'],
+      minute: map['minute'],
+      durationHours: (map['durationHours'] ?? 6.0).toDouble(),
+    );
+  }
+
+  DraftParty copyWith({
+    String? title,
+    String? description,
+    String? city,
+    String? address,
+    List<String>? photos,
+    double? capacity,
+    bool? autoLock,
+    bool? hasPool,
+    String? poolAmount,
+    List<String>? selectedTags,
+    String? partyType,
+    List<String>? rules,
+    double? geoLat,
+    double? geoLon,
+    DateTime? date,
+    int? hour,
+    int? minute,
+    double? durationHours,
+  }) {
+    return DraftParty(
+      title: title ?? this.title,
+      description: description ?? this.description,
+      city: city ?? this.city,
+      address: address ?? this.address,
+      photos: photos ?? this.photos,
+      capacity: capacity ?? this.capacity,
+      autoLock: autoLock ?? this.autoLock,
+      hasPool: hasPool ?? this.hasPool,
+      poolAmount: poolAmount ?? this.poolAmount,
+      selectedTags: selectedTags ?? this.selectedTags,
+      partyType: partyType ?? this.partyType,
+      rules: rules ?? this.rules,
+      geoLat: geoLat ?? this.geoLat,
+      geoLon: geoLon ?? this.geoLon,
+      date: date ?? this.date,
+      hour: hour ?? this.hour,
+      minute: minute ?? this.minute,
+      durationHours: durationHours ?? this.durationHours,
     );
   }
 }

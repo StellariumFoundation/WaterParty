@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
@@ -196,7 +197,12 @@ class _PartyFeedScreenState extends ConsumerState<PartyFeedScreen> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.network(displayImage, fit: BoxFit.cover),
+          CachedNetworkImage(
+            imageUrl: displayImage, 
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Container(color: Colors.black12),
+            errorWidget: (context, url, error) => const Icon(Icons.error),
+          ),
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -358,7 +364,12 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                         onPageChanged: (idx) => setState(() => _currentPhotoIndex = idx),
                         itemBuilder: (context, index) {
                           final url = photos[index].startsWith("http") ? photos[index] : AppConstants.assetUrl(photos[index]);
-                          return Image.network(url, fit: BoxFit.cover);
+                          return CachedNetworkImage(
+                            imageUrl: url, 
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(color: Colors.black12),
+                            errorWidget: (context, url, error) => const Icon(Icons.error),
+                          );
                         },
                       ),
                       // Tinder-style indicators

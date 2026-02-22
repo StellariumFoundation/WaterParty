@@ -43,9 +43,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
   String _selectedGender = "OTHER";
   String _selectedPaymentType = "PAYPAL";
 
-  // Multi-select lists
-  final List<String> _interests = [];
-
   @override
   void initState() {
     super.initState();
@@ -245,7 +242,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
           twitterHandle: _twitterCtrl.text,
           tiktokHandle: _tiktokCtrl.text,
           walletData: WalletInfo(type: _walletTypeCtrl.text, data: _walletDataCtrl.text),
-          interests: _interests,
           trustScore: 100.0,
         );
         
@@ -520,12 +516,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
                 Icons.account_balance_wallet_rounded),
             const SizedBox(height: 15),
             _input(_walletDataCtrl, "DATA (USERNAME, IBAN)", Icons.qr_code_rounded),
-            const SizedBox(height: 35),
-            Text("WHAT KIND OF PARTIES DO YOU LIKE?",
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textCyan, fontWeight: FontWeight.w900, letterSpacing: 1)),
-            const SizedBox(height: 15),
-            _interestChips(),
           ],
         );
       default:
@@ -598,46 +588,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with WidgetsBindingObse
           contentPadding: const EdgeInsets.all(20),
         ),
       ),
-    );
-  }
-
-  Widget _interestChips() {
-    final List<String> options = [
-      "RAVES",
-      "HOUSE PARTIES",
-      "DINNER PARTIES",
-      "NETWORKING",
-      "OUTDOOR",
-      "CHILL"
-    ];
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: options.map((v) {
-        bool active = _interests.contains(v);
-        return GestureDetector(
-          onTap: () =>
-              setState(() => active ? _interests.remove(v) : _interests.add(v)),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(25),
-              border: Border.all(
-                  color: active ? AppColors.electricPurple : Colors.white10, width: 2),
-              color: active
-                  ? AppColors.electricPurple.withOpacity(0.15)
-                  : Colors.transparent,
-            ),
-            child: Text(v,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: active ? Colors.white : Colors.white24,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 10,
-                    )),
-          ),
-        );
-      }).toList(),
     );
   }
 

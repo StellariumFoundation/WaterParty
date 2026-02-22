@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
@@ -48,13 +50,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         }
         
         final updatedPhotos = [...user.profilePhotos, ...newHashes];
-        await ref.read(authProvider.notifier).updateUserProfile(profilePhotos: updatedPhotos);
+        final updatedUser = user.copyWith(profilePhotos: updatedPhotos);
+        await ref.read(authProvider.notifier).updateUserProfile(updatedUser);
         
         // Wire to backend
-        ref.read(socketServiceProvider).sendMessage('UPDATE_PROFILE', {
-          'ID': user.id,
-          'ProfilePhotos': updatedPhotos,
-        });
+        ref.read(socketServiceProvider).sendMessage('UPDATE_PROFILE', updatedUser.toMap());
         
         if (images.length > remaining) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Only $remaining photos were added (max 12 reached)")));
@@ -74,12 +74,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final updatedPhotos = List<String>.from(user.profilePhotos);
     updatedPhotos.removeAt(index);
     
-    await ref.read(authProvider.notifier).updateUserProfile(profilePhotos: updatedPhotos);
+    final updatedUser = user.copyWith(profilePhotos: updatedPhotos);
+    await ref.read(authProvider.notifier).updateUserProfile(updatedUser);
     
-    ref.read(socketServiceProvider).sendMessage('UPDATE_PROFILE', {
-      'ID': user.id,
-      'ProfilePhotos': updatedPhotos,
-    });
+    ref.read(socketServiceProvider).sendMessage('UPDATE_PROFILE', updatedUser.toMap());
     setState(() {});
   }
 
@@ -104,12 +102,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   String _drinking = "Social";
   String _smoking = "No";
   String _cannabis = "No";
-  List<String> _interests = [];
 
   // Options for Dropdowns
   final List<String> _habitOptions = ["No", "Social", "Yes"];
   final List<String> _genderOptions = ["MALE", "FEMALE", "OTHER"];
-  final List<String> _commonInterests = ["#Techno", "#Jazz", "#Art", "#Hiking", "#Foodie", "#Travel", "#Gaming", "#Yoga"];
 
   @override
   void initState() {
@@ -140,7 +136,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _drinking = user.drinkingPref.isEmpty ? "Social" : user.drinkingPref;
     _smoking = user.smokingPref.isEmpty ? "No" : user.smokingPref;
     _cannabis = user.cannabisPref.isEmpty ? "No" : user.cannabisPref;
-    _interests = List.from(user.interests);
   }
 
   @override
@@ -174,37 +169,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final updatedUser = currentUser.copyWith(
       realName: _realNameCtrl.text,
       bio: _bioCtrl.text,
+      phoneNumber: _phoneCtrl.text,
+      jobTitle: _jobCtrl.text,
+      company: _companyCtrl.text,
+      school: _schoolCtrl.text,
+      degree: _degreeCtrl.text,
+      instagramHandle: _instaCtrl.text,
+      twitterHandle: _twitterCtrl.text,
+      linkedinHandle: _linkedInCtrl.text,
+      xHandle: _xCtrl.text,
+      tiktokHandle: _tiktokCtrl.text,
+      age: _age,
+      heightCm: _heightCm,
+      gender: _gender,
+      drinkingPref: _drinking,
+      smokingPref: _smoking,
+      cannabisPref: _cannabis,
     );
 
     // Update locally through the provider
-    await ref.read(authProvider.notifier).updateUserProfile(
-      realName: _realNameCtrl.text, 
-      bio: _bioCtrl.text, 
-    );
+    await ref.read(authProvider.notifier).updateUserProfile(updatedUser);
 
     // Update ALL fields on the backend via WebSocket
-    ref.read(socketServiceProvider).sendMessage('UPDATE_PROFILE', {
-      'ID': currentUser.id,
-      'RealName': _realNameCtrl.text,
-      'PhoneNumber': _phoneCtrl.text,
-      'Bio': _bioCtrl.text,
-      'JobTitle': _jobCtrl.text,
-      'Company': _companyCtrl.text,
-      'School': _schoolCtrl.text,
-      'Degree': _degreeCtrl.text,
-      'InstagramHandle': _instaCtrl.text,
-      'TwitterHandle': _twitterCtrl.text,
-      'LinkedinHandle': _linkedInCtrl.text,
-      'XHandle': _xCtrl.text,
-      'TikTokHandle': _tiktokCtrl.text,
-      'Age': _age,
-      'HeightCm': _heightCm,
-      'Gender': _gender,
-      'DrinkingPref': _drinking,
-      'SmokingPref': _smoking,
-      'CannabisPref': _cannabis,
-      'Interests': _interests,
-    });
+    ref.read(socketServiceProvider).sendMessage('UPDATE_PROFILE', updatedUser.toMap());
   }
 
   @override
@@ -260,8 +247,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           _buildWorkEducationSection(),
                           const SizedBox(height: 20),
                           _buildSocialHandlesSection(),
-                          const SizedBox(height: 20),
-                          _buildInterestsSection(),
                           const SizedBox(height: 40),
                           _buildEditButton(),
                           const SizedBox(height: 100),
@@ -313,7 +298,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (photos.isEmpty) {
       return SizedBox(
         height: 400,
-        child: Image.network("https://images.unsplash.com/photo-1511367461989-f85a21fda167?q=80&w=1000", fit: BoxFit.cover),
+        child: CachedNetworkImage(
+          imageUrl: "https://images.unsplash.com/photo-1511367461989-f85a21fda167?q=80&w=1000",
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(color: Colors.black12),
+          errorWidget: (context, url, error) => const Icon(Icons.error),
+        ),
       );
     }
 
@@ -330,7 +320,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               final photoUrl = photos[index].startsWith("http")
                   ? photos[index]
                   : AppConstants.assetUrl(photos[index]);
-              return Image.network(photoUrl, fit: BoxFit.cover);
+              return CachedNetworkImage(
+                imageUrl: photoUrl,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(color: Colors.black12),
+                errorWidget: (context, url, error) => const Icon(Icons.error),
+              );
             },
           ),
           
@@ -450,10 +445,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(15),
-                      child: Image.network(
-                        AppConstants.assetUrl(user.profilePhotos[index]),
+                      child: CachedNetworkImage(
+                        imageUrl: AppConstants.assetUrl(user.profilePhotos[index]),
                         fit: BoxFit.cover,
                         width: double.infinity, height: double.infinity,
+                        placeholder: (context, url) => Container(color: Colors.black12),
+                        errorWidget: (context, url, error) => const Icon(Icons.error),
                       ),
                     ),
                     Positioned(
@@ -506,26 +503,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           hintText: "Your Name", border: InputBorder.none),
                     )
                   : Text(
-                      "${user.realName}, $_age",
+                      "${user.realName}, ${user.age}",
                       style: Theme.of(context)
                           .textTheme
                           .displayMedium
                           ?.copyWith(fontSize: 32),
                     ),
             ),
-            if (isEditing)
-              SizedBox(
-                width: 60,
-                child: TextField(
-                  keyboardType: TextInputType.number,
-                  onChanged: (v) => _age = int.tryParse(v) ?? _age,
-                  decoration: InputDecoration(
-                      hintText: "$_age",
-                      labelText: "Age",
-                      border: InputBorder.none),
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              )
           ],
         ),
       ],
@@ -768,74 +752,68 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       String emptyLabel) {
     if (!isEditing && ctrl.text.isEmpty) return const SizedBox();
 
-    return WaterGlass(
-      height: 55,
-      borderRadius: 15,
-      child: TextField(
-        controller: ctrl,
-        enabled: isEditing,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.white,
-            ),
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: AppColors.textCyan, size: 18),
-          hintText: hint,
-          hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white24,
+    String cleanText = ctrl.text.trim();
+    bool isSocial = (icon == FontAwesomeIcons.instagram || 
+                     icon == FontAwesomeIcons.twitter || 
+                     icon == FontAwesomeIcons.xTwitter || 
+                     icon == FontAwesomeIcons.tiktok || 
+                     icon == FontAwesomeIcons.linkedin);
+    
+    bool isLinkable = !isEditing && cleanText.isNotEmpty && isSocial;
+
+    return GestureDetector(
+      onTap: isLinkable ? () async {
+        String input = cleanText;
+        String url = input;
+        
+        if (!input.startsWith('http')) {
+          // It's likely a handle
+          String handle = input.startsWith('@') ? input.substring(1) : input;
+          
+          if (icon == FontAwesomeIcons.instagram) {
+            url = 'https://instagram.com/$handle';
+          } else if (icon == FontAwesomeIcons.twitter || icon == FontAwesomeIcons.xTwitter) {
+            url = 'https://twitter.com/$handle';
+          } else if (icon == FontAwesomeIcons.tiktok) {
+            url = 'https://tiktok.com/@$handle';
+          } else if (icon == FontAwesomeIcons.linkedin) {
+            if (!handle.contains('/')) {
+              url = 'https://linkedin.com/in/$handle';
+            } else {
+              url = 'https://linkedin.com/$handle';
+            }
+          }
+        }
+        
+        final uri = Uri.tryParse(url);
+        if (uri != null) {
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        }
+      } : null,
+      child: WaterGlass(
+        height: 55,
+        borderRadius: 15,
+        child: TextField(
+          controller: ctrl,
+          enabled: isEditing,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: isLinkable ? AppColors.textCyan : Colors.white,
+                decoration: isLinkable ? TextDecoration.underline : null,
               ),
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon, color: isLinkable ? AppColors.textCyan : AppColors.textCyan.withOpacity(0.4), size: 18),
+            hintText: hint,
+            hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white24,
+                ),
+            border: InputBorder.none,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+          ),
         ),
       ),
-    );
-  }
-
-  Widget _buildInterestsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("MY VIBE",
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white38,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                )),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: (isEditing ? _commonInterests : _interests).map((tag) {
-            final isSelected = _interests.contains(tag);
-            return GestureDetector(
-              onTap: isEditing
-                  ? () {
-                      setState(() {
-                        isSelected
-                            ? _interests.remove(tag)
-                            : _interests.add(tag);
-                      });
-                    }
-                  : null,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColors.textCyan.withOpacity(0.2)
-                      : Colors.white10,
-                  border: Border.all(
-                      color: isSelected ? AppColors.textCyan : Colors.transparent),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(tag,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isSelected ? Colors.white : Colors.white38)),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
     );
   }
 

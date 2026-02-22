@@ -21,10 +21,16 @@ class SocketService {
     _isConnected = true;
 
     _channel!.stream.listen(
-      (data) => _handleIncomingMessage(data),
+      (data) {
+        _handleIncomingMessage(data);
+      },
       onDone: () => _reconnect(uid),
       onError: (err) => _reconnect(uid),
     );
+
+    // Request latest user data and chats from server immediately after connection
+    sendMessage('GET_USER', {});
+    sendMessage('GET_CHATS', {});
   }
 
   void _handleIncomingMessage(dynamic rawData) {
@@ -34,6 +40,19 @@ class SocketService {
     final dynamic payload = data['Payload'];
 
     switch (event) {
+      case 'PROFILE_UPDATED':
+        final user = User.fromMap(payload);
+        ref.read(authProvider.notifier).updateUserProfile(user);
+        break;
+      case 'CHATS_LIST':
+        final List<dynamic> roomsRaw = payload;
+        final rooms = roomsRaw.map((r) => ChatRoom.fromMap(r)).toList();
+        ref.read(chatProvider.notifier).setRooms(rooms);
+        break;
+      case 'NEW_CHAT_ROOM':
+        final room = ChatRoom.fromMap(payload);
+        ref.read(chatProvider.notifier).addRoom(room);
+        break;
       case 'NEW_MESSAGE':
         final message = ChatMessage.fromMap(payload);
         ref.read(chatProvider.notifier).updateRoomWithNewMessage(message);
@@ -63,6 +82,14 @@ class SocketService {
           (e) => e.toString().split('.').last == payload['Status']
         );
         ref.read(partyApplicantsProvider.notifier).updateStatus(payload['UserID'], status);
+        break;
+      case 'PARTY_CREATED':
+        final party = Party.fromMap(payload);
+        ref.read(partyCreationProvider.notifier).setSuccess(party.id);
+        break;
+      case 'ERROR':
+        final String message = payload['message'] ?? 'Unknown error';
+        ref.read(partyCreationProvider.notifier).setError(message);
         break;
     }
   }

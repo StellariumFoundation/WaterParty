@@ -261,15 +261,85 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		id, err := CreateParty(p)
 		if err != nil {
 			log.Printf("Create Party DB Error: %v", err)
+			// Send error feedback to client
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to create party: " + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 		p.ID = id
+
+		// Send confirmation back to creator
+		confirmationMsg, _ := json.Marshal(WSMessage{
+			Event:   "PARTY_CREATED",
+			Payload: p,
+		})
+		c.send <- confirmationMsg
+
+		// Also send the new ChatRoom to the creator immediately
+		newRoom, err := GetChatRoom(p.ChatRoomID)
+		if err == nil {
+			newRoomMsg, _ := json.Marshal(WSMessage{
+				Event:   "NEW_CHAT_ROOM",
+				Payload: newRoom,
+			})
+			c.send <- newRoomMsg
+		}
 
 		broadcastMsg, _ := json.Marshal(WSMessage{
 			Event:   "NEW_PARTY",
 			Payload: p,
 		})
 		c.hub.broadcastGlobal(broadcastMsg)
+
+	case "GET_CHATS":
+		rooms, err := GetChatRoomsForUser(c.UID)
+		if err != nil {
+			log.Printf("Get Chats DB Error: %v", err)
+			return
+		}
+		response, _ := json.Marshal(WSMessage{
+			Event:   "CHATS_LIST",
+			Payload: rooms,
+		})
+		c.send <- response
+
+	case "UPDATE_PROFILE":
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		var u User
+		json.Unmarshal(payloadBytes, &u)
+		
+		// Ensure the user is updating their own profile
+		u.ID = c.UID
+
+		err := UpdateUserFull(u)
+		if err != nil {
+			log.Printf("Update Profile DB Error: %v", err)
+			return
+		}
+
+		// Optional: broadcast update or send confirmation back to client
+		response, _ := json.Marshal(WSMessage{
+			Event:   "PROFILE_UPDATED",
+			Payload: u,
+		})
+		c.send <- response
+
+	case "GET_USER":
+		u, err := GetUser(c.UID)
+		if err != nil {
+			log.Printf("Get User DB Error: %v", err)
+			return
+		}
+		response, _ := json.Marshal(WSMessage{
+			Event:   "PROFILE_UPDATED",
+			Payload: u,
+		})
+		c.send <- response
 
 	case "SWIPE":
 		// Payload: {"PartyID": "uuid", "Direction": "right/left"}

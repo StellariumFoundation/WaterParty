@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
@@ -135,11 +136,13 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(room.isGroup ? 12 : 30),
-                child: Image.network(
-                    room.imageUrl.isNotEmpty ? room.imageUrl : "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000",
+                child: CachedNetworkImage(
+                    imageUrl: room.imageUrl.isNotEmpty ? room.imageUrl : "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000",
                     width: 60,
                     height: 60,
-                    fit: BoxFit.cover),
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(color: Colors.black12),
+                    errorWidget: (context, url, error) => const Icon(Icons.error)),
               ),
               if (room.isGroup && room.partyId.isNotEmpty)
                 const Positioned(
@@ -284,9 +287,11 @@ class _GuestManagementScreenState extends ConsumerState<GuestManagementScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(15),
-                  child: Image.network(
-                    user.profilePhotos.isNotEmpty ? AppConstants.assetUrl(user.profilePhotos.first) : "https://images.unsplash.com/photo-1511367461989-f85a21fda167?q=80&w=1000",
-                    width: 90, height: 90, fit: BoxFit.cover),
+                  child: CachedNetworkImage(
+                    imageUrl: user.profilePhotos.isNotEmpty ? AppConstants.assetUrl(user.profilePhotos.first) : "https://images.unsplash.com/photo-1511367461989-f85a21fda167?q=80&w=1000",
+                    width: 90, height: 90, fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(color: Colors.black12),
+                    errorWidget: (context, url, error) => const Icon(Icons.error)),
                 ),
                 const SizedBox(width: 15),
                 Expanded(
@@ -485,7 +490,11 @@ class ExternalProfileScreen extends ConsumerWidget {
     return PageView.builder(
       itemCount: user.profilePhotos.length,
       itemBuilder: (context, index) {
-        return Image.network(AppConstants.assetUrl(user.profilePhotos[index]), fit: BoxFit.cover);
+        return CachedNetworkImage(
+          imageUrl: AppConstants.assetUrl(user.profilePhotos[index]), 
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(color: Colors.black12),
+          errorWidget: (context, url, error) => const Icon(Icons.error));
       },
     );
   }

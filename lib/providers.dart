@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,7 +15,13 @@ class AuthNotifier extends AsyncNotifier<User?> {
 
   @override
   Future<User?> build() async {
-    return _initAndLoadSession();
+    final localUser = await _initAndLoadSession();
+    if (localUser != null) {
+      // Trigger background refresh
+      Future.microtask(() => refreshProfile(localUser.id));
+      return localUser;
+    }
+    return null;
   }
 
   Future<User?> _initAndLoadSession() async {
@@ -36,6 +43,20 @@ class AuthNotifier extends AsyncNotifier<User?> {
       }
     }
     return null;
+  }
+
+  Future<void> refreshProfile(String id) async {
+    try {
+      final response = await http.get(Uri.parse("$apiBase/profile?id=$id"));
+      if (response.statusCode == 200) {
+        final serverUser = User.fromMap(jsonDecode(response.body));
+        state = AsyncValue.data(serverUser);
+        await _saveSession(serverUser);
+      }
+    } catch (e) {
+      // Keep local data if refresh fails
+      debugPrint("Profile refresh failed: $e");
+    }
   }
 
   Future<void> _saveSession(User user) async {
@@ -130,11 +151,9 @@ class AuthNotifier extends AsyncNotifier<User?> {
     throw Exception("Upload failed");
   }
 
-  Future<void> updateUserProfile({String? realName, String? bio, List<String>? profilePhotos}) async {
-    if (state.value == null) return;
-    final newUser = state.value!.copyWith(realName: realName, bio: bio, profilePhotos: profilePhotos);
-    state = AsyncValue.data(newUser);
-    await _saveSession(newUser);
+  Future<void> updateUserProfile(User updatedUser) async {
+    state = AsyncValue.data(updatedUser);
+    await _saveSession(updatedUser);
   }
 }
 
@@ -146,6 +165,16 @@ class ChatNotifier extends Notifier<List<ChatRoom>> {
   @override
   List<ChatRoom> build() {
     return [];
+  }
+
+  void setRooms(List<ChatRoom> rooms) {
+    state = rooms;
+  }
+
+  void addRoom(ChatRoom room) {
+    if (!state.any((r) => r.id == room.id)) {
+      state = [room, ...state];
+    }
   }
 
   void updateRoomWithNewMessage(ChatMessage msg) {
@@ -269,3 +298,67 @@ class PartyApplicantsNotifier extends Notifier<List<PartyApplication>> {
 }
 
 final partyApplicantsProvider = NotifierProvider<PartyApplicantsNotifier, List<PartyApplication>>(PartyApplicantsNotifier.new);
+
+class DraftPartyNotifier extends Notifier<DraftParty> {
+  static const String _key = 'draft_party';
+
+  @override
+  DraftParty build() {
+    _loadFromPrefs();
+    return const DraftParty();
+  }
+
+  Future<void> _loadFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final json = prefs.getString(_key);
+    if (json != null) {
+      state = DraftParty.fromMap(jsonDecode(json));
+    }
+  }
+
+  Future<void> _saveToPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, jsonEncode(state.toMap()));
+  }
+
+  void update(DraftParty draft) {
+    state = draft;
+    _saveToPrefs();
+  }
+
+  void clear() {
+    state = const DraftParty();
+    _saveToPrefs();
+  }
+}
+
+final draftPartyProvider = NotifierProvider<DraftPartyNotifier, DraftParty>(DraftPartyNotifier.new);
+
+enum CreationStatus { idle, loading, success, error }
+
+class PartyCreationState {
+  final CreationStatus status;
+  final String? errorMessage;
+  final String? createdPartyId;
+
+  const PartyCreationState({
+    this.status = CreationStatus.idle,
+    this.errorMessage,
+    this.createdPartyId,
+  });
+}
+
+class PartyCreationNotifier extends Notifier<PartyCreationState> {
+  @override
+  PartyCreationState build() => const PartyCreationState();
+
+  void setLoading() => state = const PartyCreationState(status: CreationStatus.loading);
+  
+  void setSuccess(String id) => state = PartyCreationState(status: CreationStatus.success, createdPartyId: id);
+  
+  void setError(String message) => state = PartyCreationState(status: CreationStatus.error, errorMessage: message);
+  
+  void reset() => state = const PartyCreationState();
+}
+
+final partyCreationProvider = NotifierProvider<PartyCreationNotifier, PartyCreationState>(PartyCreationNotifier.new);
