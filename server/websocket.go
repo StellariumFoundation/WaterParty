@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -374,17 +375,59 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		payloadBytes, _ := json.Marshal(wsMsg.Payload)
 		json.Unmarshal(payloadBytes, &loc)
 
-		// Basic distance query (In production, use PostGIS or Haversine formula)
-		query := `SELECT id, host_id, title, description, party_photos, city, max_capacity, current_guest_count, vibe_tags, start_time 
-				  FROM parties 
-				  WHERE status = 'OPEN' 
-				  ORDER BY created_at DESC LIMIT 50`
+		if loc.RadiusKm <= 0 {
+			loc.RadiusKm = 50.0
+		}
+
+		// Simple bounding box calculation
+		// 1 degree lat ~= 111km
+		latDelta := loc.RadiusKm / 111.0
+		// 1 degree lon ~= 111km * cos(lat)
+		lonDelta := loc.RadiusKm / (111.0 * 0.7) // Roughly estimate for mid-latitudes
+
+		query := `
+			SELECT id, host_id, title, description, party_photos, start_time, end_time, status, 
+			       is_location_revealed, address, city, geo_lat, geo_lon, max_capacity, 
+			       current_guest_count, vibe_tags, rules, chat_room_id, created_at
+			FROM parties 
+			WHERE status = 'OPEN' 
+			  AND host_id != $1
+			  AND id NOT IN (SELECT party_id FROM party_applications WHERE user_id = $1)
+		`
 		
-		rows, _ := db.Query(context.Background(), query)
+		var rows pgx.Rows
+		var err error
+		
+		if loc.Lat != 0 || loc.Lon != 0 {
+			query += ` AND geo_lat BETWEEN $2 AND $3 AND geo_lon BETWEEN $4 AND $5`
+			query += ` ORDER BY created_at DESC LIMIT 50`
+			rows, err = db.Query(context.Background(), query, 
+				c.UID, 
+				loc.Lat-latDelta, loc.Lat+latDelta, 
+				loc.Lon-lonDelta, loc.Lon+lonDelta)
+		} else {
+			query += ` ORDER BY created_at DESC LIMIT 50`
+			rows, err = db.Query(context.Background(), query, c.UID)
+		}
+
+		if err != nil {
+			log.Printf("Feed Query Error: %v", err)
+			return
+		}
+		defer rows.Close()
+
 		var parties []Party
 		for rows.Next() {
 			var p Party
-			rows.Scan(&p.ID, &p.HostID, &p.Title, &p.Description, &p.PartyPhotos, &p.City, &p.MaxCapacity, &p.CurrentGuestCount, &p.VibeTags, &p.StartTime)
+			err := rows.Scan(
+				&p.ID, &p.HostID, &p.Title, &p.Description, &p.PartyPhotos, &p.StartTime, &p.EndTime,
+				&p.Status, &p.IsLocationRevealed, &p.Address, &p.City, &p.GeoLat, &p.GeoLon,
+				&p.MaxCapacity, &p.CurrentGuestCount, &p.VibeTags, &p.Rules, &p.ChatRoomID, &p.CreatedAt,
+			)
+			if err != nil {
+				log.Printf("Feed Scan Error: %v", err)
+				continue
+			}
 			parties = append(parties, p)
 		}
 

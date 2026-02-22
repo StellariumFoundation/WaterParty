@@ -63,6 +63,7 @@ type User struct {
 	DateOfBirth     *time.Time `json:"DateOfBirth,omitempty" db:"date_of_birth"`
 	HeightCm        int        `json:"HeightCm" db:"height_cm"`
 	Gender          string     `json:"Gender" db:"gender"`
+	LookingFor      string     `json:"LookingFor" db:"looking_for"`
 	DrinkingPref    string     `json:"DrinkingPref" db:"drinking_pref"`
 	SmokingPref     string     `json:"SmokingPref" db:"smoking_pref"`
 	CannabisPref    string     `json:"CannabisPref" db:"cannabis_pref"`
