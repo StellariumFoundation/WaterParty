@@ -396,8 +396,8 @@ func GetUser(id string) (User, error) {
 		height_cm, gender, drinking_pref, smoking_pref,
 		top_artists, job_title, company, school, degree, instagram_handle, 
 		linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, elo_score,
-		parties_hosted, flake_count, wallet_data, location_lat, location_lon, bio,
-		last_active_at, created_at, thumbnail FROM users WHERE id = $1`
+		parties_hosted, flake_count, wallet_data, location_lat, location_lon, COALESCE(bio, ''),
+		last_active_at, created_at, COALESCE(thumbnail, '') FROM users WHERE id = $1`
 
 	err := db.QueryRow(context.Background(), query, id).Scan(
 		&u.ID, &u.RealName, &u.PhoneNumber, &u.Email, &u.ProfilePhotos, &u.Age, &u.DateOfBirth,
@@ -422,7 +422,7 @@ func GetUserByEmail(email string) (User, string, error) {
 		top_artists, job_title, company, school, degree, instagram_handle, 
 		linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, 
 		elo_score, parties_hosted, flake_count, wallet_data, location_lat, location_lon, 
-		last_active_at, created_at, bio, thumbnail 
+		last_active_at, created_at, COALESCE(bio, ''), COALESCE(thumbnail, '') 
 		FROM users WHERE email = $1`
 
 	err := db.QueryRow(context.Background(), query, email).Scan(

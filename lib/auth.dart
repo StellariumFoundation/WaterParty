@@ -333,7 +333,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                       padding: const EdgeInsets.fromLTRB(30, 20, 30, 150),
                       child: Column(
                         children: [
-                          _buildErrorBanner(),
                           if (isLogin)
                             _buildLoginFields()
                           else
@@ -357,50 +356,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     );
   }
 
-  Widget _buildErrorBanner() {
-    if (errorMessage == null) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      margin: const EdgeInsets.only(bottom: 25),
-      decoration: BoxDecoration(
-        color: Colors.redAccent.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: Colors.redAccent.withValues(alpha: 0.4),
-          width: 1.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: Colors.redAccent,
-            size: 24,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              errorMessage!,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => setState(() => errorMessage = null),
-            child: const Icon(
-              Icons.close_rounded,
-              color: Colors.white54,
-              size: 20,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Removed _buildErrorBanner as errors are now SnackBar-only.
 
   Widget _buildHeader() {
     return Column(

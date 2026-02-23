@@ -161,7 +161,15 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	).Scan(&u.ID, &lastActiveAt)
 
 	if err != nil {
-		http.Error(w, "Failed to register user: "+err.Error(), http.StatusInternalServerError)
+		// Friendly message for duplicate keys
+		if strings.Contains(err.Error(), "unique constraint") || strings.Contains(err.Error(), "duplicate key") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "email of user already registered"})
+			return
+		}
+		log.Printf("Registration error: %v", err)
+		http.Error(w, "Failed to register user", http.StatusInternalServerError)
 		return
 	}
 
@@ -190,6 +198,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	user, hash, err := GetUserByEmail(req.Email)
 	if err != nil {
+		log.Printf("Login lookup error for %s: %v", req.Email, err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{"error": "User not found"})
