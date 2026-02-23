@@ -421,7 +421,7 @@ class ChatRoom {
       id: map['ID'] ?? '',
       partyId: map['PartyID'] ?? '',
       hostId: map['HostID'] ?? map['host_id'] ?? '',
-      title: map['Title'] ?? map['title'] ?? 'PARTY CHAT',
+      title: map['Title'] ?? map['title'] ?? '',
       imageUrl: map['ImageUrl'] ?? map['image_url'] ?? '',
       isGroup: map['IsGroup'] ?? true,
       participantIds: List<String>.from(map['ParticipantIDs'] ?? []),

@@ -87,6 +87,7 @@ class SocketService {
         break;
       case 'PARTY_CREATED':
         final party = Party.fromMap(payload);
+        ref.read(partyFeedProvider.notifier).addParty(party);
         ref.read(partyCreationProvider.notifier).setSuccess(party.id);
         break;
       case 'PARTY_DELETED':

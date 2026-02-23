@@ -76,7 +76,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
 
     if (displayTitle.isEmpty) {
-      displayTitle = currentRoom.isGroup ? 'GROUP CHAT' : 'DIRECT MESSAGE';
+      displayTitle = currentRoom.isGroup ? 'PARTY CHAT' : 'DIRECT MESSAGE';
     }
 
     return Container(
@@ -429,7 +429,8 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
               ),
             ),
             Text(
-              widget.room.title.toUpperCase(),
+              (widget.room.title.isEmpty ? "PARTY CHAT" : widget.room.title)
+                  .toUpperCase(),
               style: const TextStyle(
                 fontSize: AppFontSizes.xs,
                 color: Colors.white38,
@@ -668,6 +669,17 @@ class PartySettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).value;
     final isHost = user?.id == room.hostId;
+    final parties = ref.watch(partyFeedProvider);
+
+    // Resolve dynamic title
+    String displayTitle = room.title;
+    if (room.isGroup && room.partyId.isNotEmpty) {
+      try {
+        final party = parties.firstWhere((p) => p.id == room.partyId);
+        displayTitle = party.title;
+      } catch (_) {}
+    }
+    if (displayTitle.isEmpty) displayTitle = "PARTY CHAT";
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -714,7 +726,7 @@ class PartySettingsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    room.title.toUpperCase(),
+                    displayTitle.toUpperCase(),
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
