@@ -59,11 +59,13 @@ class SocketService {
         break;
       case 'NEW_PARTY':
         final party = Party.fromMap(payload);
+        ref.read(partyCacheProvider.notifier).updateParty(party);
         ref.read(partyFeedProvider.notifier).addParty(party);
         break;
       case 'FEED_UPDATE':
         final List<dynamic> partiesRaw = payload;
         final parties = partiesRaw.map((p) => Party.fromMap(p)).toList();
+        ref.read(partyCacheProvider.notifier).updateParties(parties);
         ref.read(partyFeedProvider.notifier).setParties(parties);
         break;
       case 'PARTY_LOCKED':
@@ -87,12 +89,14 @@ class SocketService {
         break;
       case 'PARTY_CREATED':
         final party = Party.fromMap(payload);
+        ref.read(partyCacheProvider.notifier).updateParty(party);
         ref.read(partyFeedProvider.notifier).addParty(party);
         ref.read(partyCreationProvider.notifier).setSuccess(party.id);
         break;
       case 'PARTY_DELETED':
-        final partyId = payload['PartyID'];
-        final chatRoomId = payload['ChatRoomID'];
+        final partyId = payload['PartyID'] ?? payload['partyId'];
+        final chatRoomId = payload['ChatRoomID'] ?? payload['chatRoomId'];
+        ref.read(partyCacheProvider.notifier).removeParty(partyId);
         ref.read(chatProvider.notifier).removeRoom(chatRoomId);
         ref.read(partyFeedProvider.notifier).removeParty(partyId);
         break;

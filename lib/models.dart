@@ -108,46 +108,52 @@ class User {
 
   factory User.fromMap(Map<String, dynamic> map) {
     return User(
-      id: map['ID'] ?? '',
-      realName: map['RealName'] ?? '',
-      phoneNumber: map['PhoneNumber'] ?? '',
-      email: map['Email'] ?? '',
-      profilePhotos: List<String>.from(map['ProfilePhotos'] ?? []),
-      age: map['Age'] ?? 0,
-      dateOfBirth: map['DateOfBirth'] != null
-          ? DateTime.parse(map['DateOfBirth'])
+      id: map['ID'] ?? map['id'] ?? '',
+      realName: map['RealName'] ?? map['real_name'] ?? '',
+      phoneNumber: map['PhoneNumber'] ?? map['phone_number'] ?? '',
+      email: map['Email'] ?? map['email'] ?? '',
+      profilePhotos: List<String>.from(
+        map['ProfilePhotos'] ?? map['profile_photos'] ?? [],
+      ),
+      age: map['Age'] ?? map['age'] ?? 0,
+      dateOfBirth: (map['DateOfBirth'] ?? map['date_of_birth']) != null
+          ? DateTime.parse(map['DateOfBirth'] ?? map['date_of_birth'])
           : null,
-      heightCm: map['HeightCm'] ?? 0,
-      gender: map['Gender'] ?? '',
-      drinkingPref: map['DrinkingPref'] ?? '',
-      smokingPref: map['SmokingPref'] ?? '',
-      topArtists: List<String>.from(map['TopArtists'] ?? []),
-      jobTitle: map['JobTitle'] ?? '',
-      company: map['Company'] ?? '',
-      school: map['School'] ?? '',
-      degree: map['Degree'] ?? '',
-      instagramHandle: map['InstagramHandle'] ?? '',
-      linkedinHandle: map['LinkedinHandle'] ?? '',
-      xHandle: map['XHandle'] ?? '',
-      tiktokHandle: map['TikTokHandle'] ?? '',
-      isVerified: map['IsVerified'] ?? false,
-      trustScore: (map['TrustScore'] ?? 0.0).toDouble(),
-      eloScore: (map['EloScore'] ?? 0.0).toDouble(),
-      partiesHosted: map['PartiesHosted'] ?? 0,
-      flakeCount: map['FlakeCount'] ?? 0,
-      walletData: map['WalletData'] != null
-          ? WalletInfo.fromMap(map['WalletData'])
+      heightCm: map['HeightCm'] ?? map['height_cm'] ?? 0,
+      gender: map['Gender'] ?? map['gender'] ?? '',
+      drinkingPref: map['DrinkingPref'] ?? map['drinking_pref'] ?? '',
+      smokingPref: map['SmokingPref'] ?? map['smoking_pref'] ?? '',
+      topArtists: List<String>.from(
+        map['TopArtists'] ?? map['top_artists'] ?? [],
+      ),
+      jobTitle: map['JobTitle'] ?? map['job_title'] ?? '',
+      company: map['Company'] ?? map['company'] ?? '',
+      school: map['School'] ?? map['school'] ?? '',
+      degree: map['Degree'] ?? map['degree'] ?? '',
+      instagramHandle: map['InstagramHandle'] ?? map['instagram_handle'] ?? '',
+      linkedinHandle: map['LinkedinHandle'] ?? map['linkedin_handle'] ?? '',
+      xHandle: map['XHandle'] ?? map['x_handle'] ?? '',
+      tiktokHandle: map['TikTokHandle'] ?? map['tiktok_handle'] ?? '',
+      isVerified: map['IsVerified'] ?? map['is_verified'] ?? false,
+      trustScore: (map['TrustScore'] ?? map['trust_score'] ?? 0.0).toDouble(),
+      eloScore: (map['EloScore'] ?? map['elo_score'] ?? 0.0).toDouble(),
+      partiesHosted: map['PartiesHosted'] ?? map['parties_hosted'] ?? 0,
+      flakeCount: map['FlakeCount'] ?? map['flake_count'] ?? 0,
+      walletData: (map['WalletData'] ?? map['wallet_data']) != null
+          ? WalletInfo.fromMap(map['WalletData'] ?? map['wallet_data'])
           : const WalletInfo(),
-      locationLat: (map['LocationLat'] ?? 0.0).toDouble(),
-      locationLon: (map['LocationLon'] ?? 0.0).toDouble(),
-      lastActiveAt: map['LastActiveAt'] != null
-          ? DateTime.parse(map['LastActiveAt'])
+      locationLat: (map['LocationLat'] ?? map['location_lat'] ?? 0.0)
+          .toDouble(),
+      locationLon: (map['LocationLon'] ?? map['location_lon'] ?? 0.0)
+          .toDouble(),
+      lastActiveAt: (map['LastActiveAt'] ?? map['last_active_at']) != null
+          ? DateTime.parse(map['LastActiveAt'] ?? map['last_active_at'])
           : null,
-      createdAt: map['CreatedAt'] != null
-          ? DateTime.parse(map['CreatedAt'])
+      createdAt: (map['CreatedAt'] ?? map['created_at']) != null
+          ? DateTime.parse(map['CreatedAt'] ?? map['created_at'])
           : null,
-      bio: map['Bio'] ?? '',
-      thumbnail: map['Thumbnail'] ?? '',
+      bio: map['Bio'] ?? map['bio'] ?? '',
+      thumbnail: map['Thumbnail'] ?? map['thumbnail'] ?? '',
     );
   }
 
@@ -299,38 +305,47 @@ class Party {
 
   factory Party.fromMap(Map<String, dynamic> map) {
     return Party(
-      id: map['ID'] ?? '',
-      hostId: map['HostID'] ?? '',
-      title: map['Title'] ?? '',
-      description: map['Description'] ?? '',
-      partyPhotos: List<String>.from(map['PartyPhotos'] ?? []),
-      startTime: DateTime.parse(map['StartTime']),
-      endTime: DateTime.parse(map['EndTime']),
+      id: map['ID'] ?? map['id'] ?? '',
+      hostId: map['HostID'] ?? map['host_id'] ?? '',
+      title: map['Title'] ?? map['title'] ?? '',
+      description: map['Description'] ?? map['description'] ?? '',
+      partyPhotos: List<String>.from(
+        map['PartyPhotos'] ?? map['party_photos'] ?? [],
+      ),
+      startTime: DateTime.parse(map['StartTime'] ?? map['start_time']),
+      endTime: DateTime.parse(map['EndTime'] ?? map['end_time']),
       status: PartyStatus.values.firstWhere(
-        (e) => e.toString().split('.').last == map['Status'],
+        (e) => e.toString().split('.').last == (map['Status'] ?? map['status']),
         orElse: () => PartyStatus.OPEN,
       ),
-      isLocationRevealed: map['IsLocationRevealed'] ?? false,
-      address: map['Address'] ?? '',
-      city: map['City'] ?? '',
-      geoLat: (map['GeoLat'] ?? 0.0).toDouble(),
-      geoLon: (map['GeoLon'] ?? 0.0).toDouble(),
-      maxCapacity: map['MaxCapacity'] ?? 0,
-      currentGuestCount: map['CurrentGuestCount'] ?? 0,
-      autoLockOnFull: map['AutoLockOnFull'] ?? false,
-      vibeTags: List<String>.from(map['VibeTags'] ?? []),
-      rules: List<String>.from(map['Rules'] ?? []),
-      rotationPool: map['RotationPool'] != null
-          ? Crowdfunding.fromMap(map['RotationPool'])
+      isLocationRevealed:
+          map['IsLocationRevealed'] ?? map['is_location_revealed'] ?? false,
+      address: map['Address'] ?? map['address'] ?? '',
+      city: map['City'] ?? map['city'] ?? '',
+      geoLat: (map['GeoLat'] ?? map['geo_lat'] ?? 0.0).toDouble(),
+      geoLon: (map['GeoLon'] ?? map['geo_lon'] ?? 0.0).toDouble(),
+      maxCapacity: map['MaxCapacity'] ?? map['max_capacity'] ?? 0,
+      currentGuestCount:
+          map['CurrentGuestCount'] ?? map['current_guest_count'] ?? 0,
+      autoLockOnFull:
+          map['AutoLockOnFull'] ?? map['auto_lock_on_full'] ?? false,
+      vibeTags: List<String>.from(map['VibeTags'] ?? map['vibe_tags'] ?? []),
+      rules: List<String>.from(map['Rules'] ?? map['rules'] ?? []),
+      rotationPool:
+          (map['RotationPool'] ??
+                  map['rotation_pool'] ??
+                  map['RotationPool']) !=
+              null
+          ? Crowdfunding.fromMap(map['RotationPool'] ?? map['rotation_pool'])
           : null,
-      chatRoomId: map['ChatRoomID'] ?? '',
-      createdAt: map['CreatedAt'] != null
-          ? DateTime.parse(map['CreatedAt'])
+      chatRoomId: map['ChatRoomID'] ?? map['chat_room_id'] ?? '',
+      createdAt: (map['CreatedAt'] ?? map['created_at']) != null
+          ? DateTime.parse(map['CreatedAt'] ?? map['created_at'])
           : null,
-      updatedAt: map['UpdatedAt'] != null
-          ? DateTime.parse(map['UpdatedAt'])
+      updatedAt: (map['UpdatedAt'] ?? map['updated_at']) != null
+          ? DateTime.parse(map['UpdatedAt'] ?? map['updated_at'])
           : null,
-      thumbnail: map['Thumbnail'] ?? '',
+      thumbnail: map['Thumbnail'] ?? map['thumbnail'] ?? '',
     );
   }
 
@@ -418,24 +433,38 @@ class ChatRoom {
 
   factory ChatRoom.fromMap(Map<String, dynamic> map) {
     return ChatRoom(
-      id: map['ID'] ?? '',
-      partyId: map['PartyID'] ?? '',
+      id: map['ID'] ?? map['id'] ?? '',
+      partyId: map['PartyID'] ?? map['party_id'] ?? '',
       hostId: map['HostID'] ?? map['host_id'] ?? '',
       title: map['Title'] ?? map['title'] ?? '',
       imageUrl: map['ImageUrl'] ?? map['image_url'] ?? '',
-      isGroup: map['IsGroup'] ?? true,
-      participantIds: List<String>.from(map['ParticipantIDs'] ?? []),
-      isActive: map['IsActive'] ?? true,
-      recentMessages: (map['RecentMessages'] as List? ?? [])
-          .map((m) => ChatMessage.fromMap(m))
-          .toList(),
-      lastMessageContent: map['LastMessageContent'] ?? '',
-      lastMessageAt: map['LastMessageAt'] != null
-          ? DateTime.parse(map['LastMessageAt'])
+      isGroup: map['IsGroup'] ?? map['is_group'] ?? true,
+      participantIds: List<String>.from(
+        map['ParticipantIDs'] ?? map['participant_ids'] ?? [],
+      ),
+      isActive: map['IsActive'] ?? map['is_active'] ?? true,
+      recentMessages:
+          (map['RecentMessages'] ?? map['recent_messages'] as List? ?? [])
+              .map((m) => ChatMessage.fromMap(m))
+              .toList(),
+      lastMessageContent:
+          map['LastMessageContent'] ?? map['last_message_content'] ?? '',
+      lastMessageAt: (map['LastMessageAt'] ?? map['last_message_at']) != null
+          ? DateTime.parse(map['LastMessageAt'] ?? map['last_message_at'])
           : null,
-      unreadCount: map['UnreadCount'] ?? 0,
-      startTime: map['StartTime'] != null
-          ? DateTime.parse(map['StartTime'])
+      unreadCount: map['UnreadCount'] ?? map['unread_count'] ?? 0,
+      startTime:
+          (map['StartTime'] ??
+                  map['start_time'] ??
+                  map['PartyStartTime'] ??
+                  map['party_start_time']) !=
+              null
+          ? DateTime.parse(
+              map['StartTime'] ??
+                  map['start_time'] ??
+                  map['PartyStartTime'] ??
+                  map['party_start_time'],
+            )
           : null,
     );
   }
@@ -473,21 +502,23 @@ class ChatMessage {
 
   factory ChatMessage.fromMap(Map<String, dynamic> map) {
     return ChatMessage(
-      id: map['ID'] ?? '',
-      chatId: map['ChatID'] ?? '',
-      senderId: map['SenderID'] ?? '',
+      id: map['ID'] ?? map['id'] ?? '',
+      chatId: map['ChatID'] ?? map['chat_id'] ?? '',
+      senderId: map['SenderID'] ?? map['sender_id'] ?? '',
       type: MessageType.values.firstWhere(
-        (e) => e.toString().split('.').last == map['Type'],
+        (e) => e.toString().split('.').last == (map['Type'] ?? map['type']),
         orElse: () => MessageType.TEXT,
       ),
-      content: map['Content'] ?? '',
-      mediaUrl: map['MediaURL'] ?? '',
-      thumbnailUrl: map['ThumbnailURL'] ?? '',
-      metadata: Map<String, dynamic>.from(map['Metadata'] ?? {}),
-      replyToId: map['ReplyToID'] ?? '',
-      createdAt: DateTime.parse(map['CreatedAt']),
-      senderName: map['SenderName'] ?? '',
-      senderThumbnail: map['SenderThumbnail'] ?? '',
+      content: map['Content'] ?? map['content'] ?? '',
+      mediaUrl: map['MediaURL'] ?? map['media_url'] ?? '',
+      thumbnailUrl: map['ThumbnailURL'] ?? map['thumbnail_url'] ?? '',
+      metadata: Map<String, dynamic>.from(
+        map['Metadata'] ?? map['metadata'] ?? {},
+      ),
+      replyToId: map['ReplyToID'] ?? map['reply_to_id'] ?? '',
+      createdAt: DateTime.parse(map['CreatedAt'] ?? map['created_at']),
+      senderName: map['SenderName'] ?? map['sender_name'] ?? '',
+      senderThumbnail: map['SenderThumbnail'] ?? map['sender_thumbnail'] ?? '',
     );
   }
 }

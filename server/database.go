@@ -558,7 +558,7 @@ func DeleteParty(id string) error {
 
 func GetApplicantsForParty(partyID string) ([]map[string]interface{}, error) {
 	query := `SELECT pa.party_id, pa.user_id, pa.status, pa.applied_at,
-		u.real_name, u.profile_photos, u.age, u.elo_score, u.bio, u.trust_score, u.thumbnail
+		u.real_name, u.profile_photos, u.age, u.elo_score, COALESCE(u.bio, ''), u.trust_score, COALESCE(u.thumbnail, '')
 		FROM party_applications pa
 		JOIN users u ON pa.user_id = u.id
 		WHERE pa.party_id = $1
@@ -605,10 +605,30 @@ func GetApplicantsForParty(partyID string) ([]map[string]interface{}, error) {
 }
 
 func UpdateApplicationStatus(partyID, userID, status string) error {
-	_, err := db.Exec(context.Background(),
+	tx, err := db.Begin(context.Background())
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(context.Background())
+
+	_, err = tx.Exec(context.Background(),
 		"UPDATE party_applications SET status = $1 WHERE party_id = $2 AND user_id = $3",
 		status, partyID, userID)
-	return err
+	if err != nil {
+		return err
+	}
+
+	if status == "ACCEPTED" {
+		// Also add the user to the chat room participants
+		_, err = tx.Exec(context.Background(),
+			"UPDATE chat_rooms SET participant_ids = array_append(participant_ids, $1) WHERE party_id = $2 AND NOT ($1 = ANY(participant_ids))",
+			userID, partyID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(context.Background())
 }
 
 func CreateChatRoom(cr ChatRoom) (string, error) {
@@ -623,10 +643,14 @@ func CreateChatRoom(cr ChatRoom) (string, error) {
 func GetChatRoom(id string) (ChatRoom, error) {
 	var cr ChatRoom
 	var partyID, title, imageURL *string
-	query := `SELECT id, party_id, host_id, title, image_url, is_group, participant_ids, is_active, created_at 
-		FROM chat_rooms WHERE id = $1`
+	var partyStartTime *time.Time
+	query := `
+		SELECT cr.id, cr.party_id, cr.host_id, COALESCE(cr.title, p.title, '') as title, cr.image_url, cr.is_group, cr.participant_ids, cr.is_active, cr.created_at, p.start_time
+		FROM chat_rooms cr
+		LEFT JOIN parties p ON cr.party_id = p.id
+		WHERE cr.id = $1`
 	err := db.QueryRow(context.Background(), query, id).Scan(
-		&cr.ID, &partyID, &cr.HostID, &title, &imageURL, &cr.IsGroup, &cr.ParticipantIDs, &cr.IsActive, &cr.CreatedAt,
+		&cr.ID, &partyID, &cr.HostID, &title, &imageURL, &cr.IsGroup, &cr.ParticipantIDs, &cr.IsActive, &cr.CreatedAt, &partyStartTime,
 	)
 	if err == nil {
 		if partyID != nil {
@@ -638,6 +662,34 @@ func GetChatRoom(id string) (ChatRoom, error) {
 		if imageURL != nil {
 			cr.ImageUrl = *imageURL
 		}
+		cr.PartyStartTime = partyStartTime
+	}
+	return cr, err
+}
+
+func GetChatRoomByParty(partyID string) (ChatRoom, error) {
+	var cr ChatRoom
+	var pID, title, imageURL *string
+	var partyStartTime *time.Time
+	query := `
+		SELECT cr.id, cr.party_id, cr.host_id, COALESCE(cr.title, p.title, '') as title, cr.image_url, cr.is_group, cr.participant_ids, cr.is_active, cr.created_at, p.start_time
+		FROM chat_rooms cr
+		LEFT JOIN parties p ON cr.party_id = p.id
+		WHERE cr.party_id = $1`
+	err := db.QueryRow(context.Background(), query, partyID).Scan(
+		&cr.ID, &pID, &cr.HostID, &title, &imageURL, &cr.IsGroup, &cr.ParticipantIDs, &cr.IsActive, &cr.CreatedAt, &partyStartTime,
+	)
+	if err == nil {
+		if pID != nil {
+			cr.PartyID = *pID
+		}
+		if title != nil {
+			cr.Title = *title
+		}
+		if imageURL != nil {
+			cr.ImageUrl = *imageURL
+		}
+		cr.PartyStartTime = partyStartTime
 	}
 	return cr, err
 }
@@ -760,7 +812,7 @@ func SaveMessage(m ChatMessage) (string, error) {
 
 func GetChatHistory(chatID string, limit int) ([]ChatMessage, error) {
 	query := `SELECT m.id, m.sender_id, m.type, m.content, m.media_url, m.thumbnail_url, m.metadata, m.reply_to_id, m.created_at,
-		u.real_name as sender_name, u.thumbnail as sender_thumbnail
+		u.real_name as sender_name, COALESCE(u.thumbnail, '') as sender_thumbnail
 		FROM chat_messages m
 		JOIN users u ON m.sender_id = u.id
 		WHERE m.chat_id = $1 ORDER BY m.created_at DESC LIMIT $2`

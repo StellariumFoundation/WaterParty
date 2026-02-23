@@ -489,13 +489,32 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			return
 		}
 
-		// Broadcast update to the host (self) and maybe the user?
-		// For now just notify host success
+		// Broadcast update to the host (self)
 		response, _ := json.Marshal(WSMessage{
 			Event:   "APPLICATION_UPDATED",
 			Payload: req,
 		})
 		c.send <- response
+
+		// Notify the specific user if they are connected
+		if req.Status == "ACCEPTED" {
+			c.hub.mu.RLock()
+			if recipient, ok := c.hub.clients[req.UserID]; ok {
+				// 1. Send the application update notification
+				recipient.send <- response
+
+				// 2. Fetch and send the chat room details so it appears in their list immediately
+				room, err := GetChatRoomByParty(req.PartyID)
+				if err == nil {
+					roomMsg, _ := json.Marshal(WSMessage{
+						Event:   "NEW_CHAT_ROOM",
+						Payload: room,
+					})
+					recipient.send <- roomMsg
+				}
+			}
+			c.hub.mu.RUnlock()
+		}
 
 	case "DELETE_PARTY":
 		// Payload: {"PartyID": "uuid"}

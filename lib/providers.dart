@@ -434,3 +434,29 @@ final partyCreationProvider =
     NotifierProvider<PartyCreationNotifier, PartyCreationState>(
       PartyCreationNotifier.new,
     );
+
+class PartyCacheNotifier extends Notifier<Map<String, Party>> {
+  @override
+  Map<String, Party> build() => {};
+
+  void updateParty(Party party) {
+    state = {...state, party.id: party};
+  }
+
+  void updateParties(List<Party> parties) {
+    state = {...state, for (final p in parties) p.id: p};
+  }
+
+  void removeParty(String id) {
+    if (state.containsKey(id)) {
+      final newState = Map<String, Party>.from(state);
+      newState.remove(id);
+      state = newState;
+    }
+  }
+}
+
+final partyCacheProvider =
+    NotifierProvider<PartyCacheNotifier, Map<String, Party>>(
+      PartyCacheNotifier.new,
+    );

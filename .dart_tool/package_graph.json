@@ -5,7 +5,7 @@
   "packages": [
     {
       "name": "water_party",
-      "version": "1.0.6",
+      "version": "0.8.0",
       "dependencies": [
         "cached_network_image",
         "flutter",

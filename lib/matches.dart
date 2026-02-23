@@ -140,18 +140,18 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
 
   Widget _buildChatTile(ChatRoom room) {
     String timeLabel = _formatDateTime(room.lastMessageAt);
-    final parties = ref.watch(partyFeedProvider);
+    final partyCache = ref.watch(partyCacheProvider);
 
     // Resolve dynamic title if it's a party
     String displayTitle = room.title;
     if (room.isGroup && room.partyId.isNotEmpty) {
-      try {
-        final party = parties.firstWhere((p) => p.id == room.partyId);
+      final party = partyCache[room.partyId];
+      if (party != null) {
         displayTitle = party.title;
-      } catch (_) {}
+      }
     }
 
-    if (displayTitle.isEmpty) {
+    if (displayTitle.isEmpty || displayTitle == "PARTY CHAT") {
       displayTitle = room.isGroup ? "PARTY CHAT" : "DIRECT MESSAGE";
     }
 

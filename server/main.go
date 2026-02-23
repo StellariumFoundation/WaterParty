@@ -165,7 +165,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(err.Error(), "unique constraint") || strings.Contains(err.Error(), "duplicate key") {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "email of user already registered"})
+			json.NewEncoder(w).Encode(map[string]string{"error": "User already registered"})
 			return
 		}
 		log.Printf("Registration error: %v", err)

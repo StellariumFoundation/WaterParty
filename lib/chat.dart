@@ -64,18 +64,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       orElse: () => widget.room,
     );
     final user = ref.watch(authProvider).value;
-    final parties = ref.watch(partyFeedProvider);
+    final partyCache = ref.watch(partyCacheProvider);
 
     // Resolve dynamic title if it's a party
     String displayTitle = currentRoom.title;
     if (currentRoom.isGroup && currentRoom.partyId.isNotEmpty) {
-      try {
-        final party = parties.firstWhere((p) => p.id == currentRoom.partyId);
+      final party = partyCache[currentRoom.partyId];
+      if (party != null) {
         displayTitle = party.title;
-      } catch (_) {}
+      }
     }
 
-    if (displayTitle.isEmpty) {
+    if (displayTitle.isEmpty || displayTitle == 'PARTY CHAT') {
       displayTitle = currentRoom.isGroup ? 'PARTY CHAT' : 'DIRECT MESSAGE';
     }
 
@@ -337,7 +337,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               icon: const Icon(
                 FontAwesomeIcons.paperPlane,
                 color: AppColors.textCyan,
-                size: 20,
+                size:
+                    28, // Slighly reduced from 30 to ensure it fits well in standard IconButton
               ),
             ),
           ],
@@ -380,11 +381,8 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
   @override
   Widget build(BuildContext context) {
     final allApps = ref.watch(partyApplicantsProvider);
-    final parties = ref.watch(partyFeedProvider);
-    Party? party;
-    try {
-      party = parties.firstWhere((p) => p.id == widget.room.partyId);
-    } catch (_) {}
+    final partyCache = ref.watch(partyCacheProvider);
+    final party = partyCache[widget.room.partyId];
 
     final going = allApps
         .where((a) => a.status == ApplicantStatus.ACCEPTED)
@@ -429,7 +427,11 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
               ),
             ),
             Text(
-              (widget.room.title.isEmpty ? "PARTY CHAT" : widget.room.title)
+              (party?.title ??
+                      (widget.room.title.isEmpty ||
+                              widget.room.title == "PARTY CHAT"
+                          ? "PARTY CHAT"
+                          : widget.room.title))
                   .toUpperCase(),
               style: const TextStyle(
                 fontSize: AppFontSizes.xs,
@@ -669,17 +671,18 @@ class PartySettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).value;
     final isHost = user?.id == room.hostId;
-    final parties = ref.watch(partyFeedProvider);
+    final partyCache = ref.watch(partyCacheProvider);
 
     // Resolve dynamic title
     String displayTitle = room.title;
     if (room.isGroup && room.partyId.isNotEmpty) {
-      try {
-        final party = parties.firstWhere((p) => p.id == room.partyId);
+      final party = partyCache[room.partyId];
+      if (party != null) {
         displayTitle = party.title;
-      } catch (_) {}
+      }
     }
-    if (displayTitle.isEmpty) displayTitle = "PARTY CHAT";
+    if (displayTitle.isEmpty || displayTitle == "PARTY CHAT")
+      displayTitle = "PARTY CHAT";
 
     return Scaffold(
       backgroundColor: Colors.black,
