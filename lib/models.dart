@@ -357,7 +357,7 @@ class Party {
       'Description': description,
       'PartyPhotos': partyPhotos,
       'StartTime': startTime.toIso8601String(),
-      'EndTime': endTime.toIso8601String(),
+      'DurationHours': endTime.difference(startTime).inHours,
       'Status': status.toString().split('.').last,
       'IsLocationRevealed': isLocationRevealed,
       'Address': address,

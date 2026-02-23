@@ -822,6 +822,9 @@ class PartySettingsScreen extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () {
+              print(
+                '[ChatScreen] Sending DELETE_PARTY for party: ${room.partyId}',
+              );
               ref.read(socketServiceProvider).sendMessage('DELETE_PARTY', {
                 'PartyID': room.partyId,
               });

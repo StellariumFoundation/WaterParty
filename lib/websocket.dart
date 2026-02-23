@@ -117,11 +117,14 @@ class SocketService {
         ref.read(partyCreationProvider.notifier).setSuccess(party.id);
         break;
       case 'PARTY_DELETED':
+        print('[WebSocket] PARTY_DELETED payload: $payload');
         final partyId = payload['PartyID'] ?? payload['partyId'];
         final chatRoomId = payload['ChatRoomID'] ?? payload['chatRoomId'];
+        print('[WebSocket] Removing party: $partyId, chatRoom: $chatRoomId');
         ref.read(partyCacheProvider.notifier).removeParty(partyId);
         ref.read(chatProvider.notifier).removeRoom(chatRoomId);
         ref.read(partyFeedProvider.notifier).removeParty(partyId);
+        print('[WebSocket] Party removed from providers');
         break;
       case 'ERROR':
         final String message = payload['message'] ?? 'Unknown error';

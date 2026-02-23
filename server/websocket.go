@@ -270,11 +270,25 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		if desc, ok := payloadMap["Description"].(string); ok {
 			p.Description = desc
 		}
-		if startTime, ok := payloadMap["StartTime"].(string); ok {
-			p.StartTime, _ = time.Parse(time.RFC3339, startTime)
+		if startTime, ok := payloadMap["StartTime"].(string); ok && startTime != "" {
+			// Try multiple formats
+			if t, err := time.Parse(time.RFC3339, startTime); err == nil {
+				p.StartTime = t
+			} else if t, err := time.Parse("2006-01-02T15:04:05.000Z", startTime); err == nil {
+				p.StartTime = t
+			} else if t, err := time.Parse("2006-01-02T15:04:05Z", startTime); err == nil {
+				p.StartTime = t
+			} else if t, err := time.Parse("2006-01-02 15:04:05", startTime); err == nil {
+				p.StartTime = t
+			}
 		}
-		if endTime, ok := payloadMap["EndTime"].(string); ok {
-			p.EndTime, _ = time.Parse(time.RFC3339, endTime)
+		// Calculate end time from duration if provided
+		durationHours := 2 // default 2 hours
+		if dh, ok := payloadMap["DurationHours"].(float64); ok {
+			durationHours = int(dh)
+		}
+		if !p.StartTime.IsZero() {
+			p.EndTime = p.StartTime.Add(time.Duration(durationHours) * time.Hour)
 		}
 		if status, ok := payloadMap["Status"].(string); ok {
 			p.Status = PartyStatus(status)
@@ -339,12 +353,6 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		}
 		if p.StartTime.IsZero() {
 			errors = append(errors, "Start time is required")
-		}
-		if p.EndTime.IsZero() {
-			errors = append(errors, "End time is required")
-		}
-		if !p.StartTime.IsZero() && !p.EndTime.IsZero() && p.StartTime.After(p.EndTime) {
-			errors = append(errors, "End time must be after start time")
 		}
 		if p.ChatRoomID == "" {
 			errors = append(errors, "Chat room ID is required")
@@ -434,6 +442,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		c.hub.broadcastGlobal(broadcastMsg)
 
 	case "GET_CHATS":
+		log.Printf("GET_CHATS received from user: %s", c.UID)
 		rooms, err := GetChatRoomsForUser(c.UID)
 		if err != nil {
 			log.Printf("Get Chats DB Error: %v", err)
@@ -443,6 +452,27 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			Event:   "CHATS_LIST",
 			Payload: rooms,
 		})
+		c.send <- response
+
+	case "GET_MY_PARTIES":
+		log.Printf("GET_MY_PARTIES received from user: %s", c.UID)
+		parties, err := GetMyParties(c.UID)
+		if err != nil {
+			log.Printf("GetMyParties DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to get your parties",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+		response, _ := json.Marshal(WSMessage{
+			Event:   "MY_PARTIES",
+			Payload: parties,
+		})
+		log.Printf("GET_MY_PARTIES: returning %d parties", len(parties))
 		c.send <- response
 
 	case "UPDATE_PROFILE":
@@ -503,6 +533,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 
 	case "GET_FEED":
 		// Payload: {"Lat": 0.0, "Lon": 0.0, "RadiusKm": 50}
+		log.Printf("GET_FEED received from user: %s", c.UID)
 		var loc struct {
 			Lat      float64 `json:"Lat"`
 			Lon      float64 `json:"Lon"`
@@ -640,27 +671,33 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 
 	case "DELETE_PARTY":
 		// Payload: {"PartyID": "uuid"}
+		log.Printf("DELETE_PARTY received - PartyID: %s", wsMsg.Payload)
+
 		partyID, _ := wsMsg.Payload.(map[string]interface{})["PartyID"].(string)
 		if partyID == "" {
+			log.Printf("DELETE_PARTY: No PartyID provided")
 			return
 		}
 
 		// 1. Verify Host
 		p, err := GetParty(partyID)
 		if err != nil {
+			log.Printf("DELETE_PARTY: Failed to get party: %v", err)
 			return
 		}
 		if p.HostID != c.UID {
 			// Permission denied
+			log.Printf("DELETE_PARTY: Permission denied - user %s is not host %s", c.UID, p.HostID)
 			return
 		}
 
 		// 2. Delete from DB
 		err = DeleteParty(partyID)
 		if err != nil {
-			log.Printf("Delete Party DB Error: %v", err)
+			log.Printf("DELETE_PARTY: DB Error: %v", err)
 			return
 		}
+		log.Printf("DELETE_PARTY: Party %s deleted successfully", partyID)
 
 		// 3. Broadcast deletion to the room so people are kicked out
 		deletionMsg, _ := json.Marshal(WSMessage{

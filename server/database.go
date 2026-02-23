@@ -889,3 +889,39 @@ func AddContribution(partyID string, contrib Contribution) error {
 	}
 	return nil
 }
+
+// GetMyParties returns parties where user is host or has accepted application
+func GetMyParties(userID string) ([]Party, error) {
+	query := `
+		SELECT id, host_id, title, description, party_photos, start_time, end_time, status,
+		       is_location_revealed, address, city, geo_lat, geo_lon, max_capacity, current_guest_count,
+		       auto_lock_on_full, vibe_tags, rules, chat_room_id, created_at, updated_at, thumbnail
+		FROM parties
+		WHERE host_id = $1
+		   OR id IN (SELECT party_id FROM party_applications WHERE user_id = $1 AND status = 'ACCEPTED')
+		ORDER BY created_at DESC
+	`
+
+	rows, err := db.Query(context.Background(), query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var parties []Party
+	for rows.Next() {
+		var p Party
+		err := rows.Scan(
+			&p.ID, &p.HostID, &p.Title, &p.Description, &p.PartyPhotos, &p.StartTime, &p.EndTime,
+			&p.Status, &p.IsLocationRevealed, &p.Address, &p.City, &p.GeoLat, &p.GeoLon,
+			&p.MaxCapacity, &p.CurrentGuestCount, &p.AutoLockOnFull, &p.VibeTags,
+			&p.Rules, &p.ChatRoomID, &p.CreatedAt, &p.UpdatedAt, &p.Thumbnail,
+		)
+		if err != nil {
+			log.Printf("GetMyParties Scan Error: %v", err)
+			continue
+		}
+		parties = append(parties, p)
+	}
+	return parties, nil
+}
