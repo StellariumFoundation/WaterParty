@@ -27,3 +27,4 @@ GEMINI.md
 
 .gemini/
 gha-creds-*.json
+server/server_bin

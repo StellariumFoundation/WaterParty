@@ -17,11 +17,13 @@ class SocketService {
     if (_isConnected) return;
 
     final uri = Uri.parse('wss://$serverUrl/ws?uid=$uid');
+    print('[WebSocket] Connecting to: wss://$serverUrl/ws?uid=$uid');
     _channel = WebSocketChannel.connect(uri);
     _isConnected = true;
 
     _channel!.stream.listen(
       (data) {
+        print('[WebSocket] Received data: $data');
         _handleIncomingMessage(data);
       },
       onDone: () => _reconnect(uid),
@@ -34,10 +36,13 @@ class SocketService {
   }
 
   void _handleIncomingMessage(dynamic rawData) {
+    print('[WebSocket] Raw message received: $rawData');
     final Map<String, dynamic> data = jsonDecode(rawData);
 
     final String event = data['Event'];
     final dynamic payload = data['Payload'];
+
+    print('[WebSocket] Handling event: $event');
 
     switch (event) {
       case 'PROFILE_UPDATED':
@@ -50,8 +55,13 @@ class SocketService {
         ref.read(chatProvider.notifier).setRooms(rooms);
         break;
       case 'NEW_CHAT_ROOM':
+        print('[WebSocket] Processing NEW_CHAT_ROOM: $payload');
         final room = ChatRoom.fromMap(payload);
+        print(
+          '[WebSocket] Parsed room: ${room.id}, partyId: ${room.partyId}, title: ${room.title}',
+        );
         ref.read(chatProvider.notifier).addRoom(room);
+        print('[WebSocket] Room added to provider');
         break;
       case 'NEW_MESSAGE':
         final message = ChatMessage.fromMap(payload);
@@ -63,6 +73,11 @@ class SocketService {
         ref.read(partyFeedProvider.notifier).addParty(party);
         break;
       case 'FEED_UPDATE':
+        print('[WebSocket] FEED_UPDATE payload: $payload');
+        if (payload == null) {
+          print('[WebSocket] FEED_UPDATE payload is null, skipping');
+          break;
+        }
         final List<dynamic> partiesRaw = payload;
         final parties = partiesRaw.map((p) => Party.fromMap(p)).toList();
         ref.read(partyCacheProvider.notifier).updateParties(parties);
@@ -88,7 +103,15 @@ class SocketService {
             .updateStatus(payload['UserID'], status);
         break;
       case 'PARTY_CREATED':
+        print('[WebSocket] PARTY_CREATED raw payload: $payload');
+        print(
+          '[WebSocket] PARTY_CREATED payload keys: ${payload.keys.toList()}',
+        );
+        print('[WebSocket] PARTY_CREATED Title value: "${payload['Title']}"');
         final party = Party.fromMap(payload);
+        print(
+          '[WebSocket] Parsed party: id=${party.id}, title="${party.title}"',
+        );
         ref.read(partyCacheProvider.notifier).updateParty(party);
         ref.read(partyFeedProvider.notifier).addParty(party);
         ref.read(partyCreationProvider.notifier).setSuccess(party.id);
@@ -102,6 +125,7 @@ class SocketService {
         break;
       case 'ERROR':
         final String message = payload['message'] ?? 'Unknown error';
+        print('[WebSocket] ERROR received: $message');
         ref.read(partyCreationProvider.notifier).setError(message);
         break;
     }
@@ -109,6 +133,7 @@ class SocketService {
 
   // Send message to Go Backend
   void sendMessage(String event, dynamic payload) {
+    print('[WebSocket] Sending message: $event with payload: $payload');
     if (_channel != null) {
       final user = ref.read(authProvider).value;
       final msg = jsonEncode({

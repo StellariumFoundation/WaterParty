@@ -443,10 +443,9 @@ class ChatRoom {
         map['ParticipantIDs'] ?? map['participant_ids'] ?? [],
       ),
       isActive: map['IsActive'] ?? map['is_active'] ?? true,
-      recentMessages:
-          (map['RecentMessages'] ?? map['recent_messages'] as List? ?? [])
-              .map((m) => ChatMessage.fromMap(m))
-              .toList(),
+      recentMessages: _parseRecentMessages(
+        map['RecentMessages'] ?? map['recent_messages'],
+      ),
       lastMessageContent:
           map['LastMessageContent'] ?? map['last_message_content'] ?? '',
       lastMessageAt: (map['LastMessageAt'] ?? map['last_message_at']) != null
@@ -467,6 +466,18 @@ class ChatRoom {
             )
           : null,
     );
+  }
+
+  static List<ChatMessage> _parseRecentMessages(dynamic data) {
+    if (data == null) return [];
+    if (data is! List) return [];
+    try {
+      return data
+          .map((m) => ChatMessage.fromMap(Map<String, dynamic>.from(m as Map)))
+          .toList();
+    } catch (e) {
+      return [];
+    }
   }
 }
 

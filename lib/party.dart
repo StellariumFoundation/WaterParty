@@ -266,6 +266,25 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       return;
     }
 
+    // Validate date/time is in the future
+    final selectedDateTime = DateTime(
+      _date.year,
+      _date.month,
+      _date.day,
+      _time.hour,
+      _time.minute,
+    );
+    if (selectedDateTime.isBefore(DateTime.now())) {
+      _showError("Date and time must be in the future");
+      return;
+    }
+
+    // Validate at least one tag or party type is selected
+    if (_selectedTags.isEmpty && _partyTypeController.text.isEmpty) {
+      _showError("Select at least one party type or describe the party");
+      return;
+    }
+
     ref.read(partyCreationProvider.notifier).setLoading();
 
     final String partyId = const Uuid().v4();
@@ -354,9 +373,14 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
           next.createdPartyId != null) {
         _showSuccess("PARTY IGNITED SUCCESSFULLY!");
         ref.read(draftPartyProvider.notifier).clear();
-        ref
-            .read(navIndexProvider.notifier)
-            .setIndex(1); // Redirect to Chats (index 1)
+
+        // Request feed first so party data is loaded before navigating to chats
+        // This ensures party title is available when chat list renders
+        ref.read(socketServiceProvider).sendMessage('GET_FEED', {});
+        ref.read(socketServiceProvider).sendMessage('GET_CHATS', {});
+
+        // Navigate to feed first to ensure data loads, then user can go to chats
+        ref.read(navIndexProvider.notifier).setIndex(0);
 
         // Navigation is now handled by MatchesScreen listener to avoid race conditions
         ref.read(partyCreationProvider.notifier).reset();
@@ -610,7 +634,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
               child: Slider(
                 value: _durationHours,
                 min: 1,
-                max: 12,
+                max: 6,
                 activeColor: AppColors.textCyan,
                 onChanged: (v) {
                   setState(() => _durationHours = v);

@@ -20,6 +20,12 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
   @override
   Widget build(BuildContext context) {
     final allChatRooms = ref.watch(chatProvider);
+    print('[MatchesScreen] chatProvider state: ${allChatRooms.length} rooms');
+    for (var room in allChatRooms) {
+      print(
+        '[MatchesScreen] Room: ${room.id}, partyId: ${room.partyId}, title: ${room.title}',
+      );
+    }
     final partyChats = allChatRooms.where((room) => room.isGroup).toList();
     final directMessages = allChatRooms.where((room) => !room.isGroup).toList();
 
@@ -146,6 +152,9 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     String displayTitle = room.title;
     if (room.isGroup && room.partyId.isNotEmpty) {
       final party = partyCache[room.partyId];
+      print(
+        '[MatchesScreen] Looking up party ${room.partyId} in cache: ${party?.title ?? "NOT FOUND"}',
+      );
       if (party != null) {
         displayTitle = party.title;
       }

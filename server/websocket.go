@@ -251,9 +251,128 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		c.hub.mu.RUnlock()
 
 	case "CREATE_PARTY":
-		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		// Directly access payload as map to avoid marshal/unmarshal issues
+		payloadMap, ok := wsMsg.Payload.(map[string]interface{})
+		if !ok {
+			log.Printf("CREATE_PARTY: Failed to cast payload to map")
+			return
+		}
+
+		// Extract fields manually
 		var p Party
-		json.Unmarshal(payloadBytes, &p)
+		p.ID = ""
+		if id, ok := payloadMap["ID"].(string); ok {
+			p.ID = id
+		}
+		if title, ok := payloadMap["Title"].(string); ok {
+			p.Title = title
+		}
+		if desc, ok := payloadMap["Description"].(string); ok {
+			p.Description = desc
+		}
+		if startTime, ok := payloadMap["StartTime"].(string); ok {
+			p.StartTime, _ = time.Parse(time.RFC3339, startTime)
+		}
+		if endTime, ok := payloadMap["EndTime"].(string); ok {
+			p.EndTime, _ = time.Parse(time.RFC3339, endTime)
+		}
+		if status, ok := payloadMap["Status"].(string); ok {
+			p.Status = PartyStatus(status)
+		}
+		if addr, ok := payloadMap["Address"].(string); ok {
+			p.Address = addr
+		}
+		if city, ok := payloadMap["City"].(string); ok {
+			p.City = city
+		}
+		if photos, ok := payloadMap["PartyPhotos"].([]interface{}); ok {
+			for _, photo := range photos {
+				if s, ok := photo.(string); ok {
+					p.PartyPhotos = append(p.PartyPhotos, s)
+				}
+			}
+		}
+		if tags, ok := payloadMap["VibeTags"].([]interface{}); ok {
+			for _, tag := range tags {
+				if s, ok := tag.(string); ok {
+					p.VibeTags = append(p.VibeTags, s)
+				}
+			}
+		}
+		if rules, ok := payloadMap["Rules"].([]interface{}); ok {
+			for _, rule := range rules {
+				if s, ok := rule.(string); ok {
+					p.Rules = append(p.Rules, s)
+				}
+			}
+		}
+		if chatRoomID, ok := payloadMap["ChatRoomID"].(string); ok {
+			p.ChatRoomID = chatRoomID
+		}
+		if thumbnail, ok := payloadMap["Thumbnail"].(string); ok {
+			p.Thumbnail = thumbnail
+		}
+		if geoLat, ok := payloadMap["GeoLat"].(float64); ok {
+			p.GeoLat = geoLat
+		}
+		if geoLon, ok := payloadMap["GeoLon"].(float64); ok {
+			p.GeoLon = geoLon
+		}
+		if maxCap, ok := payloadMap["MaxCapacity"].(float64); ok {
+			p.MaxCapacity = int(maxCap)
+		}
+		if autoLock, ok := payloadMap["AutoLockOnFull"].(bool); ok {
+			p.AutoLockOnFull = autoLock
+		}
+		if isLocRevealed, ok := payloadMap["IsLocationRevealed"].(bool); ok {
+			p.IsLocationRevealed = isLocRevealed
+		}
+
+		// DEBUG: Log what was received
+		log.Printf("CREATE_PARTY received - Title: %q, Description: %q", p.Title, p.Description)
+
+		// Validate required fields
+		errors := []string{}
+
+		if p.Title == "" {
+			errors = append(errors, "Title is required")
+		}
+		if p.StartTime.IsZero() {
+			errors = append(errors, "Start time is required")
+		}
+		if p.EndTime.IsZero() {
+			errors = append(errors, "End time is required")
+		}
+		if !p.StartTime.IsZero() && !p.EndTime.IsZero() && p.StartTime.After(p.EndTime) {
+			errors = append(errors, "End time must be after start time")
+		}
+		if p.ChatRoomID == "" {
+			errors = append(errors, "Chat room ID is required")
+		}
+		if len(p.PartyPhotos) == 0 {
+			errors = append(errors, "At least one photo is required")
+		}
+		if p.Address == "" {
+			errors = append(errors, "Address is required")
+		}
+		if p.City == "" {
+			errors = append(errors, "City is required")
+		}
+		if p.MaxCapacity <= 0 {
+			errors = append(errors, "Max capacity must be greater than 0")
+		}
+
+		if len(errors) > 0 {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]interface{}{
+					"message": "Validation failed",
+					"errors":  errors,
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
 
 		p.HostID = c.UID
 		now := time.Now()
@@ -287,6 +406,9 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			return
 		}
 		p.ID = id
+
+		// DEBUG: Log what was saved and is being sent back
+		log.Printf("After CreateParty - ID: %s, Title: %q", p.ID, p.Title)
 
 		// Send confirmation back to creator
 		confirmationMsg, _ := json.Marshal(WSMessage{
