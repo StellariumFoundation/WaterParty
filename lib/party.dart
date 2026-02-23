@@ -322,7 +322,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       description: _descController.text,
       partyPhotos: _partyPhotos,
       startTime: startDateTime,
-      endTime: startDateTime.add(Duration(hours: _durationHours.toInt())),
+      durationHours: _durationHours.toInt(),
       status: PartyStatus.OPEN,
       isLocationRevealed: false,
       address: _addressController.text,

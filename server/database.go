@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS parties (
     
     -- Logistics
     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    duration_hours INTEGER DEFAULT 2,
     status TEXT NOT NULL DEFAULT 'OPEN', -- OPEN, LOCKED, LIVE, COMPLETED, CANCELLED
     
     -- Location Privacy
@@ -206,12 +206,28 @@ CREATE TABLE IF NOT EXISTS parties (
 );
 
 -- Ensure thumbnail column exists for parties
-DO $$
+DO $
 BEGIN
+    -- Add duration_hours column if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parties' AND column_name = 'duration_hours') THEN
+        ALTER TABLE parties ADD COLUMN duration_hours INTEGER DEFAULT 2;
+        -- Migrate existing data: calculate duration from end_time - start_time
+        UPDATE parties SET duration_hours = EXTRACT(EPOCH FROM (end_time - start_time))/3600 WHERE duration_hours IS NULL OR duration_hours = 0;
+    END IF;
+END $;
+
+-- Drop old end_time column if it exists (after migration)
+DO $
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parties' AND column_name = 'end_time') THEN
+        ALTER TABLE parties DROP COLUMN IF EXISTS end_time;
+    END IF;
+
+    -- Ensure thumbnail column exists for parties
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='parties' AND column_name='thumbnail') THEN
         ALTER TABLE parties ADD COLUMN thumbnail TEXT;
     END IF;
-END $$;
+END $;
 
 -- Drop obsolete party columns
 DO $$
@@ -481,7 +497,7 @@ func DeleteUser(id string) error {
 
 func CreateParty(p Party) (string, error) {
 	query := `INSERT INTO parties (
-		host_id, title, description, party_photos, start_time, end_time, status,
+		host_id, title, description, party_photos, start_time, duration_hours, status,
 		is_location_revealed, address, city, geo_lat, geo_lon, max_capacity,
 		vibe_tags, rules, chat_room_id, thumbnail
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) 
@@ -489,7 +505,7 @@ func CreateParty(p Party) (string, error) {
 
 	var id string
 	err := db.QueryRow(context.Background(), query,
-		p.HostID, p.Title, p.Description, p.PartyPhotos, p.StartTime, p.EndTime, p.Status,
+		p.HostID, p.Title, p.Description, p.PartyPhotos, p.StartTime, p.DurationHours, p.Status,
 		p.IsLocationRevealed, p.Address, p.City, p.GeoLat, p.GeoLon, p.MaxCapacity,
 		p.VibeTags, p.Rules, p.ChatRoomID, p.Thumbnail,
 	).Scan(&id)
@@ -522,13 +538,13 @@ func CreateParty(p Party) (string, error) {
 
 func GetParty(id string) (Party, error) {
 	var p Party
-	query := `SELECT id, host_id, title, description, party_photos, start_time, end_time, status,
+	query := `SELECT id, host_id, title, description, party_photos, start_time, duration_hours, status,
 		is_location_revealed, address, city, geo_lat, geo_lon, max_capacity, current_guest_count,
 		auto_lock_on_full, vibe_tags, rules, chat_room_id,
 		created_at, updated_at, thumbnail FROM parties WHERE id = $1`
 
 	err := db.QueryRow(context.Background(), query, id).Scan(
-		&p.ID, &p.HostID, &p.Title, &p.Description, &p.PartyPhotos, &p.StartTime, &p.EndTime,
+		&p.ID, &p.HostID, &p.Title, &p.Description, &p.PartyPhotos, &p.StartTime, &p.DurationHours,
 		&p.Status, &p.IsLocationRevealed, &p.Address, &p.City, &p.GeoLat, &p.GeoLon,
 		&p.MaxCapacity, &p.CurrentGuestCount, &p.AutoLockOnFull, &p.VibeTags,
 		&p.Rules, &p.ChatRoomID, &p.CreatedAt, &p.UpdatedAt, &p.Thumbnail,
@@ -562,6 +578,55 @@ func GetApplicantsForParty(partyID string) ([]map[string]interface{}, error) {
 		FROM party_applications pa
 		JOIN users u ON pa.user_id = u.id
 		WHERE pa.party_id = $1
+		ORDER BY u.elo_score DESC`
+
+	rows, err := db.Query(context.Background(), query, partyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var apps []map[string]interface{}
+	for rows.Next() {
+		var appID, userID, status, realName, bio string
+		var appliedAt time.Time
+		var profilePhotos []string
+		var age int
+		var eloScore, trustScore float64
+		var thumbnail string
+
+		err := rows.Scan(&appID, &userID, &status, &appliedAt, &realName, &profilePhotos, &age, &eloScore, &bio, &trustScore, &thumbnail)
+		if err != nil {
+			return nil, err
+		}
+
+		apps = append(apps, map[string]interface{}{
+			"PartyID":   appID,
+			"UserID":    userID,
+			"Status":    status,
+			"AppliedAt": appliedAt,
+			"User": map[string]interface{}{
+				"ID":            userID,
+				"RealName":      realName,
+				"ProfilePhotos": profilePhotos,
+				"Age":           age,
+				"EloScore":      eloScore,
+				"Bio":           bio,
+				"TrustScore":    trustScore,
+				"Thumbnail":     thumbnail,
+			},
+		})
+	}
+	return apps, nil
+}
+
+// GetAcceptedApplicants returns users who have been accepted to a party
+func GetAcceptedApplicants(partyID string) ([]map[string]interface{}, error) {
+	query := `SELECT pa.party_id, pa.user_id, pa.status, pa.applied_at,
+		u.real_name, u.profile_photos, u.age, u.elo_score, COALESCE(u.bio, ''), u.trust_score, COALESCE(u.thumbnail, '')
+		FROM party_applications pa
+		JOIN users u ON pa.user_id = u.id
+		WHERE pa.party_id = $1 AND pa.status = 'ACCEPTED'
 		ORDER BY u.elo_score DESC`
 
 	rows, err := db.Query(context.Background(), query, partyID)
@@ -842,6 +907,259 @@ func GetChatHistory(chatID string, limit int) ([]ChatMessage, error) {
 	return msgs, nil
 }
 
+// GetDMsForUser returns direct message chats for a user (pair-wise DMs)
+func GetDMsForUser(userID string) ([]map[string]interface{}, error) {
+	query := `
+		SELECT DISTINCT
+			CASE WHEN c.participant_ids[1] = $1 THEN c.participant_ids[2] ELSE c.participant_ids[1] END as other_user_id,
+			u.real_name as other_user_name, COALESCE(u.thumbnail, '') as other_user_thumbnail,
+			(
+				SELECT content FROM chat_messages 
+				WHERE chat_id = c.id 
+				ORDER BY created_at DESC LIMIT 1
+			) as last_message,
+			(
+				SELECT created_at FROM chat_messages 
+				WHERE chat_id = c.id 
+				ORDER BY created_at DESC LIMIT 1
+			) as last_message_at
+		FROM chat_rooms c
+		JOIN users u ON u.id = CASE WHEN c.participant_ids[1] = $1 THEN c.participant_ids[2] ELSE c.participant_ids[1] END
+		WHERE c.is_group = false 
+		  AND $1 = ANY(c.participant_ids)
+		ORDER BY last_message_at DESC
+	`
+
+	rows, err := db.Query(context.Background(), query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dms []map[string]interface{}
+	for rows.Next() {
+		var otherUserID, otherUserName, otherUserThumbnail, lastMessage string
+		var lastMessageAt *time.Time
+
+		err := rows.Scan(&otherUserID, &otherUserName, &otherUserThumbnail, &lastMessage, &lastMessageAt)
+		if err != nil {
+			return nil, err
+		}
+
+		dms = append(dms, map[string]interface{}{
+			"OtherUserID":        otherUserID,
+			"OtherUserName":      otherUserName,
+			"OtherUserThumbnail": otherUserThumbnail,
+			"LastMessage":        lastMessage,
+			"LastMessageAt":      lastMessageAt,
+		})
+	}
+	return dms, nil
+}
+
+// GetDMMessages returns messages between two users
+func GetDMMessages(userID, otherUserID string, limit int) ([]ChatMessage, error) {
+	// Generate the deterministic DM chat ID
+	u1, u2 := userID, otherUserID
+	if u1 > u2 {
+		u1, u2 = u2, u1
+	}
+	dmChatID := u1 + "_" + u2
+
+	return GetChatHistory(dmChatID, limit)
+}
+
+// DeleteMessage deletes a chat message
+func DeleteMessage(messageID, userID string) error {
+	// Only allow the sender to delete their own message
+	_, err := db.Exec(context.Background(),
+		"DELETE FROM chat_messages WHERE id = $1 AND sender_id = $2",
+		messageID, userID)
+	return err
+}
+
+// ==========================================
+// NOTIFICATIONS
+// ==========================================
+
+// CreateNotification creates a new notification
+func CreateNotification(n Notification) (string, error) {
+	query := `INSERT INTO notifications (user_id, type, title, body, data) 
+			  VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	var id string
+	err := db.QueryRow(context.Background(), query, n.UserID, n.Type, n.Title, n.Body, n.Data).Scan(&id)
+	return id, err
+}
+
+// GetNotifications returns notifications for a user
+func GetNotifications(userID string, limit int) ([]Notification, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	query := `SELECT id, user_id, type, title, body, data, is_read, created_at 
+			  FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`
+
+	rows, err := db.Query(context.Background(), query, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var notifs []Notification
+	for rows.Next() {
+		var n Notification
+		err := rows.Scan(&n.ID, &n.UserID, &n.Type, &n.Title, &n.Body, &n.Data, &n.IsRead, &n.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		notifs = append(notifs, n)
+	}
+	return notifs, nil
+}
+
+// MarkNotificationRead marks a notification as read
+func MarkNotificationRead(notifID, userID string) error {
+	_, err := db.Exec(context.Background(),
+		"UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2",
+		notifID, userID)
+	return err
+}
+
+// MarkAllNotificationsRead marks all notifications as read for a user
+func MarkAllNotificationsRead(userID string) error {
+	_, err := db.Exec(context.Background(),
+		"UPDATE notifications SET is_read = true WHERE user_id = $1",
+		userID)
+	return err
+}
+
+// ==========================================
+// USER SEARCH & BLOCKING
+// ==========================================
+
+// SearchUsers searches for users by name or handle
+func SearchUsers(query string, limit int) ([]User, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	searchQuery := `%` + query + `%`
+	sqlQuery := `SELECT id, real_name, profile_photos, age, bio, elo_score, trust_score, thumbnail
+				FROM users 
+				WHERE real_name ILIKE $1 OR instagram_handle ILIKE $1 OR x_handle ILIKE $1
+				ORDER BY elo_score DESC LIMIT $2`
+
+	rows, err := db.Query(context.Background(), sqlQuery, searchQuery, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var u User
+		err := rows.Scan(&u.ID, &u.RealName, &u.ProfilePhotos, &u.Age, &u.Bio, &u.EloScore, &u.TrustScore, &u.Thumbnail)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, nil
+}
+
+// BlockUser blocks a user
+func BlockUser(blockerID, blockedID string) error {
+	query := `INSERT INTO blocked_users (blocker_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`
+	_, err := db.Exec(context.Background(), query, blockerID, blockedID)
+	return err
+}
+
+// UnblockUser unblocks a user
+func UnblockUser(blockerID, blockedID string) error {
+	query := `DELETE FROM blocked_users WHERE blocker_id = $1 AND blocked_id = $2`
+	_, err := db.Exec(context.Background(), query, blockerID, blockedID)
+	return err
+}
+
+// IsBlocked checks if user is blocked
+func IsBlocked(blockerID, checkedID string) (bool, error) {
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM blocked_users WHERE blocker_id = $1 AND blocked_id = $2)`
+	err := db.QueryRow(context.Background(), query, blockerID, checkedID).Scan(&exists)
+	return exists, err
+}
+
+// GetBlockedUsers returns list of blocked user IDs
+func GetBlockedUsers(userID string) ([]string, error) {
+	query := `SELECT blocked_id FROM blocked_users WHERE blocker_id = $1`
+	rows, err := db.Query(context.Background(), query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var blockedIDs []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		blockedIDs = append(blockedIDs, id)
+	}
+	return blockedIDs, nil
+}
+
+// ==========================================
+// REPORTING
+// ==========================================
+
+// ReportUser creates a user report
+func ReportUser(reporterID, reportedID, reason, details string) error {
+	query := `INSERT INTO user_reports (reporter_id, reported_id, reason, details) VALUES ($1, $2, $3, $4)`
+	_, err := db.Exec(context.Background(), query, reporterID, reportedID, reason, details)
+	return err
+}
+
+// ReportParty creates a party report
+func ReportParty(reporterID, partyID, reason, details string) error {
+	query := `INSERT INTO party_reports (reporter_id, party_id, reason, details) VALUES ($1, $2, $3, $4)`
+	_, err := db.Exec(context.Background(), query, reporterID, partyID, reason, details)
+	return err
+}
+
+// ==========================================
+// PARTY ANALYTICS
+// ==========================================
+
+// GetPartyAnalytics returns analytics for a party
+func GetPartyAnalytics(partyID string) (PartyAnalytics, error) {
+	var analytics PartyAnalytics
+	analytics.PartyID = partyID
+
+	// Get application counts
+	appQuery := `SELECT 
+			COUNT(*) as total,
+			SUM(CASE WHEN status = 'ACCEPTED' THEN 1 ELSE 0 END) as accepted,
+			SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending,
+			SUM(CASE WHEN status = 'DECLINED' THEN 1 ELSE 0 END) as declined
+			FROM party_applications WHERE party_id = $1`
+
+	err := db.QueryRow(context.Background(), appQuery, partyID).Scan(
+		&analytics.TotalApplications, &analytics.AcceptedCount,
+		&analytics.PendingCount, &analytics.DeclinedCount)
+	if err != nil {
+		return analytics, err
+	}
+
+	// Get current guest count from party
+	partyQuery := `SELECT current_guest_count FROM parties WHERE id = $1`
+	err = db.QueryRow(context.Background(), partyQuery, partyID).Scan(&analytics.CurrentGuestCount)
+	if err != nil {
+		return analytics, err
+	}
+
+	return analytics, nil
+}
+
 // ==========================================
 // CROWDFUNDING / ROTATION POOL
 // ==========================================
@@ -893,7 +1211,7 @@ func AddContribution(partyID string, contrib Contribution) error {
 // GetMyParties returns parties where user is host or has accepted application
 func GetMyParties(userID string) ([]Party, error) {
 	query := `
-		SELECT id, host_id, title, description, party_photos, start_time, end_time, status,
+		SELECT id, host_id, title, description, party_photos, start_time, duration_hours, status,
 		       is_location_revealed, address, city, geo_lat, geo_lon, max_capacity, current_guest_count,
 		       auto_lock_on_full, vibe_tags, rules, chat_room_id, created_at, updated_at, thumbnail
 		FROM parties
@@ -912,7 +1230,7 @@ func GetMyParties(userID string) ([]Party, error) {
 	for rows.Next() {
 		var p Party
 		err := rows.Scan(
-			&p.ID, &p.HostID, &p.Title, &p.Description, &p.PartyPhotos, &p.StartTime, &p.EndTime,
+			&p.ID, &p.HostID, &p.Title, &p.Description, &p.PartyPhotos, &p.StartTime, &p.DurationHours,
 			&p.Status, &p.IsLocationRevealed, &p.Address, &p.City, &p.GeoLat, &p.GeoLon,
 			&p.MaxCapacity, &p.CurrentGuestCount, &p.AutoLockOnFull, &p.VibeTags,
 			&p.Rules, &p.ChatRoomID, &p.CreatedAt, &p.UpdatedAt, &p.Thumbnail,

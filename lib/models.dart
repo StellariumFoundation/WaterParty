@@ -259,7 +259,7 @@ class Party {
   final String description;
   final List<String> partyPhotos;
   final DateTime startTime;
-  final DateTime endTime;
+  final int durationHours;
   final PartyStatus status;
   final bool isLocationRevealed;
   final String address;
@@ -284,7 +284,7 @@ class Party {
     required this.description,
     this.partyPhotos = const [],
     required this.startTime,
-    required this.endTime,
+    required this.durationHours,
     this.status = PartyStatus.OPEN,
     this.isLocationRevealed = false,
     this.address = '',
@@ -313,7 +313,8 @@ class Party {
         map['PartyPhotos'] ?? map['party_photos'] ?? [],
       ),
       startTime: DateTime.parse(map['StartTime'] ?? map['start_time']),
-      endTime: DateTime.parse(map['EndTime'] ?? map['end_time']),
+      durationHours:
+          (map['DurationHours'] ?? map['duration_hours'] as num?)?.toInt() ?? 2,
       status: PartyStatus.values.firstWhere(
         (e) => e.toString().split('.').last == (map['Status'] ?? map['status']),
         orElse: () => PartyStatus.OPEN,
@@ -357,7 +358,7 @@ class Party {
       'Description': description,
       'PartyPhotos': partyPhotos,
       'StartTime': startTime.toIso8601String(),
-      'DurationHours': endTime.difference(startTime).inHours,
+      'DurationHours': durationHours,
       'Status': status.toString().split('.').last,
       'IsLocationRevealed': isLocationRevealed,
       'Address': address,

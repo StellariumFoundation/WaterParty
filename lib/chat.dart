@@ -760,7 +760,7 @@ class PartySettingsScreen extends ConsumerWidget {
                       : "No description",
                 ),
                 _buildInfoRow("Start Time", _formatDateTime(party.startTime)),
-                _buildInfoRow("End Time", _formatDateTime(party.endTime)),
+                _buildInfoRow("Duration", "${party.durationHours} hours"),
                 _buildInfoRow("Address", party.address),
                 _buildInfoRow("City", party.city),
                 _buildInfoRow("Max Capacity", party.maxCapacity.toString()),

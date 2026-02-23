@@ -95,7 +95,7 @@ type Party struct {
 	Description        string        `json:"Description" db:"description"`
 	PartyPhotos        []string      `json:"PartyPhotos" db:"party_photos"` // Stores hashes
 	StartTime          time.Time     `json:"StartTime" db:"start_time"`
-	EndTime            time.Time     `json:"EndTime" db:"end_time"`
+	DurationHours      int           `json:"DurationHours" db:"duration_hours"`
 	Status             PartyStatus   `json:"Status" db:"status"`
 	IsLocationRevealed bool          `json:"IsLocationRevealed" db:"is_location_revealed"`
 	Address            string        `json:"Address" db:"address"`
@@ -156,4 +156,27 @@ type Contribution struct {
 	UserID string    `json:"UserID" db:"user_id"`
 	Amount float64   `json:"Amount" db:"amount"`
 	PaidAt time.Time `json:"PaidAt" db:"paid_at"`
+}
+
+// Notification represents a user notification
+type Notification struct {
+	ID        string    `json:"ID" db:"id"`
+	UserID    string    `json:"UserID" db:"user_id"`
+	Type      string    `json:"Type" db:"type"`
+	Title     string    `json:"Title" db:"title"`
+	Body      string    `json:"Body" db:"body"`
+	Data      string    `json:"Data" db:"data"`
+	IsRead    bool      `json:"IsRead" db:"is_read"`
+	CreatedAt time.Time `json:"CreatedAt" db:"created_at"`
+}
+
+// PartyAnalytics holds party statistics
+type PartyAnalytics struct {
+	PartyID           string `json:"PartyID"`
+	TotalViews        int    `json:"TotalViews"`
+	TotalApplications int    `json:"TotalApplications"`
+	AcceptedCount     int    `json:"AcceptedCount"`
+	PendingCount      int    `json:"PendingCount"`
+	DeclinedCount     int    `json:"DeclinedCount"`
+	CurrentGuestCount int    `json:"CurrentGuestCount"`
 }
