@@ -614,16 +614,16 @@ func TestSearchOperations(t *testing.T) {
 	t.Run("SearchUsers", func(t *testing.T) {
 		// Create users for search - use a unique mock DB
 		users := []User{
-			{ID: "search-1", RealName: "John Doe", InstagramHandle: "@john"},
-			{ID: "search-2", RealName: "Jane Smith", XHandle: "@jane"},
-			{ID: "search-3", RealName: "Bob Johnson", InstagramHandle: "@bob"},
+			{ID: "search-john", RealName: "John Doe", InstagramHandle: "@john"},
+			{ID: "search-jane", RealName: "Jane Smith", XHandle: "@jane"},
+			{ID: "search-bob", RealName: "Bob Wilson", InstagramHandle: "@bob"},
 		}
 
 		for _, u := range users {
 			mockDB.users[u.ID] = u
 		}
 
-		// Search by name "John"
+		// Search by name "John" - should only match "John Doe", not "Bob Wilson"
 		query := "John"
 		var results []User
 		for _, u := range mockDB.users {
@@ -644,7 +644,7 @@ func TestSearchOperations(t *testing.T) {
 
 		// Only "John Doe" should match "John"
 		if len(results) != 1 {
-			t.Errorf("Expected 1 search result, got %d", len(results))
+			t.Errorf("Expected 1 search result, got %d: %v", len(results), results)
 		}
 	})
 }

@@ -41,6 +41,9 @@ type Hub struct {
 	register   chan *Client
 	unregister chan *Client
 
+	// Channel to signal hub shutdown
+	quit chan bool
+
 	mu sync.RWMutex
 }
 
@@ -56,6 +59,7 @@ func NewHub() *Hub {
 		globalBroadcast: make(chan []byte, 1024),
 		register:        make(chan *Client),
 		unregister:      make(chan *Client),
+		quit:            make(chan bool),
 		clients:         make(map[string]*Client),
 		rooms:           make(map[string]map[*Client]bool),
 	}
@@ -68,6 +72,9 @@ func (h *Hub) broadcastGlobal(msg []byte) {
 func (h *Hub) Run() {
 	for {
 		select {
+		case <-h.quit:
+			return
+
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client.UID] = client

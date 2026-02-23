@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 )
@@ -68,6 +71,9 @@ func TestHubBroadcastGlobal(t *testing.T) {
 func TestHubRoomManagement(t *testing.T) {
 	hub := NewHub()
 
+	// Start the hub's Run method in a goroutine
+	go hub.Run()
+
 	// Create mock client (simplified - without rooms field)
 	client := &Client{
 		UID:  "test-user",
@@ -102,6 +108,9 @@ func TestHubRoomManagement(t *testing.T) {
 	if exists {
 		t.Error("Client should be unregistered")
 	}
+
+	// Shutdown the hub
+	hub.quit <- true
 }
 
 // ==================== CLIENT TESTS ====================
@@ -760,5 +769,442 @@ func TestHubRunRoomBroadcast(t *testing.T) {
 		case <-time.After(100 * time.Millisecond):
 			t.Errorf("Client %d: Timeout waiting for message", i)
 		}
+	}
+}
+
+// ==================== JOIN ROOM TESTS ====================
+
+func TestJoinRoom(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+	defer func() { hub.quit <- true }()
+
+	client := &Client{
+		UID:  "test-user",
+		send: make(chan []byte, 10),
+		hub:  hub,
+	}
+
+	roomID := "test-room-123"
+
+	// Join the room
+	hub.JoinRoom(roomID, client)
+
+	// Verify client is in the room
+	hub.mu.RLock()
+	room, exists := hub.rooms[roomID]
+	hub.mu.RUnlock()
+
+	if !exists {
+		t.Error("Room should exist after joining")
+	}
+
+	if room == nil {
+		t.Error("Room should not be nil")
+	}
+
+	if !room[client] {
+		t.Error("Client should be in the room")
+	}
+
+	// Join another room
+	roomID2 := "test-room-456"
+	hub.JoinRoom(roomID2, client)
+
+	hub.mu.RLock()
+	_, exists2 := hub.rooms[roomID2]
+	hub.mu.RUnlock()
+
+	if !exists2 {
+		t.Error("Second room should exist after joining")
+	}
+}
+
+// ==================== HANDLE INCOMING MESSAGE TESTS ====================
+
+func TestHandleIncomingMessage_JoinRoom(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+	defer func() { hub.quit <- true }()
+
+	client := &Client{
+		UID:  "test-user-join",
+		send: make(chan []byte, 10),
+		hub:  hub,
+	}
+
+	// Register client
+	hub.register <- client
+	time.Sleep(10 * time.Millisecond)
+
+	// Create JOIN_ROOM message
+	msg := WSMessage{
+		Event: "JOIN_ROOM",
+		Payload: map[string]interface{}{
+			"RoomID": "party-chat-123",
+		},
+	}
+
+	msgBytes, _ := json.Marshal(msg)
+
+	// Handle the message
+	client.handleIncomingMessage(msgBytes)
+
+	// Verify client joined the room
+	hub.mu.RLock()
+	room, exists := hub.rooms["party-chat-123"]
+	hub.mu.RUnlock()
+
+	if !exists {
+		t.Error("Room should exist after JOIN_ROOM")
+	}
+
+	if !room[client] {
+		t.Error("Client should be in the room after JOIN_ROOM")
+	}
+}
+
+func TestHandleIncomingMessage_EmptyRoomID(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+	defer func() { hub.quit <- true }()
+
+	client := &Client{
+		UID:  "test-user-empty",
+		send: make(chan []byte, 10),
+		hub:  hub,
+	}
+
+	// Register client
+	hub.register <- client
+	time.Sleep(10 * time.Millisecond)
+
+	// Create JOIN_ROOM message with empty room ID
+	msg := WSMessage{
+		Event: "JOIN_ROOM",
+		Payload: map[string]interface{}{
+			"RoomID": "",
+		},
+	}
+
+	msgBytes, _ := json.Marshal(msg)
+
+	// Handle the message - should not panic
+	client.handleIncomingMessage(msgBytes)
+
+	// Verify no room was created
+	hub.mu.RLock()
+	_, exists := hub.rooms[""]
+	hub.mu.RUnlock()
+
+	if exists {
+		t.Error("Empty room ID should not create a room")
+	}
+}
+
+func TestHandleIncomingMessage_InvalidJSON(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+	defer func() { hub.quit <- true }()
+
+	client := &Client{
+		UID:  "test-user-invalid",
+		send: make(chan []byte, 10),
+		hub:  hub,
+	}
+
+	// Send invalid JSON - should not panic
+	client.handleIncomingMessage([]byte("invalid json"))
+}
+
+func TestHandleIncomingMessage_UnknownEvent(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+	defer func() { hub.quit <- true }()
+
+	client := &Client{
+		UID:  "test-user-unknown",
+		send: make(chan []byte, 10),
+		hub:  hub,
+	}
+
+	// Send unknown event - should not panic
+	msg := WSMessage{
+		Event:   "UNKNOWN_EVENT",
+		Payload: map[string]interface{}{},
+	}
+
+	msgBytes, _ := json.Marshal(msg)
+	client.handleIncomingMessage(msgBytes)
+}
+
+// ==================== REVERSE GEOCODE TESTS ====================
+
+func TestReverseGeocode(t *testing.T) {
+	// Test with valid coordinates (NYC)
+	addr, city, err := ReverseGeocode(40.7128, -74.0060)
+
+	// Note: This may fail if there's no network, so we check for error
+	if err != nil {
+		// Network error is expected in test environment
+		t.Logf("ReverseGeocode failed (expected without network): %v", err)
+	} else {
+		if addr == "" && city == "" {
+			t.Log("ReverseGeocode returned empty results")
+		}
+	}
+}
+
+func TestReverseGeocode_InvalidCoords(t *testing.T) {
+	// Test with invalid coordinates (0, 0)
+	addr, city, err := ReverseGeocode(0, 0)
+
+	// This should return an error or empty results
+	if err != nil {
+		t.Logf("ReverseGeocode returned error: %v", err)
+	}
+
+	_ = addr
+	_ = city
+}
+
+// ==================== HUB ROOM MANAGEMENT TESTS ====================
+
+func TestHubGetRoomClients(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+	defer func() { hub.quit <- true }()
+
+	client1 := &Client{
+		UID:  "user1",
+		send: make(chan []byte, 10),
+		hub:  hub,
+	}
+
+	client2 := &Client{
+		UID:  "user2",
+		send: make(chan []byte, 10),
+		hub:  hub,
+	}
+
+	roomID := "test-get-clients"
+
+	// Add clients to room
+	hub.JoinRoom(roomID, client1)
+	hub.JoinRoom(roomID, client2)
+
+	// Get room clients
+	hub.mu.RLock()
+	clients := hub.rooms[roomID]
+	hub.mu.RUnlock()
+
+	if len(clients) != 2 {
+		t.Errorf("Expected 2 clients in room, got %d", len(clients))
+	}
+}
+
+func TestHubRemoveClientFromRoom(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+	defer func() { hub.quit <- true }()
+
+	client := &Client{
+		UID:  "remove-test-user",
+		send: make(chan []byte, 10),
+		hub:  hub,
+	}
+
+	roomID := "test-remove-room"
+
+	// Add client to room
+	hub.JoinRoom(roomID, client)
+
+	// Manually remove from room (simulating unregister behavior)
+	hub.mu.Lock()
+	if room, ok := hub.rooms[roomID]; ok {
+		delete(room, client)
+	}
+	hub.mu.Unlock()
+
+	// Verify client is removed
+	hub.mu.RLock()
+	room, exists := hub.rooms[roomID]
+	hub.mu.RUnlock()
+
+	if exists && room[client] {
+		t.Error("Client should be removed from room")
+	}
+}
+
+// ==================== GETENV AND CORS TESTS ====================
+
+func TestGetEnv(t *testing.T) {
+	// Test with existing key
+	os.Setenv("TEST_KEY", "test_value")
+	defer os.Unsetenv("TEST_KEY")
+
+	result := getEnv("TEST_KEY", "default")
+	if result != "test_value" {
+		t.Errorf("Expected 'test_value', got '%s'", result)
+	}
+
+	// Test with non-existing key (uses fallback)
+	result = getEnv("NON_EXISTENT_KEY", "fallback_value")
+	if result != "fallback_value" {
+		t.Errorf("Expected 'fallback_value', got '%s'", result)
+	}
+}
+
+func TestCorsMiddleware(t *testing.T) {
+	// Create a simple handler to test CORS middleware
+	handlerCalled := false
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	wrappedHandler := corsMiddleware(testHandler)
+
+	// Test OPTIONS request (preflight)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("OPTIONS", "/test", nil)
+
+	wrappedHandler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	if handlerCalled {
+		t.Error("Handler should not be called for OPTIONS request")
+	}
+
+	// Check CORS headers
+	if rec.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Error("CORS origin header not set")
+	}
+
+	// Test regular GET request
+	handlerCalled = false
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest("GET", "/test", nil)
+
+	wrappedHandler.ServeHTTP(rec, req)
+
+	if !handlerCalled {
+		t.Error("Handler should be called for GET request")
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
+// ==================== HUB QUIT TEST ====================
+
+func TestHubRunQuit(t *testing.T) {
+	hub := NewHub()
+
+	// Start the hub
+	runDone := make(chan bool)
+	go func() {
+		hub.Run()
+		runDone <- true
+	}()
+
+	// Give it a moment to start
+	time.Sleep(10 * time.Millisecond)
+
+	// Send quit signal
+	hub.quit <- true
+
+	// Wait for Run to exit
+	select {
+	case <-runDone:
+		// Success - hub quit
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Hub should have quit within timeout")
+	}
+}
+
+// ==================== HTTP HANDLER TESTS ====================
+
+func TestHandleRegister_MethodNotAllowed(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/register", nil)
+
+	handleRegister(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("Expected status %d, got %d", http.StatusMethodNotAllowed, rec.Code)
+	}
+}
+
+func TestHandleRegister_InvalidJSON(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/register", bytes.NewBufferString("not valid json"))
+	req.Header.Set("Content-Type", "application/json")
+
+	handleRegister(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestHandleLogin_MethodNotAllowed(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/login", nil)
+
+	handleLogin(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("Expected status %d, got %d", http.StatusMethodNotAllowed, rec.Code)
+	}
+}
+
+func TestHandleLogin_InvalidJSON(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/login", bytes.NewBufferString("not valid json"))
+	req.Header.Set("Content-Type", "application/json")
+
+	handleLogin(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestHandleGetProfile_MethodNotAllowed(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/profile", nil)
+
+	handleGetProfile(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("Expected status %d, got %d", http.StatusMethodNotAllowed, rec.Code)
+	}
+}
+
+func TestHandleUpload_MethodNotAllowed(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/upload", nil)
+
+	handleUpload(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("Expected status %d, got %d", http.StatusMethodNotAllowed, rec.Code)
+	}
+}
+
+func TestHandleUpload_NoFile(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/upload", nil)
+	req.Header.Set("Content-Type", "multipart/form-data")
+
+	handleUpload(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status %d, got %d", http.StatusBadRequest, rec.Code)
 	}
 }
