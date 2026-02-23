@@ -1,0 +1,124 @@
+name: Build & Release Dev (Human Connection OS)
+
+on:
+  push:
+    branches: [ "dev", "develop", "feature/*", "master" ]
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------
+  # 1. DEV BUILD: ANDROID APP (ARM64)
+  # ---------------------------------------------------
+  build-dev-app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            .dart_tool
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable' # Using stable for faster/more reliable CI
+          cache: true
+      
+      - name: Build Dev App via Makefile
+        run: make release-dev-app
+      
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WaterParty-Dev-App
+          path: release/dev/WaterParty-Dev-arm64.apk
+
+  # ---------------------------------------------------
+  # 2. DEV BUILD: SERVER (LINUX X64)
+  # ---------------------------------------------------
+  build-dev-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.0'
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: Build Dev Server via Makefile
+        run: make release-dev-server
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WaterParty-Dev-Server
+          path: release/dev/partyserver-dev-linux-amd64
+
+  # ---------------------------------------------------
+  # 3. DEV RELEASE
+  # ---------------------------------------------------
+  create-dev-release:
+    needs: [build-dev-app, build-dev-server]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download App Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: WaterParty-Dev-App
+          path: .
+
+      - name: Download Server Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: WaterParty-Dev-Server
+          path: .
+
+      - name: Update Static Dev Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev
+          name: Water Party Development Build
+          body: |
+            ## 🚧 Development Build - Latest
+            
+            This is an automated development build of the Water Party ecosystem.
+            
+            ### 📱 App
+            - **Android (ARM64)**: Optimized development APK.
+            
+            ### ⚡ Server
+            - **Linux x64**: Go server binary.
+            
+            *Parallel build optimized for speed.*
+          files: |
+            WaterParty-Dev-arm64.apk
+            partyserver-dev-linux-amd64
+          draft: false
+          prerelease: true
+          generate_release_notes: false
+          make_latest: false

@@ -1,0 +1,180 @@
+name: Build & Release Water Party
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------
+  # 1. ANDROID BUILD
+  # ---------------------------------------------------
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'master'
+          cache: true
+      
+      - name: Build Android APK & AAB via Makefile
+        run: |
+          make build-android
+          make build-aab
+      
+      - name: Prepare Artifacts
+        run: |
+          mkdir -p artifacts
+          cp build/app/outputs/flutter-apk/app-release.apk artifacts/WaterParty-Universal.apk || true
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk artifacts/WaterParty-Android-arm64.apk || true
+          cp build/app/outputs/bundle/release/app-release.aab artifacts/WaterParty.aab || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WaterParty-Android
+          path: artifacts/WaterParty-*
+
+  # ---------------------------------------------------
+  # 2. LINUX BUILD
+  # ---------------------------------------------------
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libespeak-ng-dev espeak-ng
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'master'
+          cache: true
+          
+      - name: Build Linux via Makefile
+        run: make build-linux
+
+      - name: Compress Build
+        run: tar -czvf WaterParty-Linux.tar.gz -C build/linux/x64/release/bundle .
+        
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WaterParty-Linux
+          path: WaterParty-Linux.tar.gz
+
+  # ---------------------------------------------------
+  # 3. WEB BUILD
+  # ---------------------------------------------------
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'master'
+          cache: true
+          
+      - name: Build Web via Makefile
+        run: make build-web
+      
+      - name: Compress Build
+        run: zip -r WaterParty-Web.zip build/web
+        
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WaterParty-Web
+          path: WaterParty-Web.zip
+
+  # ---------------------------------------------------
+  # 4. SERVER BUILD (Go 1.26.0 - Multi-Platform)
+  # ---------------------------------------------------
+  build-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.0'
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: Build All Server Binaries via Makefile
+        run: make release-server
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WaterParty-Server-All
+          path: release/server/partyserver-*
+
+  # ---------------------------------------------------
+  # 5. AUTOMATIC RELEASE
+  # ---------------------------------------------------
+  create-release:
+    needs: [build-android, build-linux, build-web, build-server]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract Version from pubspec.yaml
+        id: get_version
+        run: |
+          VERSION=$(grep 'version: ' pubspec.yaml | sed 's/version: //')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download all Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all_artifacts
+
+      - name: Move artifacts to root
+        run: |
+          find all_artifacts/ -name "WaterParty-*.apk" -exec mv {} . \;
+          find all_artifacts/ -name "WaterParty.aab" -exec mv {} . \;
+          find all_artifacts/ -name "WaterParty-Linux.tar.gz" -exec mv {} . \;
+          find all_artifacts/ -name "WaterParty-Web.zip" -exec mv {} . \;
+          find all_artifacts/ -name "partyserver-*" -exec mv {} . \;
+
+      - name: Update Static Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Water Party v${{ env.VERSION }}
+          body: |
+            ## 🚀 Human Connection OS - v${{ env.VERSION }}
+            
+            This is an automated production build of the Water Party ecosystem.
+            
+            ### 📱 Mobile
+            - **Android (Universal)**: All-in-one APK.
+            - **Android (ARM64)**: Optimized for modern devices.
+            - **Android (AAB)**: For Play Store submission.
+            
+            ### 💻 Desktop & Web
+            - **Linux**: Compressed binary bundle.
+            - **Web**: Optimized JavaScript release.
+            
+            ### ⚡ Server
+            - **Multi-Platform**: Binaries for Linux, Windows, and macOS.
+            
+            *Release version synchronized with pubspec.yaml*
+          files: |
+            WaterParty-*.apk
+            WaterParty.aab
+            WaterParty-Linux.tar.gz
+            WaterParty-Web.zip
+            partyserver-*
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+          make_latest: true

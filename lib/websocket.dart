@@ -1,0 +1,130 @@
+import 'dart:convert';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'providers.dart';
+import 'models.dart';
+import 'constants.dart';
+
+class SocketService {
+  static const String serverUrl = AppConstants.host;
+  final Ref ref;
+  WebSocketChannel? _channel;
+  bool _isConnected = false;
+
+  SocketService(this.ref);
+
+  void connect(String uid) {
+    if (_isConnected) return;
+
+    final uri = Uri.parse('wss://$serverUrl/ws?uid=$uid');
+    _channel = WebSocketChannel.connect(uri);
+    _isConnected = true;
+
+    _channel!.stream.listen(
+      (data) {
+        _handleIncomingMessage(data);
+      },
+      onDone: () => _reconnect(uid),
+      onError: (err) => _reconnect(uid),
+    );
+
+    // Request latest user data and chats from server immediately after connection
+    sendMessage('GET_USER', {});
+    sendMessage('GET_CHATS', {});
+  }
+
+  void _handleIncomingMessage(dynamic rawData) {
+    final Map<String, dynamic> data = jsonDecode(rawData);
+
+    final String event = data['Event'];
+    final dynamic payload = data['Payload'];
+
+    switch (event) {
+      case 'PROFILE_UPDATED':
+        final user = User.fromMap(payload);
+        ref.read(authProvider.notifier).updateUserProfile(user);
+        break;
+      case 'CHATS_LIST':
+        final List<dynamic> roomsRaw = payload;
+        final rooms = roomsRaw.map((r) => ChatRoom.fromMap(r)).toList();
+        ref.read(chatProvider.notifier).setRooms(rooms);
+        break;
+      case 'NEW_CHAT_ROOM':
+        final room = ChatRoom.fromMap(payload);
+        ref.read(chatProvider.notifier).addRoom(room);
+        break;
+      case 'NEW_MESSAGE':
+        final message = ChatMessage.fromMap(payload);
+        ref.read(chatProvider.notifier).updateRoomWithNewMessage(message);
+        break;
+      case 'NEW_PARTY':
+        final party = Party.fromMap(payload);
+        ref.read(partyFeedProvider.notifier).addParty(party);
+        break;
+      case 'FEED_UPDATE':
+        final List<dynamic> partiesRaw = payload;
+        final parties = partiesRaw.map((p) => Party.fromMap(p)).toList();
+        ref.read(partyFeedProvider.notifier).setParties(parties);
+        break;
+      case 'PARTY_LOCKED':
+        // Logic for party locked
+        break;
+      case 'LOCATION_REVEALED':
+        // Logic for location reveal
+        break;
+      case 'APPLICANTS_LIST':
+        final List<dynamic> appsRaw = payload['Applicants'];
+        final apps = appsRaw.map((a) => PartyApplication.fromMap(a)).toList();
+        ref.read(partyApplicantsProvider.notifier).setApplicants(apps);
+        break;
+      case 'APPLICATION_UPDATED':
+        final status = ApplicantStatus.values.firstWhere(
+          (e) => e.toString().split('.').last == payload['Status'],
+        );
+        ref
+            .read(partyApplicantsProvider.notifier)
+            .updateStatus(payload['UserID'], status);
+        break;
+      case 'PARTY_CREATED':
+        final party = Party.fromMap(payload);
+        ref.read(partyCreationProvider.notifier).setSuccess(party.id);
+        break;
+      case 'PARTY_DELETED':
+        final partyId = payload['PartyID'];
+        final chatRoomId = payload['ChatRoomID'];
+        ref.read(chatProvider.notifier).removeRoom(chatRoomId);
+        ref.read(partyFeedProvider.notifier).removeParty(partyId);
+        break;
+      case 'ERROR':
+        final String message = payload['message'] ?? 'Unknown error';
+        ref.read(partyCreationProvider.notifier).setError(message);
+        break;
+    }
+  }
+
+  // Send message to Go Backend
+  void sendMessage(String event, dynamic payload) {
+    if (_channel != null) {
+      final user = ref.read(authProvider).value;
+      final msg = jsonEncode({
+        'Event': event,
+        'Payload': payload,
+        'Token': user?.id ?? 'anonymous',
+      });
+      _channel!.sink.add(msg);
+    }
+  }
+
+  void _reconnect(String token) {
+    _isConnected = false;
+    Future.delayed(const Duration(seconds: 3), () => connect(token));
+  }
+
+  void disconnect() {
+    _channel?.sink.close();
+    _isConnected = false;
+  }
+}
+
+// Provider to access the socket anywhere
+final socketServiceProvider = Provider((ref) => SocketService(ref));
