@@ -288,7 +288,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			durationHours = int(dh)
 		}
 		if !p.StartTime.IsZero() {
-			p.EndTime = p.StartTime.Add(time.Duration(durationHours) * time.Hour)
+			p.DurationHours = durationHours
 		}
 		if status, ok := payloadMap["Status"].(string); ok {
 			p.Status = PartyStatus(status)
@@ -454,7 +454,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		})
 		c.send <- response
 
-	case "GET_MY_PARTIES":
+	case "GET_MY_PARTIES", "GET_MATCHED_PARTIES":
 		log.Printf("GET_MY_PARTIES received from user: %s", c.UID)
 		parties, err := GetMyParties(c.UID)
 		if err != nil {
@@ -553,9 +553,10 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		lonDelta := loc.RadiusKm / (111.0 * 0.7) // Roughly estimate for mid-latitudes
 
 		query := `
-			SELECT id, host_id, title, description, party_photos, start_time, end_time, status, 
+			SELECT id, host_id, title, description, party_photos, start_time, duration_hours, status, 
 			       is_location_revealed, address, city, geo_lat, geo_lon, max_capacity, 
-			       current_guest_count, vibe_tags, rules, chat_room_id, created_at
+			       current_guest_count, auto_lock_on_full, vibe_tags, rules, chat_room_id, 
+			       created_at, updated_at, thumbnail
 			FROM parties 
 			WHERE status = 'OPEN' 
 			  AND host_id != $1
@@ -587,9 +588,10 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		for rows.Next() {
 			var p Party
 			err := rows.Scan(
-				&p.ID, &p.HostID, &p.Title, &p.Description, &p.PartyPhotos, &p.StartTime, &p.EndTime,
+				&p.ID, &p.HostID, &p.Title, &p.Description, &p.PartyPhotos, &p.StartTime, &p.DurationHours,
 				&p.Status, &p.IsLocationRevealed, &p.Address, &p.City, &p.GeoLat, &p.GeoLon,
-				&p.MaxCapacity, &p.CurrentGuestCount, &p.VibeTags, &p.Rules, &p.ChatRoomID, &p.CreatedAt,
+				&p.MaxCapacity, &p.CurrentGuestCount, &p.AutoLockOnFull, &p.VibeTags,
+				&p.Rules, &p.ChatRoomID, &p.CreatedAt, &p.UpdatedAt, &p.Thumbnail,
 			)
 			if err != nil {
 				log.Printf("Feed Scan Error: %v", err)
@@ -669,6 +671,113 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			c.hub.mu.RUnlock()
 		}
 
+	case "GET_PARTY_DETAILS":
+		// Payload: {"PartyID": "uuid"}
+		partyID, _ := wsMsg.Payload.(map[string]interface{})["PartyID"].(string)
+		if partyID == "" {
+			return
+		}
+
+		p, err := GetParty(partyID)
+		if err != nil {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Party not found",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "PARTY_DETAILS",
+			Payload: p,
+		})
+		c.send <- response
+
+	case "GET_CHAT_HISTORY":
+		// Payload: {"ChatID": "uuid", "Limit": 50}
+		var req struct {
+			ChatID string `json:"ChatID"`
+			Limit  int    `json:"Limit"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		if req.ChatID == "" {
+			return
+		}
+		if req.Limit <= 0 {
+			req.Limit = 50
+		}
+
+		messages, err := GetChatHistory(req.ChatID, req.Limit)
+		if err != nil {
+			log.Printf("GetChatHistory DB Error: %v", err)
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "CHAT_HISTORY",
+			Payload: messages,
+		})
+		c.send <- response
+
+	case "LEAVE_PARTY":
+		// Payload: {"PartyID": "uuid"}
+		partyID, _ := wsMsg.Payload.(map[string]interface{})["PartyID"].(string)
+		if partyID == "" {
+			return
+		}
+
+		// Verify party exists
+		p, err := GetParty(partyID)
+		if err != nil {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Party not found",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		// If user is the host, they can't leave - they can only delete
+		if p.HostID == c.UID {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Host cannot leave party, please delete instead",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		// Remove user from party applications (set to DECLINED)
+		err = UpdateApplicationStatus(partyID, c.UID, "DECLINED")
+		if err != nil {
+			log.Printf("LeaveParty DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to leave party",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event: "PARTY_LEFT",
+			Payload: map[string]string{
+				"PartyID": partyID,
+			},
+		})
+		c.send <- response
+
 	case "DELETE_PARTY":
 		// Payload: {"PartyID": "uuid"}
 		log.Printf("DELETE_PARTY received - PartyID: %s", wsMsg.Payload)
@@ -712,9 +821,689 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		// 4. Also broadcast global notification to remove from feeds
 		c.hub.broadcastGlobal(deletionMsg)
 
+	case "GET_MATCHED_USERS":
+		// Payload: {"PartyID": "uuid"}
+		partyID, _ := wsMsg.Payload.(map[string]interface{})["PartyID"].(string)
+		if partyID == "" {
+			return
+		}
+
+		// Verify the user is the host
+		p, err := GetParty(partyID)
+		if err != nil || p.HostID != c.UID {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Not authorized to view matched users",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		// Get accepted applicants (matched users)
+		apps, err := GetAcceptedApplicants(partyID)
+		if err != nil {
+			log.Printf("GetMatchedUsers DB Error: %v", err)
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "MATCHED_USERS",
+			Payload: apps,
+		})
+		c.send <- response
+
+	case "UPDATE_PARTY":
+		// Payload: Party object with ID
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		var p Party
+		json.Unmarshal(payloadBytes, &p)
+
+		// Verify the user is the host
+		existing, err := GetParty(p.ID)
+		if err != nil || existing.HostID != c.UID {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Not authorized to edit this party",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		// Preserve host ID and created time
+		p.HostID = existing.HostID
+		p.CreatedAt = existing.CreatedAt
+		now := time.Now()
+		p.UpdatedAt = &now
+
+		err = UpdateParty(p)
+		if err != nil {
+			log.Printf("UpdateParty DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to update party",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		// Get updated party and send back
+		updated, _ := GetParty(p.ID)
+		response, _ := json.Marshal(WSMessage{
+			Event:   "PARTY_UPDATED",
+			Payload: updated,
+		})
+		c.send <- response
+
+	case "UNMATCH_USER":
+		// Payload: {"PartyID": "uuid", "UserID": "uuid"}
+		var req struct {
+			PartyID string `json:"PartyID"`
+			UserID  string `json:"UserID"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		if req.PartyID == "" || req.UserID == "" {
+			return
+		}
+
+		// Verify the user is the host
+		p, err := GetParty(req.PartyID)
+		if err != nil || p.HostID != c.UID {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Not authorized to unmatch users",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		// Update application status to DECLINED
+		err = UpdateApplicationStatus(req.PartyID, req.UserID, "DECLINED")
+		if err != nil {
+			log.Printf("UnmatchUser DB Error: %v", err)
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event: "USER_UNMATCHED",
+			Payload: map[string]string{
+				"PartyID": req.PartyID,
+				"UserID":  req.UserID,
+			},
+		})
+		c.send <- response
+
+	case "DELETE_USER":
+		// Payload: {"UserID": "uuid"}
+		var req struct {
+			UserID string `json:"UserID"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		// Only allow users to delete their own account
+		if req.UserID != c.UID {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Not authorized to delete this user",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		err := DeleteUser(req.UserID)
+		if err != nil {
+			log.Printf("DeleteUser DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to delete user",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "USER_DELETED",
+			Payload: map[string]string{"UserID": req.UserID},
+		})
+		c.send <- response
+
+	case "APPLY_TO_PARTY":
+		// Payload: {"PartyID": "uuid"}
+		partyID, _ := wsMsg.Payload.(map[string]interface{})["PartyID"].(string)
+		if partyID == "" {
+			return
+		}
+
+		// Check if party exists and is open
+		p, err := GetParty(partyID)
+		if err != nil {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Party not found",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		if p.Status != "OPEN" {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Party is not accepting applications",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		// Save application to party_applications table
+		query := `INSERT INTO party_applications (party_id, user_id, status) 
+			  VALUES ($1, $2, 'PENDING') ON CONFLICT (party_id, user_id) 
+			  DO UPDATE SET status = 'PENDING', applied_at = NOW()`
+		_, err = db.Exec(context.Background(), query, partyID, c.UID)
+		if err != nil {
+			log.Printf("ApplyToParty Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to apply to party",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event: "APPLICATION_SUBMITTED",
+			Payload: map[string]string{
+				"PartyID": partyID,
+				"Status":  "PENDING",
+			},
+		})
+		c.send <- response
+
+	case "REJECT_PARTY":
+		// Payload: {"PartyID": "uuid"}
+		partyID, _ := wsMsg.Payload.(map[string]interface{})["PartyID"].(string)
+		if partyID == "" {
+			return
+		}
+
+		// Save rejection to party_applications table
+		query := `INSERT INTO party_applications (party_id, user_id, status) 
+			  VALUES ($1, $2, 'DECLINED') ON CONFLICT (party_id, user_id) 
+			  DO UPDATE SET status = 'DECLINED', applied_at = NOW()`
+		_, err := db.Exec(context.Background(), query, partyID, c.UID)
+		if err != nil {
+			log.Printf("RejectParty Error: %v", err)
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event: "APPLICATION_REJECTED",
+			Payload: map[string]string{
+				"PartyID": partyID,
+				"Status":  "DECLINED",
+			},
+		})
+		c.send <- response
+
+	case "GET_DMS":
+		// Get direct message chats for the current user
+		log.Printf("GET_DMS received from user: %s", c.UID)
+		dms, err := GetDMsForUser(c.UID)
+		if err != nil {
+			log.Printf("GetDMsForUser DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to get DMs",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+		response, _ := json.Marshal(WSMessage{
+			Event:   "DMS_LIST",
+			Payload: dms,
+		})
+		c.send <- response
+
+	case "GET_DM_MESSAGES":
+		// Payload: {"OtherUserID": "uuid", "Limit": 50}
+		var req struct {
+			OtherUserID string `json:"OtherUserID"`
+			Limit       int    `json:"Limit"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		if req.OtherUserID == "" {
+			return
+		}
+		if req.Limit <= 0 {
+			req.Limit = 50
+		}
+
+		log.Printf("GET_DM_MESSAGES: %s <-> %s", c.UID, req.OtherUserID)
+		messages, err := GetDMMessages(c.UID, req.OtherUserID, req.Limit)
+		if err != nil {
+			log.Printf("GetDMMessages DB Error: %v", err)
+			return
+		}
+		response, _ := json.Marshal(WSMessage{
+			Event:   "DM_MESSAGES",
+			Payload: messages,
+		})
+		c.send <- response
+
+	case "DELETE_DM_MESSAGE":
+		// Payload: {"MessageID": "uuid"}
+		var req struct {
+			MessageID string `json:"MessageID"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		if req.MessageID == "" {
+			return
+		}
+
+		err := DeleteMessage(req.MessageID, c.UID)
+		if err != nil {
+			log.Printf("DeleteMessage DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to delete message",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event: "MESSAGE_DELETED",
+			Payload: map[string]string{
+				"MessageID": req.MessageID,
+			},
+		})
+		c.send <- response
+
 	case "ADD_CONTRIBUTION":
-		// Handle financial updates, save to DB, broadcast pool update to room
-		// ... logic for AddContribution ...
+		// Payload: {"PartyID": "uuid", "Amount": 10.00}
+		var req struct {
+			PartyID string  `json:"PartyID"`
+			Amount  float64 `json:"Amount"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		if req.PartyID == "" || req.Amount <= 0 {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Invalid contribution amount",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		contrib := Contribution{
+			UserID: c.UID,
+			Amount: req.Amount,
+			PaidAt: time.Now(),
+		}
+
+		err := AddContribution(req.PartyID, contrib)
+		if err != nil {
+			log.Printf("AddContribution DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to add contribution",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		// Get updated pool state
+		pool, err := GetRotationPool(req.PartyID)
+		if err == nil {
+			response, _ := json.Marshal(WSMessage{
+				Event:   "FUNDRAISER_UPDATED",
+				Payload: pool,
+			})
+			c.send <- response
+
+			// Also broadcast to the party room
+			p, _ := GetParty(req.PartyID)
+			if p.ChatRoomID != "" {
+				c.hub.broadcast <- RoomEvent{RoomID: p.ChatRoomID, Message: response}
+			}
+		}
+
+	case "GET_FUNDRAISER_STATE":
+		// Payload: {"PartyID": "uuid"}
+		partyID, _ := wsMsg.Payload.(map[string]interface{})["PartyID"].(string)
+		if partyID == "" {
+			return
+		}
+
+		pool, err := GetRotationPool(partyID)
+		if err != nil {
+			// Return empty pool if not found
+			pool = Crowdfunding{
+				PartyID:  partyID,
+				Currency: "USD",
+				IsFunded: false,
+			}
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "FUNDRAISER_STATE",
+			Payload: pool,
+		})
+		c.send <- response
+
+	case "GET_NOTIFICATIONS":
+		// Get user's notifications
+		notifs, err := GetNotifications(c.UID, 20)
+		if err != nil {
+			log.Printf("GetNotifications DB Error: %v", err)
+			return
+		}
+		response, _ := json.Marshal(WSMessage{
+			Event:   "NOTIFICATIONS_LIST",
+			Payload: notifs,
+		})
+		c.send <- response
+
+	case "MARK_NOTIFICATION_READ":
+		// Payload: {"NotificationID": "uuid"}
+		var req struct {
+			NotificationID string `json:"NotificationID"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		if req.NotificationID != "" {
+			err := MarkNotificationRead(req.NotificationID, c.UID)
+			if err != nil {
+				log.Printf("MarkNotificationRead Error: %v", err)
+			}
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "NOTIFICATION_MARKED_READ",
+			Payload: map[string]string{"NotificationID": req.NotificationID},
+		})
+		c.send <- response
+
+	case "MARK_ALL_NOTIFICATIONS_READ":
+		err := MarkAllNotificationsRead(c.UID)
+		if err != nil {
+			log.Printf("MarkAllNotificationsRead Error: %v", err)
+		}
+		response, _ := json.Marshal(WSMessage{
+			Event:   "ALL_NOTIFICATIONS_MARKED_READ",
+			Payload: map[string]string{"status": "success"},
+		})
+		c.send <- response
+
+	case "SEARCH_USERS":
+		// Payload: {"Query": "search term", "Limit": 20}
+		var req struct {
+			Query string `json:"Query"`
+			Limit int    `json:"Limit"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		if req.Query == "" {
+			return
+		}
+
+		users, err := SearchUsers(req.Query, req.Limit)
+		if err != nil {
+			log.Printf("SearchUsers DB Error: %v", err)
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "USERS_SEARCH_RESULTS",
+			Payload: users,
+		})
+		c.send <- response
+
+	case "BLOCK_USER":
+		// Payload: {"UserID": "uuid"}
+		var req struct {
+			UserID string `json:"UserID"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		if req.UserID == "" || req.UserID == c.UID {
+			return
+		}
+
+		err := BlockUser(c.UID, req.UserID)
+		if err != nil {
+			log.Printf("BlockUser Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event:   "ERROR",
+				Payload: map[string]string{"message": "Failed to block user"},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "USER_BLOCKED",
+			Payload: map[string]string{"UserID": req.UserID},
+		})
+		c.send <- response
+
+	case "UNBLOCK_USER":
+		// Payload: {"UserID": "uuid"}
+		var req struct {
+			UserID string `json:"UserID"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		if req.UserID == "" {
+			return
+		}
+
+		err := UnblockUser(c.UID, req.UserID)
+		if err != nil {
+			log.Printf("UnblockUser Error: %v", err)
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "USER_UNBLOCKED",
+			Payload: map[string]string{"UserID": req.UserID},
+		})
+		c.send <- response
+
+	case "GET_BLOCKED_USERS":
+		blockedIDs, err := GetBlockedUsers(c.UID)
+		if err != nil {
+			log.Printf("GetBlockedUsers Error: %v", err)
+			return
+		}
+		response, _ := json.Marshal(WSMessage{
+			Event:   "BLOCKED_USERS_LIST",
+			Payload: blockedIDs,
+		})
+		c.send <- response
+
+	case "REPORT_USER":
+		// Payload: {"UserID": "uuid", "Reason": "...", "Details": "..."}
+		var req struct {
+			UserID  string `json:"UserID"`
+			Reason  string `json:"Reason"`
+			Details string `json:"Details"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		if req.UserID == "" || req.Reason == "" {
+			return
+		}
+
+		err := ReportUser(c.UID, req.UserID, req.Reason, req.Details)
+		if err != nil {
+			log.Printf("ReportUser Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event:   "ERROR",
+				Payload: map[string]string{"message": "Failed to submit report"},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "USER_REPORTED",
+			Payload: map[string]string{"UserID": req.UserID},
+		})
+		c.send <- response
+
+	case "REPORT_PARTY":
+		// Payload: {"PartyID": "uuid", "Reason": "...", "Details": "..."}
+		var req struct {
+			PartyID string `json:"PartyID"`
+			Reason  string `json:"Reason"`
+			Details string `json:"Details"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		if req.PartyID == "" || req.Reason == "" {
+			return
+		}
+
+		err := ReportParty(c.UID, req.PartyID, req.Reason, req.Details)
+		if err != nil {
+			log.Printf("ReportParty Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event:   "ERROR",
+				Payload: map[string]string{"message": "Failed to submit report"},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "PARTY_REPORTED",
+			Payload: map[string]string{"PartyID": req.PartyID},
+		})
+		c.send <- response
+
+	case "GET_PARTY_ANALYTICS":
+		// Payload: {"PartyID": "uuid"}
+		partyID, _ := wsMsg.Payload.(map[string]interface{})["PartyID"].(string)
+		if partyID == "" {
+			return
+		}
+
+		// Verify user is host
+		p, err := GetParty(partyID)
+		if err != nil || p.HostID != c.UID {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Not authorized to view analytics",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		analytics, err := GetPartyAnalytics(partyID)
+		if err != nil {
+			log.Printf("GetPartyAnalytics Error: %v", err)
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event:   "PARTY_ANALYTICS",
+			Payload: analytics,
+		})
+		c.send <- response
+
+	case "UPDATE_PARTY_STATUS":
+		// Payload: {"PartyID": "uuid", "Status": "LIVE|COMPLETED|CANCELLED"}
+		var req struct {
+			PartyID string `json:"PartyID"`
+			Status  string `json:"Status"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &req)
+
+		if req.PartyID == "" || req.Status == "" {
+			return
+		}
+
+		// Verify user is host
+		p, err := GetParty(req.PartyID)
+		if err != nil || p.HostID != c.UID {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Not authorized to update status",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		err = UpdatePartyStatus(req.PartyID, PartyStatus(req.Status))
+		if err != nil {
+			log.Printf("UpdatePartyStatus Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to update status",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		// Get updated party
+		updated, _ := GetParty(req.PartyID)
+		response, _ := json.Marshal(WSMessage{
+			Event:   "PARTY_STATUS_UPDATED",
+			Payload: updated,
+		})
+		c.send <- response
+
+		// Broadcast status change to party room
+		if updated.ChatRoomID != "" {
+			c.hub.broadcast <- RoomEvent{RoomID: updated.ChatRoomID, Message: response}
+		}
 	}
 }
 
