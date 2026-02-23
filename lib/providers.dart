@@ -460,3 +460,24 @@ final partyCacheProvider =
     NotifierProvider<PartyCacheNotifier, Map<String, Party>>(
       PartyCacheNotifier.new,
     );
+
+class MyPartiesNotifier extends Notifier<List<Party>> {
+  @override
+  List<Party> build() => [];
+
+  void setParties(List<Party> parties) {
+    state = parties;
+  }
+
+  void addParty(Party party) {
+    state = [...state, party];
+  }
+
+  void removeParty(String partyId) {
+    state = state.where((p) => p.id != partyId).toList();
+  }
+}
+
+final myPartiesProvider = NotifierProvider<MyPartiesNotifier, List<Party>>(
+  MyPartiesNotifier.new,
+);

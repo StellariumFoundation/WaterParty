@@ -131,6 +131,20 @@ class SocketService {
         print('[WebSocket] ERROR received: $message');
         ref.read(partyCreationProvider.notifier).setError(message);
         break;
+      case 'MY_PARTIES':
+        print('[WebSocket] MY_PARTIES received: $payload');
+        final List<dynamic> partiesRaw = payload as List<dynamic>;
+        final parties = partiesRaw
+            .map((p) => Party.fromMap(p as Map<String, dynamic>))
+            .toList();
+        print('[WebSocket] Parsed ${parties.length} my parties');
+        // Update cache with all parties
+        for (final party in parties) {
+          ref.read(partyCacheProvider.notifier).updateParty(party);
+        }
+        // Update my parties provider
+        ref.read(myPartiesProvider.notifier).setParties(parties);
+        break;
     }
   }
 

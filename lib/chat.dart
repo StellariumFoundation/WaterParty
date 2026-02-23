@@ -673,12 +673,20 @@ class PartySettingsScreen extends ConsumerWidget {
     final isHost = user?.id == room.hostId;
     final partyCache = ref.watch(partyCacheProvider);
 
+    // Get full party data from cache
+    Party? party;
+    if (room.isGroup && room.partyId.isNotEmpty) {
+      party = partyCache[room.partyId];
+    }
+
     // Resolve dynamic title
     String displayTitle = room.title;
-    if (room.isGroup && room.partyId.isNotEmpty) {
-      final party = partyCache[room.partyId];
-      if (party != null) {
-        displayTitle = party.title;
+    if (party != null && party.title.isNotEmpty) {
+      displayTitle = party.title;
+    } else if (room.partyId.isNotEmpty) {
+      final p = partyCache[room.partyId];
+      if (p != null) {
+        displayTitle = p.title;
       }
     }
     if (displayTitle.isEmpty || displayTitle == "PARTY CHAT")
@@ -742,6 +750,70 @@ class PartySettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 40),
 
+            // Party Details Section
+            if (party != null) ...[
+              _buildInfoSection("PARTY DETAILS", [
+                _buildInfoRow(
+                  "Description",
+                  party.description.isNotEmpty
+                      ? party.description
+                      : "No description",
+                ),
+                _buildInfoRow("Start Time", _formatDateTime(party.startTime)),
+                _buildInfoRow("End Time", _formatDateTime(party.endTime)),
+                _buildInfoRow("Address", party.address),
+                _buildInfoRow("City", party.city),
+                _buildInfoRow("Max Capacity", party.maxCapacity.toString()),
+                _buildInfoRow(
+                  "Current Guests",
+                  party.currentGuestCount.toString(),
+                ),
+              ]),
+              const SizedBox(height: 20),
+              if (party.vibeTags.isNotEmpty) ...[
+                const Text(
+                  "VIBE TAGS",
+                  style: TextStyle(
+                    color: AppColors.textCyan,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                    fontSize: AppFontSizes.sm,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: party.vibeTags
+                      .map(
+                        (tag) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.textCyan.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppColors.textCyan.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: Text(
+                            tag,
+                            style: const TextStyle(
+                              color: AppColors.textCyan,
+                              fontSize: AppFontSizes.xs,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
+              const SizedBox(height: 20),
+            ],
+
             if (isHost) ...[
               const Text(
                 "DANGER ZONE",
@@ -797,6 +869,71 @@ class PartySettingsScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildInfoSection(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: AppColors.textCyan,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2,
+            fontSize: AppFontSizes.sm,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white54,
+                fontSize: AppFontSizes.xs,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: AppFontSizes.xs,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDateTime(DateTime dt) {
+    return '${dt.day}/${dt.month}/${dt.year} at ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
   void _showDeleteDialog(BuildContext context, WidgetRef ref) {
