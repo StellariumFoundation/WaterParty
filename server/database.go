@@ -206,7 +206,7 @@ BEGIN
             EXECUTE PROCEDURE update_updated_at_column();
     END IF;
 END $trigger$;
-`;
+`
 	_, err := db.Exec(context.Background(), script)
 	return err
 }
@@ -360,7 +360,44 @@ func UpdateUserFull(u User) error {
 }
 
 func DeleteUser(id string) error {
-	_, err := db.Exec(context.Background(), "DELETE FROM users WHERE id = $1", id)
+	// Delete related records first to avoid foreign key constraint violations
+	// Delete chat messages where user is sender or receiver
+	_, err := db.Exec(context.Background(),
+		"DELETE FROM chat_messages WHERE sender_id = $1 OR receiver_id = $1", id)
+	if err != nil {
+		return err
+	}
+
+	// Delete party applications
+	_, err = db.Exec(context.Background(),
+		"DELETE FROM party_applications WHERE user_id = $1", id)
+	if err != nil {
+		return err
+	}
+
+	// Delete party attendees
+	_, err = db.Exec(context.Background(),
+		"DELETE FROM party_attendees WHERE user_id = $1", id)
+	if err != nil {
+		return err
+	}
+
+	// Delete chat rooms where user is host (this will cascade to messages if foreign keys are set)
+	_, err = db.Exec(context.Background(),
+		"DELETE FROM chat_rooms WHERE host_id = $1", id)
+	if err != nil {
+		return err
+	}
+
+	// Delete parties hosted by user (this will cascade to applications and attendees if set)
+	_, err = db.Exec(context.Background(),
+		"DELETE FROM parties WHERE host_id = $1", id)
+	if err != nil {
+		return err
+	}
+
+	// Finally delete the user
+	_, err = db.Exec(context.Background(), "DELETE FROM users WHERE id = $1", id)
 	return err
 }
 
