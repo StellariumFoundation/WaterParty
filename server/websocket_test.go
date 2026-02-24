@@ -1182,7 +1182,7 @@ func TestHandleGetProfile_MethodNotAllowed(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", "/profile", nil)
 
-	handleGetProfile(rec, req)
+	handleProfile(rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("Expected status %d, got %d", http.StatusMethodNotAllowed, rec.Code)

@@ -724,7 +724,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                     )
                   : Text(
                       isLogin
-                          ? "ENTER THE VIBE"
+                          ? "LOGIN"
                           : (currentStep < 3 ? "CONTINUE" : "SIGN UP"),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Colors.black,
