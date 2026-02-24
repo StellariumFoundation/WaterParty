@@ -46,37 +46,14 @@ jobs:
           flutter clean
           flutter pub get
           # Universal APK
-          flutter build apk --release --obfuscate --split-debug-info=./debug-info
+          flutter build apk --release 
           # All ABI-specific APKs in one command
-          flutter build apk --release --split-per-abi --obfuscate --split-debug-info=./debug-info
+          flutter build apk --release --split-per-abi 
       
       - name: Build Android App Bundle
         run: |
-          flutter build appbundle --release --obfuscate --split-debug-info=./debug-info
-      
-      - name: Verify APK contains native libraries
-        run: |
-          echo "=== Checking Universal APK for .so files ==="
-          unzip -l build/app/outputs/flutter-apk/app-release.apk | grep "\.so$" || echo "ERROR: No .so files found in universal APK!"
-          echo ""
-          echo "=== Checking for libflutter.so ==="
-          unzip -l build/app/outputs/flutter-apk/app-release.apk | grep "libflutter.so" || echo "ERROR: libflutter.so NOT FOUND in universal APK!"
-          echo ""
-          echo "=== Checking ABI-specific APKs ==="
-          for arch in arm64-v8a armeabi-v7a x86_64 x86; do
-            echo "Checking app-${arch}-release.apk..."
-            unzip -l build/app/outputs/flutter-apk/app-${arch}-release.apk 2>/dev/null | grep "libflutter.so" && echo "  ✓ libflutter.so found" || echo "  ✗ libflutter.so NOT FOUND"
-          done
-      
-      - name: Prepare Artifacts
-        run: |
-          mkdir -p artifacts
-          cp build/app/outputs/flutter-apk/app-release.apk artifacts/WaterParty-Universal.apk || true
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk artifacts/WaterParty-Android-arm64.apk || true
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk artifacts/WaterParty-Android-armv7.apk || true
-          cp build/app/outputs/flutter-apk/app-x86_64-release.apk artifacts/WaterParty-Android-x86_64.apk || true
-          cp build/app/outputs/bundle/release/app-release.aab artifacts/WaterParty.aab || true
-
+          flutter build appbundle --release 
+            
       - uses: actions/upload-artifact@v4
         with:
           name: WaterParty-Android
