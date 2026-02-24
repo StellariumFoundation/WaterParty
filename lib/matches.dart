@@ -27,22 +27,13 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     // Get parties where user is admin (host) or matched (guest)
     final userParties = myParties.where((party) {
       if (currentUser == null) return false;
-      print(
-        '[MatchesScreen] Filtering party: ${party.id}, hostId=${party.hostId}, currentUserId=${currentUser.id}',
-      );
       // User is admin/host of the party
       if (party.hostId == currentUser.id) {
-        print('[MatchesScreen] Party ${party.id} included: user is host');
         return true;
       }
       // User is matched on the party (not host but included)
-      print(
-        '[MatchesScreen] Party ${party.id} included: showing all myParties',
-      );
       return true; // Show all parties from myPartiesProvider
     }).toList();
-
-    print('[MatchesScreen] Final userParties count: ${userParties.length}');
 
     final directMessages = allChatRooms.where((room) => !room.isGroup).toList();
 
@@ -57,8 +48,6 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (context) => ChatScreen(room: newRoom)),
           );
-          // We don't reset partyCreationProvider here because we want to avoid double navigation
-          // if the build method is triggered again. The PartyScreen already resets it.
         } catch (_) {
           // Room hasn't arrived yet
         }
@@ -67,128 +56,193 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(
-          "CONNECTIONS",
-          style: Theme.of(context).textTheme.displayMedium?.copyWith(
-            fontWeight: FontWeight.w900,
-            fontSize: AppFontSizes.display,
-            letterSpacing: 2,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: false,
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: WaterGlass(
-              height: 50,
-              borderRadius: 25,
-              child: Row(
-                children: [
-                  _toggleButton("PARTY CHATS", 0),
-                  _toggleButton("DIRECT MESSAGES", 1),
-                ],
+      body: CustomScrollView(
+        slivers: [
+          // Custom App Bar
+          SliverAppBar(
+            expandedHeight: 120,
+            floating: false,
+            pinned: true,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+              title: Text(
+                "CONNECTIONS",
+                style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  fontSize: AppFontSizes.display,
+                  letterSpacing: 2,
+                  color: Colors.white,
+                ),
+              ),
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black54],
+                  ),
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: _selectedTab == 0
-                  ? _buildPartyList(userParties)
-                  : _buildList(directMessages, false),
+
+          // Tab Selector
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: _buildTabSelector(),
             ),
+          ),
+
+          // Content
+          _selectedTab == 0
+              ? _buildPartySliverList(userParties)
+              : _buildChatSliverList(directMessages),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabSelector() {
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.1),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          _buildTabButton("PARTY CHATS", 0),
+          _buildTabButton("DIRECT MESSAGES", 1),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton(String label, int index) {
+    final isSelected = _selectedTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTab = index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            gradient: isSelected
+                ? const LinearGradient(
+                    colors: [AppColors.textCyan, AppColors.electricPurple],
+                  )
+                : null,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: AppFontSizes.xs + 2,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+              color: isSelected ? Colors.white : Colors.white54,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPartySliverList(List<Party> parties) {
+    if (parties.isEmpty) {
+      return SliverFillRemaining(
+        child: _buildEmptyState(
+          "No party chats yet",
+          "Host or join a party to start chatting!",
+        ),
+      );
+    }
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => _buildMatchCard(parties[index]),
+          childCount: parties.length,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatSliverList(List<ChatRoom> rooms) {
+    if (rooms.isEmpty) {
+      return SliverFillRemaining(
+        child: _buildEmptyState(
+          "No direct messages yet",
+          "Match with people to start chatting!",
+        ),
+      );
+    }
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => _buildChatCard(rooms[index]),
+          childCount: rooms.length,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String title, String subtitle) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.forum_outlined,
+              size: 48,
+              color: Colors.white24,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: AppFontSizes.lg,
+              fontWeight: FontWeight.bold,
+              color: Colors.white70,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: AppFontSizes.sm,
+              color: Colors.white38,
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  Widget _toggleButton(String label, int index) {
-    bool isSelected = _selectedTab == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedTab = index),
-        child: Container(
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isSelected
-                ? Colors.white.withValues(alpha: 0.1)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(25),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: AppFontSizes.xs + 1, // 11
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
-              color: isSelected ? AppColors.textCyan : Colors.white38,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildList(List<ChatRoom> rooms, bool isPartyTab) {
-    if (rooms.isEmpty) {
-      return Center(
-        child: Text(
-          "No connections yet",
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: Colors.white24),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      key: ValueKey(_selectedTab),
-      padding: const EdgeInsets.all(20),
-      itemCount: rooms.length,
-      itemBuilder: (context, index) {
-        final room = rooms[index];
-        return _buildChatTile(room);
-      },
-    );
-  }
-
-  Widget _buildPartyList(List<Party> parties) {
-    if (parties.isEmpty) {
-      return Center(
-        child: Text(
-          "No parties yet",
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: Colors.white24),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      key: ValueKey('party_${_selectedTab}'),
-      padding: const EdgeInsets.all(20),
-      itemCount: parties.length,
-      itemBuilder: (context, index) {
-        final party = parties[index];
-        return _buildPartyTile(party);
-      },
-    );
-  }
-
-  Widget _buildPartyTile(Party party) {
-    final allChatRooms = ref.watch(chatProvider);
+  // ============================================
+  // MATCH CARD - Party Chat Display
+  // ============================================
+  Widget _buildMatchCard(Party party) {
     final currentUser = ref.watch(authProvider).value;
-
-    // Determine if user is the host/admin
     final isHost = currentUser != null && party.hostId == currentUser.id;
 
     // Get thumbnail
@@ -207,236 +261,97 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     String etaLabel = _formatETA(party.startTime);
 
     // Status color
-    Color statusColor;
-    switch (party.status) {
-      case PartyStatus.OPEN:
-        statusColor = AppColors.textCyan;
-        break;
-      case PartyStatus.LOCKED:
-        statusColor = Colors.orange;
-        break;
-      case PartyStatus.LIVE:
-        statusColor = Colors.green;
-        break;
-      case PartyStatus.COMPLETED:
-        statusColor = Colors.grey;
-        break;
-      case PartyStatus.CANCELLED:
-        statusColor = Colors.red;
-        break;
-    }
+    Color statusColor = _getStatusColor(party.status);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
-      child: WaterGlass(
-        height: 100,
-        borderRadius: 20,
-        child: ListTile(
-          onTap: () {
-            // Find the ChatRoom for this party
-            try {
-              final room = allChatRooms.firstWhere(
-                (r) => r.partyId == party.id,
-              );
-              // Navigate to the actual party chat
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => ChatScreen(room: room)),
-              );
-            } catch (_) {
-              // Fallback: navigate to party detail if no chat room found
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => PartyDetailScreen(party: party),
+      padding: const EdgeInsets.only(bottom: 16),
+      child: _buildGlassCard(
+        child: InkWell(
+          onTap: () => _navigateToPartyChat(party),
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Thumbnail
+                _buildThumbnail(
+                  thumbnailUrl: thumbnailUrl,
+                  isGroup: true,
+                  statusColor: statusColor,
+                  isHost: isHost,
                 ),
-              );
-            }
-          },
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 15,
-            vertical: 5,
-          ),
-          leading: Stack(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: thumbnailUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: thumbnailUrl,
-                        width: 60,
-                        height: 60,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: Colors.black12,
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.textCyan,
+                const SizedBox(width: 14),
+
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Title row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              party.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: AppFontSizes.md,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                        ),
-                        errorWidget: (context, url, error) =>
-                            _buildDefaultAvatar(true),
-                      )
-                    : _buildDefaultAvatar(true),
-              ),
-              // Host badge
-              if (isHost)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: AppColors.gold,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.star,
-                      color: Colors.white,
-                      size: 10,
-                    ),
-                  ),
-                ),
-              // Party status indicator
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.celebration, color: statusColor, size: 14),
-                ),
-              ),
-            ],
-          ),
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        party.title,
+                          if (isHost) _buildHostBadge(),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+
+                      // Description
+                      Text(
+                        party.description,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontSize: AppFontSizes.md,
+                        style: TextStyle(
+                          fontSize: AppFontSizes.sm,
+                          color: Colors.white.withValues(alpha: 0.6),
                         ),
                       ),
-                    ),
-                    if (isHost) ...[
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.gold.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          "HOST",
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: AppColors.gold,
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
+                      const SizedBox(height: 8),
+
+                      // Bottom row - guests, location, ETA
+                      Row(
+                        children: [
+                          _buildInfoChip(
+                            icon: Icons.people_outline,
+                            text:
+                                "${party.currentGuestCount}/${party.maxCapacity}",
+                          ),
+                          const SizedBox(width: 12),
+                          _buildInfoChip(
+                            icon: Icons.location_on_outlined,
+                            text: party.city,
+                          ),
+                          const Spacer(),
+                          _buildETABadge(etaLabel, statusColor),
+                        ],
                       ),
                     ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              // ETA badge
-              if (etaLabel.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    etaLabel,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: statusColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
                   ),
                 ),
-            ],
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 4),
-              Text(
-                party.description,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: Colors.white54),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(Icons.people_outline, color: Colors.white38, size: 12),
-                  const SizedBox(width: 4),
-                  Text(
-                    "${party.currentGuestCount}/${party.maxCapacity}",
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white38,
-                      fontSize: AppFontSizes.xs,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Icon(
-                    Icons.location_on_outlined,
-                    color: Colors.white38,
-                    size: 12,
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      party.city,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white38,
-                        fontSize: AppFontSizes.xs,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildChatTile(ChatRoom room) {
-    String timeLabel = _formatDateTime(room.lastMessageAt);
+  // ============================================
+  // CHAT CARD - Direct Message Display
+  // ============================================
+  Widget _buildChatCard(ChatRoom room) {
     final partyCache = ref.watch(partyCacheProvider);
     final myParties = ref.watch(myPartiesProvider);
     final currentUser = ref.watch(authProvider).value;
@@ -445,29 +360,18 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     String displayTitle = room.title;
     String? partyThumbnail;
     DateTime? partyStartTime;
+
     if (room.isGroup && room.partyId.isNotEmpty) {
-      // First check party cache
-      final party = partyCache[room.partyId];
+      final party =
+          partyCache[room.partyId] ??
+          myParties.where((p) => p.id == room.partyId).firstOrNull;
+
       if (party != null) {
         displayTitle = party.title;
         partyThumbnail = party.thumbnail.isNotEmpty
             ? party.thumbnail
             : (party.partyPhotos.isNotEmpty ? party.partyPhotos.first : null);
         partyStartTime = party.startTime;
-      } else {
-        // Fallback: check myPartiesProvider
-        final myParty = myParties
-            .where((p) => p.id == room.partyId)
-            .firstOrNull;
-        if (myParty != null) {
-          displayTitle = myParty.title;
-          partyThumbnail = myParty.thumbnail.isNotEmpty
-              ? myParty.thumbnail
-              : (myParty.partyPhotos.isNotEmpty
-                    ? myParty.partyPhotos.first
-                    : null);
-          partyStartTime = myParty.startTime;
-        }
       }
     }
 
@@ -482,14 +386,10 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     }
 
     // Check if last message is from current user
-    String lastMessageText = room.lastMessageContent;
     bool isLastMessageFromMe =
         currentUser != null &&
         room.recentMessages.isNotEmpty &&
         room.recentMessages.last.senderId == currentUser.id;
-    if (isLastMessageFromMe) {
-      lastMessageText = "You: ${room.lastMessageContent}";
-    }
 
     // Determine thumbnail URL
     String? thumbnailUrl;
@@ -503,194 +403,241 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
           : AppConstants.assetUrl(room.imageUrl);
     }
 
+    // Format last message
+    String lastMessageText = room.lastMessageContent.isEmpty
+        ? "No messages yet"
+        : room.lastMessageContent;
+    if (isLastMessageFromMe) {
+      lastMessageText = "You: $lastMessageText";
+    }
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
-      child: WaterGlass(
-        height: 100,
-        borderRadius: 20,
-        child: ListTile(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: _buildGlassCard(
+        child: InkWell(
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(builder: (context) => ChatScreen(room: room)),
             );
           },
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 15,
-            vertical: 5,
-          ),
-          leading: Stack(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(room.isGroup ? 12 : 30),
-                child: thumbnailUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: thumbnailUrl,
-                        width: 60,
-                        height: 60,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: Colors.black12,
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.textCyan,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Thumbnail
+                _buildThumbnail(
+                  thumbnailUrl: thumbnailUrl,
+                  isGroup: room.isGroup,
+                  isPartyChat: room.partyId.isNotEmpty,
+                ),
+                const SizedBox(width: 14),
+
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Title row with time and ETA
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              displayTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: AppFontSizes.md,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                        ),
-                        errorWidget: (context, url, error) =>
-                            _buildDefaultAvatar(room.isGroup),
-                      )
-                    : _buildDefaultAvatar(room.isGroup),
-              ),
-              if (room.isGroup && room.partyId.isNotEmpty)
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.celebration,
-                      color: AppColors.gold,
-                      size: 14,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        displayTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontSize: AppFontSizes.md,
-                        ),
+                          if (etaLabel != null) ...[
+                            const SizedBox(width: 8),
+                            _buildETABadge(etaLabel, AppColors.textCyan),
+                          ],
+                          const SizedBox(width: 8),
+                          Text(
+                            _formatDateTime(room.lastMessageAt),
+                            style: TextStyle(
+                              fontSize: AppFontSizes.xs,
+                              color: Colors.white.withValues(alpha: 0.4),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    if (etaLabel != null) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.textCyan.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          etaLabel,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: AppColors.textCyan,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                      const SizedBox(height: 6),
+
+                      // Last message
+                      Row(
+                        children: [
+                          if (isLastMessageFromMe) ...[
+                            Icon(
+                              Icons.check_circle_outline,
+                              size: 14,
+                              color: AppColors.textCyan.withValues(alpha: 0.7),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Expanded(
+                            child: Text(
+                              lastMessageText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: AppFontSizes.sm,
+                                color: isLastMessageFromMe
+                                    ? AppColors.textCyan
+                                    : Colors.white.withValues(alpha: 0.6),
+                                fontStyle: room.lastMessageContent.isEmpty
+                                    ? FontStyle.italic
+                                    : FontStyle.normal,
                               ),
-                        ),
+                            ),
+                          ),
+                          if (room.unreadCount > 0) ...[
+                            const SizedBox(width: 8),
+                            _buildUnreadBadge(room.unreadCount),
+                          ],
+                        ],
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                timeLabel,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white30,
-                  fontSize: AppFontSizes.xs + 1,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  if (isLastMessageFromMe)
-                    const Icon(
-                      Icons.check_circle_outline,
-                      color: AppColors.textCyan,
-                      size: 14,
-                    ),
-                  if (isLastMessageFromMe) const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      lastMessageText.isEmpty
-                          ? "No messages yet"
-                          : lastMessageText,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: isLastMessageFromMe
-                            ? AppColors.textCyan
-                            : (room.unreadCount > 0
-                                  ? Colors.white
-                                  : Colors.white54),
-                        fontStyle: lastMessageText.isEmpty
-                            ? FontStyle.italic
-                            : FontStyle.normal,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          trailing: room.unreadCount > 0
-              ? Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                    color: AppColors.textCyan,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    room.unreadCount.toString(),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                )
-              : null,
         ),
       ),
     );
   }
 
-  Widget _buildDefaultAvatar(bool isGroup) {
+  // ============================================
+  // UI COMPONENTS
+  // ============================================
+
+  Widget _buildGlassCard({required Widget child}) {
     return Container(
-      width: 60,
-      height: 60,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: isGroup
-              ? [
-                  AppColors.gold.withValues(alpha: 0.3),
-                  AppColors.textCyan.withValues(alpha: 0.3),
-                ]
-              : [
-                  AppColors.textCyan.withValues(alpha: 0.3),
-                  Colors.purple.withValues(alpha: 0.3),
-                ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.1),
+            Colors.white.withValues(alpha: 0.03),
+          ],
         ),
-        borderRadius: BorderRadius.circular(isGroup ? 12 : 30),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.15),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
+      child: child,
+    );
+  }
+
+  Widget _buildThumbnail({
+    String? thumbnailUrl,
+    required bool isGroup,
+    Color? statusColor,
+    bool isHost = false,
+    bool isPartyChat = false,
+  }) {
+    return Stack(
+      children: [
+        // Image or placeholder
+        Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(isGroup ? 14 : 32),
+            gradient: thumbnailUrl == null
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isGroup
+                        ? [
+                            AppColors.gold.withValues(alpha: 0.3),
+                            AppColors.textCyan.withValues(alpha: 0.3),
+                          ]
+                        : [
+                            AppColors.textCyan.withValues(alpha: 0.3),
+                            Colors.purple.withValues(alpha: 0.3),
+                          ],
+                  )
+                : null,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(isGroup ? 14 : 32),
+            child: thumbnailUrl != null
+                ? CachedNetworkImage(
+                    imageUrl: thumbnailUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      color: Colors.black12,
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.textCyan,
+                        ),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) =>
+                        _buildDefaultIcon(isGroup),
+                  )
+                : _buildDefaultIcon(isGroup),
+          ),
+        ),
+
+        // Host badge
+        if (isHost)
+          Positioned(
+            top: -2,
+            right: -2,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: const BoxDecoration(
+                color: AppColors.gold,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.star, color: Colors.white, size: 10),
+            ),
+          ),
+
+        // Status/Type indicator
+        if ((isGroup || isPartyChat) && !isHost)
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isGroup ? Icons.celebration : Icons.person,
+                color: statusColor ?? AppColors.gold,
+                size: 12,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDefaultIcon(bool isGroup) {
+    return Center(
       child: Icon(
         isGroup ? Icons.celebration : Icons.person,
         color: Colors.white54,
@@ -699,19 +646,124 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     );
   }
 
+  Widget _buildHostBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.gold.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: const Text(
+        "HOST",
+        style: TextStyle(
+          fontSize: 8,
+          fontWeight: FontWeight.bold,
+          color: AppColors.gold,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildETABadge(String eta, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        eta,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoChip({required IconData icon, required String text}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: Colors.white.withValues(alpha: 0.5)),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: AppFontSizes.xs,
+            color: Colors.white.withValues(alpha: 0.5),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUnreadBadge(int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: const BoxDecoration(
+        color: AppColors.textCyan,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        count > 99 ? "99+" : count.toString(),
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
+        ),
+      ),
+    );
+  }
+
+  // ============================================
+  // HELPER METHODS
+  // ============================================
+
+  void _navigateToPartyChat(Party party) {
+    final allChatRooms = ref.read(chatProvider);
+    try {
+      final room = allChatRooms.firstWhere((r) => r.partyId == party.id);
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (context) => ChatScreen(room: room)));
+    } catch (_) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => PartyDetailScreen(party: party),
+        ),
+      );
+    }
+  }
+
+  Color _getStatusColor(PartyStatus status) {
+    switch (status) {
+      case PartyStatus.OPEN:
+        return AppColors.textCyan;
+      case PartyStatus.LOCKED:
+        return Colors.orange;
+      case PartyStatus.LIVE:
+        return Colors.green;
+      case PartyStatus.COMPLETED:
+        return Colors.grey;
+      case PartyStatus.CANCELLED:
+        return Colors.red;
+    }
+  }
+
   String _formatETA(DateTime? startTime) {
     if (startTime == null) return "";
     final now = DateTime.now();
     final diff = startTime.difference(now);
 
     if (diff.isNegative) {
-      // Party has started
       if (diff.inMinutes.abs() < 60) return "NOW";
       if (diff.inHours.abs() < 24) return "${diff.inHours.abs()}h";
       return "${diff.inDays.abs()}d";
     }
 
-    // Party hasn't started yet
     if (diff.inMinutes < 60) return "${diff.inMinutes}m";
     if (diff.inHours < 24) return "${diff.inHours}h";
     if (diff.inDays < 7) return "${diff.inDays}d";
@@ -721,21 +773,16 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
   String _formatDateTime(DateTime? dt) {
     if (dt == null) return "";
     final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 60) return "${diff.inMinutes}m ago";
-    if (diff.inHours < 24) return "${diff.inHours}h ago";
-    return "${diff.inDays}d ago";
+    if (diff.inMinutes < 60) return "${diff.inMinutes}m";
+    if (diff.inHours < 24) return "${diff.inHours}h";
+    if (diff.inDays < 7) return "${diff.inDays}d";
+    return "${(diff.inDays / 7).floor()}w";
   }
 }
 
-// ==========================================
-// GUEST MANAGEMENT SCREEN
-// ==========================================
-
-// GuestManagementScreen has been replaced by PartyManageScreen in chat.dart
-
-// ==========================================
+// ============================================
 // EXTERNAL PROFILE VIEW
-// ==========================================
+// ============================================
 
 class ExternalProfileScreen extends ConsumerWidget {
   final User user;
@@ -774,160 +821,138 @@ class ExternalProfileScreen extends ConsumerWidget {
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          _statTile(
-                            "ELO",
-                            user.eloScore.toInt().toString(),
-                            AppColors.gold,
+                          _buildInfoPill(
+                            Icons.badge_outlined,
+                            "${user.trustScore.toStringAsFixed(0)}% Trust",
                           ),
-                          const SizedBox(width: 15),
-                          _statTile(
-                            "TRUST",
-                            user.trustScore.toInt().toString(),
-                            AppColors.textCyan,
-                          ),
+                          const SizedBox(width: 10),
+                          if (user.isVerified) _buildVerifiedBadge(),
                         ],
                       ),
-                      const SizedBox(height: 30),
-                      const Text(
-                        "BIO",
-                        style: TextStyle(
-                          color: Colors.white38,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        user.bio,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: AppFontSizes.lg,
-                          height: 1.5,
-                        ),
-                      ),
-
-                      const SizedBox(height: 30),
-                      _infoRow(Icons.work_outline, "JOB", user.jobTitle),
-                      _infoRow(
-                        Icons.business_outlined,
-                        "COMPANY",
-                        user.company,
-                      ),
-                      _infoRow(
-                        Icons.school_outlined,
-                        "EDUCATION",
-                        "${user.school} (${user.degree})",
-                      ),
-
-                      const SizedBox(height: 30),
-                      const Text(
-                        "LIFESTYLE",
-                        style: TextStyle(
-                          color: Colors.white38,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          _habitChip(Icons.straighten, "${user.heightCm}cm"),
-                          _habitChip(
-                            Icons.local_bar,
-                            "Drinks: ${user.drinkingPref}",
+                      const SizedBox(height: 25),
+                      if (user.bio.isNotEmpty) ...[
+                        Text(
+                          "ABOUT",
+                          style: TextStyle(
+                            fontSize: AppFontSizes.xs,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white.withValues(alpha: 0.5),
+                            letterSpacing: 1.5,
                           ),
-                          _habitChip(
-                            Icons.smoking_rooms,
-                            "Smoke: ${user.smokingPref}",
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          user.bio,
+                          style: const TextStyle(
+                            fontSize: AppFontSizes.md,
+                            color: Colors.white70,
+                            height: 1.5,
                           ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 150),
+                        ),
+                        const SizedBox(height: 25),
+                      ],
+                      _buildDetailSection("BASICS", [
+                        _buildDetailRow("Gender", user.gender),
+                        _buildDetailRow("Height", "${user.heightCm} cm"),
+                        _buildDetailRow("Drinking", user.drinkingPref),
+                        _buildDetailRow("Smoking", user.smokingPref),
+                      ]),
+                      const SizedBox(height: 20),
+                      _buildDetailSection("WORK & EDUCATION", [
+                        if (user.jobTitle.isNotEmpty)
+                          _buildDetailRow(
+                            "Job",
+                            "${user.jobTitle} ${user.company.isNotEmpty ? "at ${user.company}" : ""}",
+                          ),
+                        if (user.school.isNotEmpty)
+                          _buildDetailRow(
+                            "School",
+                            "${user.school} ${user.degree.isNotEmpty ? "- ${user.degree}" : ""}",
+                          ),
+                      ]),
+                      const SizedBox(height: 20),
+                      if (user.topArtists.isNotEmpty) ...[
+                        Text(
+                          "TOP ARTISTS",
+                          style: TextStyle(
+                            fontSize: AppFontSizes.xs,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white.withValues(alpha: 0.5),
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: user.topArtists
+                              .take(5)
+                              .map((artist) => _buildTag(artist))
+                              .toList(),
+                        ),
+                        const SizedBox(height: 25),
+                      ],
+                      const SizedBox(height: 80),
                     ],
                   ),
                 ),
               ),
             ],
           ),
-
-          // Back Button
           Positioned(
-            top: 50,
-            left: 20,
-            child: IconButton(
-              icon: const Icon(
-                Icons.arrow_back_ios_new,
-                color: Colors.white,
-                size: 20,
-              ),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-
-          // Message Button
-          Positioned(
-            bottom: 40,
-            left: 30,
-            right: 30,
-            child: GestureDetector(
-              onTap: () {
-                final myUser = ref.read(authProvider).value;
-                if (myUser == null) return;
-
-                // Create deterministic DM ID
-                final u1 = myUser.id;
-                final u2 = user.id;
-                final dmId = u1.compareTo(u2) < 0 ? "${u1}_$u2" : "${u2}_$u1";
-
-                final dmRoom = ChatRoom(
-                  id: dmId,
-                  partyId: "",
-                  hostId: u1,
-                  title: user.realName,
-                  imageUrl: user.thumbnail.isNotEmpty
-                      ? AppConstants.assetUrl(user.thumbnail)
-                      : (user.profilePhotos.isNotEmpty
-                            ? AppConstants.assetUrl(user.profilePhotos.first)
-                            : ""),
-                  isGroup: false,
-                  participantIds: [u1, u2],
-                );
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ChatScreen(room: dmRoom),
-                  ),
-                );
-              },
-              child: Container(
-                height: 60,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(15),
-                  gradient: const LinearGradient(
-                    colors: [AppColors.textCyan, AppColors.electricPurple],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.textCyan.withValues(alpha: 0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.9),
                   ],
                 ),
-                alignment: Alignment.center,
-                child: const Text(
-                  "SEND MESSAGE",
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                  ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        label: const Text("Close"),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white24),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          // TODO: Implement message action
+                        },
+                        icon: const Icon(Icons.chat_bubble_outline),
+                        label: const Text("Message"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.textCyan,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -938,104 +963,150 @@ class ExternalProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildPhotoCarousel(User user) {
+    if (user.profilePhotos.isEmpty) {
+      return Container(
+        color: Colors.grey[900],
+        child: const Center(
+          child: Icon(Icons.person, size: 100, color: Colors.white24),
+        ),
+      );
+    }
+
     return PageView.builder(
       itemCount: user.profilePhotos.length,
       itemBuilder: (context, index) {
         return CachedNetworkImage(
           imageUrl: AppConstants.assetUrl(user.profilePhotos[index]),
           fit: BoxFit.cover,
-          placeholder: (context, url) => Container(color: Colors.black12),
-          errorWidget: (context, url, error) => const Icon(Icons.error),
+          placeholder: (context, url) => Container(
+            color: Colors.grey[900],
+            child: const Center(
+              child: CircularProgressIndicator(color: AppColors.textCyan),
+            ),
+          ),
+          errorWidget: (context, url, error) => Container(
+            color: Colors.grey[900],
+            child: const Center(
+              child: Icon(Icons.error, color: Colors.white24),
+            ),
+          ),
         );
       },
     );
   }
 
-  Widget _statTile(String label, String val, Color color) {
+  Widget _buildInfoPill(IconData icon, String text) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: AppFontSizes.xs,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            val,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: AppFontSizes.md,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String label, String val) {
-    if (val.isEmpty || val == " ()") return const SizedBox();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white24, size: 20),
-          const SizedBox(width: 15),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white24,
-                  fontSize: AppFontSizes.xs - 1, // 9
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                val,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: AppFontSizes.md,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _habitChip(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.white38, size: 14),
-          const SizedBox(width: 8),
+          Icon(icon, size: 16, color: AppColors.textCyan),
+          const SizedBox(width: 6),
           Text(
-            label,
+            text,
             style: const TextStyle(
-              color: Colors.white70,
               fontSize: AppFontSizes.sm,
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildVerifiedBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.textCyan.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.verified, size: 14, color: AppColors.textCyan),
+          SizedBox(width: 4),
+          Text(
+            "VERIFIED",
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textCyan,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailSection(String title, List<Widget> children) {
+    final filteredChildren = children.where((c) => c is! SizedBox).toList();
+    if (filteredChildren.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: AppFontSizes.xs,
+            fontWeight: FontWeight.bold,
+            color: Colors.white.withValues(alpha: 0.5),
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...filteredChildren,
+      ],
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    if (value.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: AppFontSizes.md,
+              color: Colors.white.withValues(alpha: 0.6),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: AppFontSizes.md,
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTag(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.white24),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: AppFontSizes.sm,
+          color: Colors.white70,
+        ),
       ),
     );
   }

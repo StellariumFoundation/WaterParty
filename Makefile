@@ -71,7 +71,7 @@ build-android-x86_64:
 	flutter build apk --release --target-platform android-x64 --obfuscate --split-debug-info=./debug-info
 
 # Build all Android architectures
-build-android-all: build-android-arm64 build-android-armv build-android-x86 build-android-x86_64
+build-android-all: build-android-arm64 build-android-armv7 build-android-x86 build-android-x86_64
 
 build-ios:
 	@echo "--- Building iOS (No-Codesign) ---"
