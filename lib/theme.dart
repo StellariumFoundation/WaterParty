@@ -131,30 +131,41 @@ class WaterGlass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassmorphicContainer(
-      width: width ?? MediaQuery.of(context).size.width,
-      height: height,
-      borderRadius: borderRadius,
-      blur: blur,
-      alignment: Alignment.center,
-      border: border,
-      linearGradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.white.withValues(alpha: 0.08),
-          Colors.white.withValues(alpha: 0.03),
-        ],
-      ),
-      borderGradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          (borderColor ?? Colors.white).withValues(alpha: 0.2),
-          Colors.transparent,
-        ],
-      ),
-      child: child,
+    // Use LayoutBuilder to get available constraints instead of MediaQuery
+    // This prevents geometry assertion errors in constrained contexts like ListView
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        return GlassmorphicContainer(
+          width:
+              width ??
+              (availableWidth == double.infinity
+                  ? MediaQuery.of(context).size.width
+                  : availableWidth),
+          height: height,
+          borderRadius: borderRadius,
+          blur: blur,
+          alignment: Alignment.center,
+          border: border,
+          linearGradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withValues(alpha: 0.08),
+              Colors.white.withValues(alpha: 0.03),
+            ],
+          ),
+          borderGradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              (borderColor ?? Colors.white).withValues(alpha: 0.2),
+              Colors.transparent,
+            ],
+          ),
+          child: child,
+        );
+      },
     );
   }
 }

@@ -241,10 +241,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
           realName: _realNameCtrl.text,
           email: _emailCtrl.text,
           phoneNumber: _phoneCtrl.text,
+          profilePhotos: const [],
           age: _calculateAge(_selectedBirthDate!),
           dateOfBirth: _selectedBirthDate,
           heightCm: int.tryParse(_heightCtrl.text) ?? 0,
           gender: _selectedGender,
+          drinkingPref: '',
+          smokingPref: '',
+          topArtists: const [],
           bio: _bioCtrl.text,
           jobTitle: _jobCtrl.text,
           company: _compCtrl.text,
@@ -259,6 +263,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
             data: _walletDataCtrl.text,
           ),
           trustScore: 100.0,
+          isVerified: false,
+          eloScore: 0.0,
+          partiesHosted: 0,
+          flakeCount: 0,
+          locationLat: 0.0,
+          locationLon: 0.0,
+          thumbnail: '',
         );
 
         await ref.read(authProvider.notifier).register(newUser, _passCtrl.text);

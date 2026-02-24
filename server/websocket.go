@@ -828,6 +828,9 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		// 4. Also broadcast global notification to remove from feeds
 		c.hub.broadcastGlobal(deletionMsg)
 
+		// 5. Send direct response to the client that requested the deletion
+		c.send <- deletionMsg
+
 	case "GET_MATCHED_USERS":
 		// Payload: {"PartyID": "uuid"}
 		partyID, _ := wsMsg.Payload.(map[string]interface{})["PartyID"].(string)

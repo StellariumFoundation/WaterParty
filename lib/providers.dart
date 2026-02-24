@@ -481,3 +481,33 @@ class MyPartiesNotifier extends Notifier<List<Party>> {
 final myPartiesProvider = NotifierProvider<MyPartiesNotifier, List<Party>>(
   MyPartiesNotifier.new,
 );
+
+// --- PARTIES AROUND (Nearby parties for match.dart screen) ---
+
+class PartiesAroundNotifier extends Notifier<List<Party>> {
+  @override
+  List<Party> build() => [];
+
+  void setParties(List<Party> parties) {
+    state = parties;
+  }
+
+  void addParty(Party party) {
+    if (!state.any((p) => p.id == party.id)) {
+      state = [...state, party];
+    }
+  }
+
+  void removeParty(String partyId) {
+    state = state.where((p) => p.id != partyId).toList();
+  }
+
+  void clear() {
+    state = [];
+  }
+}
+
+final partiesAroundProvider =
+    NotifierProvider<PartiesAroundNotifier, List<Party>>(
+      PartiesAroundNotifier.new,
+    );

@@ -33,6 +33,8 @@ class SocketService {
     // Request latest user data and chats from server immediately after connection
     sendMessage('GET_USER', {});
     sendMessage('GET_CHATS', {});
+    // Request user's parties (hosted and matched)
+    sendMessage('GET_MY_PARTIES', {});
   }
 
   void _handleIncomingMessage(dynamic rawData) {
@@ -90,7 +92,14 @@ class SocketService {
         // Logic for location reveal
         break;
       case 'APPLICANTS_LIST':
-        final List<dynamic> appsRaw = payload['Applicants'];
+        print('[WebSocket] APPLICANTS_LIST payload: $payload');
+        final applicantsData = payload['Applicants'];
+        if (applicantsData == null) {
+          print('[WebSocket] Applicants is null, setting empty list');
+          ref.read(partyApplicantsProvider.notifier).setApplicants([]);
+          break;
+        }
+        final List<dynamic> appsRaw = applicantsData;
         final apps = appsRaw.map((a) => PartyApplication.fromMap(a)).toList();
         ref.read(partyApplicantsProvider.notifier).setApplicants(apps);
         break;
@@ -124,7 +133,21 @@ class SocketService {
         ref.read(partyCacheProvider.notifier).removeParty(partyId);
         ref.read(chatProvider.notifier).removeRoom(chatRoomId);
         ref.read(partyFeedProvider.notifier).removeParty(partyId);
+        ref.read(myPartiesProvider.notifier).removeParty(partyId);
         print('[WebSocket] Party removed from providers');
+        break;
+      case 'DELETE_PARTY_RESPONSE':
+        print('[WebSocket] DELETE_PARTY_RESPONSE payload: $payload');
+        final success = payload['success'] ?? payload['Success'] ?? true;
+        if (success == true || success == 'true') {
+          final partyId = payload['PartyID'] ?? payload['partyId'];
+          final chatRoomId = payload['ChatRoomID'] ?? payload['chatRoomId'];
+          ref.read(partyCacheProvider.notifier).removeParty(partyId);
+          ref.read(chatProvider.notifier).removeRoom(chatRoomId);
+          ref.read(partyFeedProvider.notifier).removeParty(partyId);
+          ref.read(myPartiesProvider.notifier).removeParty(partyId);
+          print('[WebSocket] Party deleted successfully');
+        }
         break;
       case 'ERROR':
         final String message = payload['message'] ?? 'Unknown error';
@@ -140,10 +163,36 @@ class SocketService {
         print('[WebSocket] Parsed ${parties.length} my parties');
         // Update cache with all parties
         for (final party in parties) {
+          print(
+            '[WebSocket] My party: id=${party.id}, title=${party.title}, hostId=${party.hostId}',
+          );
           ref.read(partyCacheProvider.notifier).updateParty(party);
         }
         // Update my parties provider
         ref.read(myPartiesProvider.notifier).setParties(parties);
+        print(
+          '[WebSocket] myPartiesProvider updated with ${parties.length} parties',
+        );
+        break;
+      case 'MY_PARTIES_RESPONSE':
+        // Alternative response format
+        print('[WebSocket] MY_PARTIES_RESPONSE received: $payload');
+        final List<dynamic> partiesRaw =
+            payload['Parties'] ?? payload as List<dynamic>;
+        final parties = partiesRaw
+            .map((p) => Party.fromMap(p as Map<String, dynamic>))
+            .toList();
+        print('[WebSocket] Parsed ${parties.length} my parties from response');
+        for (final party in parties) {
+          print(
+            '[WebSocket] My party: id=${party.id}, title=${party.title}, hostId=${party.hostId}',
+          );
+          ref.read(partyCacheProvider.notifier).updateParty(party);
+        }
+        ref.read(myPartiesProvider.notifier).setParties(parties);
+        print(
+          '[WebSocket] myPartiesProvider updated with ${parties.length} parties',
+        );
         break;
     }
   }

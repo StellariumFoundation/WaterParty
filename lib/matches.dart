@@ -6,6 +6,7 @@ import 'providers.dart';
 import 'models.dart';
 import 'chat.dart';
 import 'constants.dart';
+import 'match.dart';
 
 class MatchesScreen extends ConsumerStatefulWidget {
   const MatchesScreen({super.key});
@@ -20,13 +21,47 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
   @override
   Widget build(BuildContext context) {
     final allChatRooms = ref.watch(chatProvider);
+    final myParties = ref.watch(myPartiesProvider);
+    final currentUser = ref.watch(authProvider).value;
+
     print('[MatchesScreen] chatProvider state: ${allChatRooms.length} rooms');
+    print(
+      '[MatchesScreen] myPartiesProvider state: ${myParties.length} parties',
+    );
+
+    // Debug: print each party details
+    for (var party in myParties) {
+      print(
+        '[MatchesScreen] Party from myPartiesProvider: id=${party.id}, title=${party.title}, hostId=${party.hostId}, currentUserId=${currentUser?.id}',
+      );
+    }
+
     for (var room in allChatRooms) {
       print(
         '[MatchesScreen] Room: ${room.id}, partyId: ${room.partyId}, title: ${room.title}',
       );
     }
-    final partyChats = allChatRooms.where((room) => room.isGroup).toList();
+
+    // Get parties where user is admin (host) or matched (guest)
+    final userParties = myParties.where((party) {
+      if (currentUser == null) return false;
+      print(
+        '[MatchesScreen] Filtering party: ${party.id}, hostId=${party.hostId}, currentUserId=${currentUser.id}',
+      );
+      // User is admin/host of the party
+      if (party.hostId == currentUser.id) {
+        print('[MatchesScreen] Party ${party.id} included: user is host');
+        return true;
+      }
+      // User is matched on the party (not host but included)
+      print(
+        '[MatchesScreen] Party ${party.id} included: showing all myParties',
+      );
+      return true; // Show all parties from myPartiesProvider
+    }).toList();
+
+    print('[MatchesScreen] Final userParties count: ${userParties.length}');
+
     final directMessages = allChatRooms.where((room) => !room.isGroup).toList();
 
     // Handle automatic navigation to newly created party chat
@@ -85,7 +120,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
               child: _selectedTab == 0
-                  ? _buildList(partyChats, true)
+                  ? _buildPartyList(userParties)
                   : _buildList(directMessages, false),
             ),
           ),
@@ -144,19 +179,160 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     );
   }
 
+  Widget _buildPartyList(List<Party> parties) {
+    if (parties.isEmpty) {
+      return Center(
+        child: Text(
+          "No parties yet",
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: Colors.white24),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      key: ValueKey('party_${_selectedTab}'),
+      padding: const EdgeInsets.all(20),
+      itemCount: parties.length,
+      itemBuilder: (context, index) {
+        final party = parties[index];
+        return _buildPartyTile(party);
+      },
+    );
+  }
+
+  Widget _buildPartyTile(Party party) {
+    final allChatRooms = ref.watch(chatProvider);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 15),
+      child: WaterGlass(
+        height: 100,
+        borderRadius: 20,
+        child: ListTile(
+          onTap: () {
+            // Find the ChatRoom for this party
+            try {
+              final room = allChatRooms.firstWhere(
+                (r) => r.partyId == party.id,
+              );
+              // Navigate to the actual party chat
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => ChatScreen(room: room)),
+              );
+            } catch (_) {
+              // Fallback: navigate to party detail if no chat room found
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => PartyDetailScreen(party: party),
+                ),
+              );
+            }
+          },
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 15,
+            vertical: 5,
+          ),
+          leading: Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CachedNetworkImage(
+                  imageUrl: party.partyPhotos.isNotEmpty
+                      ? AppConstants.assetUrl(party.partyPhotos.first)
+                      : "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000",
+                  width: 60,
+                  height: 60,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) =>
+                      Container(color: Colors.black12),
+                  errorWidget: (context, url, error) => const Icon(Icons.error),
+                ),
+              ),
+              const Positioned(
+                bottom: 0,
+                right: 0,
+                child: Icon(Icons.celebration, color: AppColors.gold, size: 18),
+              ),
+            ],
+          ),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  party.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontSize: AppFontSizes.md,
+                  ),
+                ),
+              ),
+              Text(
+                party.status.name,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textCyan,
+                  fontSize: AppFontSizes.xs + 1,
+                ),
+              ),
+            ],
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                party.description,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.white54),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "${party.currentGuestCount}/${party.maxCapacity} guests • ${party.city}",
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white38,
+                  fontSize: AppFontSizes.xs,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildChatTile(ChatRoom room) {
     String timeLabel = _formatDateTime(room.lastMessageAt);
     final partyCache = ref.watch(partyCacheProvider);
+    final myParties = ref.watch(myPartiesProvider);
 
     // Resolve dynamic title if it's a party
     String displayTitle = room.title;
     if (room.isGroup && room.partyId.isNotEmpty) {
+      // First check party cache
       final party = partyCache[room.partyId];
       print(
         '[MatchesScreen] Looking up party ${room.partyId} in cache: ${party?.title ?? "NOT FOUND"}',
       );
       if (party != null) {
         displayTitle = party.title;
+      } else {
+        // Fallback: check myPartiesProvider (parties user is registered with as admin or matched)
+        final myParty = myParties
+            .where((p) => p.id == room.partyId)
+            .firstOrNull;
+        if (myParty != null) {
+          displayTitle = myParty.title;
+          print(
+            '[MatchesScreen] Found party in myPartiesProvider: ${displayTitle}',
+          );
+        }
       }
     }
 

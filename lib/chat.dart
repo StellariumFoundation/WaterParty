@@ -415,30 +415,60 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
           ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Column(
+        title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              "USER MANAGEMENT",
-              style: TextStyle(
-                fontSize: AppFontSizes.md,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
+            if (party?.thumbnail.isNotEmpty == true)
+              Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    imageUrl: AppConstants.assetUrl(party!.thumbnail),
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) =>
+                        Container(width: 36, height: 36, color: Colors.white12),
+                    errorWidget: (context, url, error) => Container(
+                      width: 36,
+                      height: 36,
+                      color: Colors.white12,
+                      child: const Icon(
+                        Icons.image,
+                        color: Colors.white24,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
-            Text(
-              (party?.title ??
-                      (widget.room.title.isEmpty ||
-                              widget.room.title == "PARTY CHAT"
-                          ? "PARTY CHAT"
-                          : widget.room.title))
-                  .toUpperCase(),
-              style: const TextStyle(
-                fontSize: AppFontSizes.xs,
-                color: Colors.white38,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1,
-              ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "USER MANAGEMENT",
+                  style: TextStyle(
+                    fontSize: AppFontSizes.md,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                  ),
+                ),
+                Text(
+                  (party?.title ??
+                          (widget.room.title.isEmpty ||
+                                  widget.room.title == "PARTY CHAT"
+                              ? "PARTY CHAT"
+                              : widget.room.title))
+                      .toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: AppFontSizes.xs,
+                    color: Colors.white38,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -960,14 +990,24 @@ class PartySettingsScreen extends ConsumerWidget {
           TextButton(
             onPressed: () {
               print(
-                '[ChatScreen] Sending DELETE_PARTY for party: ${room.partyId}',
+                '[ChatScreen] Sending DELETE_PARTY for party: ${room.partyId}, chatRoomId: ${room.id}',
               );
+              // Send DELETE_PARTY with both party ID and chat room ID
               ref.read(socketServiceProvider).sendMessage('DELETE_PARTY', {
                 'PartyID': room.partyId,
+                'ChatRoomID': room.id,
               });
               Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Close settings
-              Navigator.pop(context); // Close chat
+              // Refresh the party list after deletion
+              ref.read(socketServiceProvider).sendMessage('GET_MY_PARTIES', {});
+              ref.read(socketServiceProvider).sendMessage('GET_FEED', {});
+              // Small delay to allow server response before navigating back
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (context.mounted) {
+                  Navigator.pop(context); // Close settings
+                  Navigator.pop(context); // Close chat
+                }
+              });
             },
             child: const Text(
               "DELETE",
