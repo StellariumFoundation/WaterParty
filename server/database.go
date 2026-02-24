@@ -206,7 +206,7 @@ CREATE TABLE IF NOT EXISTS parties (
 );
 
 -- Ensure thumbnail column exists for parties
-DO $
+DO $$
 BEGIN
     -- Add duration_hours column if it doesn't exist
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parties' AND column_name = 'duration_hours') THEN
@@ -214,10 +214,10 @@ BEGIN
         -- Migrate existing data: calculate duration from end_time - start_time
         UPDATE parties SET duration_hours = EXTRACT(EPOCH FROM (end_time - start_time))/3600 WHERE duration_hours IS NULL OR duration_hours = 0;
     END IF;
-END $;
+END $$
 
 -- Drop old end_time column if it exists (after migration)
-DO $
+DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parties' AND column_name = 'end_time') THEN
         ALTER TABLE parties DROP COLUMN IF EXISTS end_time;
@@ -227,7 +227,7 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='parties' AND column_name='thumbnail') THEN
         ALTER TABLE parties ADD COLUMN thumbnail TEXT;
     END IF;
-END $;
+END $$
 
 -- Drop obsolete party columns
 DO $$
