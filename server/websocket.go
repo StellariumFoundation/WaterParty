@@ -515,6 +515,52 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		})
 		c.send <- response
 
+	case "REVERSE_GEOCODE":
+		// Payload: {"lat": 40.7128, "lon": -74.0060}
+		var coords struct {
+			Lat float64 `json:"lat"`
+			Lon float64 `json:"lon"`
+		}
+		payloadBytes, _ := json.Marshal(wsMsg.Payload)
+		json.Unmarshal(payloadBytes, &coords)
+
+		if coords.Lat == 0 && coords.Lon == 0 {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Invalid coordinates: latitude and longitude cannot be zero",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		log.Printf("REVERSE_GEOCODE request from user %s: Lat=%f, Lon=%f", c.UID, coords.Lat, coords.Lon)
+
+		address, city, err := ReverseGeocode(coords.Lat, coords.Lon)
+		if err != nil {
+			log.Printf("ReverseGeocode Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to reverse geocode: " + err.Error(),
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		response, _ := json.Marshal(WSMessage{
+			Event: "GEOCODE_RESULT",
+			Payload: map[string]string{
+				"address": address,
+				"city":    city,
+				"lat":     fmt.Sprintf("%f", coords.Lat),
+				"lon":     fmt.Sprintf("%f", coords.Lon),
+			},
+		})
+		c.send <- response
+
 	case "SWIPE":
 		// Payload: {"PartyID": "uuid", "Direction": "right/left"}
 		var swipe struct {

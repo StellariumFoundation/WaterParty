@@ -136,9 +136,14 @@ class AuthNotifier extends AsyncNotifier<User?> {
     }
   }
 
-  void logout() async {
-    if (_db != null) await _db!.delete('session');
+  Future<void> logout() async {
+    print('[logout] Starting logout process');
+    if (_db != null) {
+      await _db!.delete('session');
+      print('[logout] Session deleted from database');
+    }
     state = const AsyncValue.data(null);
+    print('[logout] Auth state set to null');
   }
 
   Future<void> deleteAccount() async {
@@ -146,16 +151,25 @@ class AuthNotifier extends AsyncNotifier<User?> {
     if (user == null) return;
 
     try {
+      print('[deleteAccount] Attempting to delete user: ${user.id}');
       final response = await http.delete(
         Uri.parse("$apiBase/profile?id=${user.id}"),
       );
 
+      print('[deleteAccount] Response status: ${response.statusCode}');
+      print('[deleteAccount] Response body: ${response.body}');
+
       if (response.statusCode == 200) {
+        print('[deleteAccount] Deletion successful, calling logout');
         logout();
       } else {
-        throw Exception("Failed to delete account");
+        print(
+          '[deleteAccount] Deletion failed with status: ${response.statusCode}',
+        );
+        throw Exception("Failed to delete account: ${response.statusCode}");
       }
     } catch (e) {
+      print('[deleteAccount] Exception: $e');
       rethrow;
     }
   }
@@ -510,4 +524,78 @@ class PartiesAroundNotifier extends Notifier<List<Party>> {
 final partiesAroundProvider =
     NotifierProvider<PartiesAroundNotifier, List<Party>>(
       PartiesAroundNotifier.new,
+    );
+
+// Delete feedback state for showing SnackBar messages
+class DeleteFeedbackNotifier extends Notifier<DeleteFeedbackState> {
+  @override
+  DeleteFeedbackState build() => DeleteFeedbackState();
+
+  void setDeleting(String partyId) {
+    state = DeleteFeedbackState(
+      status: DeleteStatus.deleting,
+      partyId: partyId,
+    );
+  }
+
+  void setDeleted(String partyId) {
+    state = DeleteFeedbackState(status: DeleteStatus.deleted, partyId: partyId);
+    // Clear the state after showing the message
+    Future.delayed(const Duration(seconds: 2), () {
+      if (state.partyId == partyId) {
+        state = DeleteFeedbackState();
+      }
+    });
+  }
+
+  void clear() {
+    state = DeleteFeedbackState();
+  }
+}
+
+enum DeleteStatus { idle, deleting, deleted }
+
+class DeleteFeedbackState {
+  final DeleteStatus status;
+  final String? partyId;
+
+  DeleteFeedbackState({this.status = DeleteStatus.idle, this.partyId});
+}
+
+final deleteFeedbackProvider =
+    NotifierProvider<DeleteFeedbackNotifier, DeleteFeedbackState>(
+      DeleteFeedbackNotifier.new,
+    );
+
+// Geocode result for reverse geocoding
+class GeocodeResult {
+  final String address;
+  final String city;
+  final String lat;
+  final String lon;
+
+  GeocodeResult({
+    this.address = '',
+    this.city = '',
+    this.lat = '',
+    this.lon = '',
+  });
+}
+
+class GeocodeResultNotifier extends Notifier<GeocodeResult> {
+  @override
+  GeocodeResult build() => GeocodeResult();
+
+  void setGeocodeResult(GeocodeResult result) {
+    state = result;
+  }
+
+  void clear() {
+    state = GeocodeResult();
+  }
+}
+
+final geocodeResultProvider =
+    NotifierProvider<GeocodeResultNotifier, GeocodeResult>(
+      GeocodeResultNotifier.new,
     );

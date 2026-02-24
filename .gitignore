@@ -30,3 +30,4 @@ gha-creds-*.json
 server/server_bin
 .kilocodemodes
 .kilocode/mcp.json
+server/server_test

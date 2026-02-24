@@ -24,10 +24,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    // Join the room via websocket
+    // Join the room via websocket and listen for delete feedback
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Join the room
       ref.read(socketServiceProvider).sendMessage('JOIN_ROOM', {
         'RoomID': widget.room.id,
+      });
+
+      // Listen for delete feedback to show SnackBar messages
+      ref.listen<DeleteFeedbackState>(deleteFeedbackProvider, (previous, next) {
+        if (next.status == DeleteStatus.deleting) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Deleting party...'),
+              duration: Duration(seconds: 2),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } else if (next.status == DeleteStatus.deleted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Party deleted successfully'),
+              duration: Duration(seconds: 3),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       });
     });
   }
@@ -992,6 +1014,10 @@ class PartySettingsScreen extends ConsumerWidget {
               print(
                 '[ChatScreen] Sending DELETE_PARTY for party: ${room.partyId}, chatRoomId: ${room.id}',
               );
+              // Set deleting feedback to show "Deleting..." message
+              ref
+                  .read(deleteFeedbackProvider.notifier)
+                  .setDeleting(room.partyId);
               // Send DELETE_PARTY with both party ID and chat room ID
               ref.read(socketServiceProvider).sendMessage('DELETE_PARTY', {
                 'PartyID': room.partyId,

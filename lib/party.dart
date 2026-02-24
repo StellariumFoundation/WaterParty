@@ -54,7 +54,12 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   String _partyThumbnail = "";
   bool _isUploading = false;
   bool _isGettingLocation = false;
+  bool _isReverseGeocoding = false;
   double _durationHours = 6;
+
+  /// Reverse geocoding result holder
+  String? _detectedAddress;
+  String? _detectedCity;
 
   @override
   void initState() {
@@ -132,6 +137,80 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     super.dispose();
   }
 
+  /// Request reverse geocoding via websocket
+  void _requestReverseGeocode(double lat, double lon) {
+    // Clear previous result
+    ref.read(geocodeResultProvider.notifier).clear();
+
+    // Send request to server
+    ref.read(socketServiceProvider).sendMessage('REVERSE_GEOCODE', {
+      'Lat': lat,
+      'Lon': lon,
+    });
+  }
+
+  /// Auto-fill address and city from GPS coordinates via websocket
+  Future<void> _autoFillLocationFromCoords(double lat, double lon) async {
+    setState(() => _isReverseGeocoding = true);
+
+    // Send reverse geocode request via websocket
+    _requestReverseGeocode(lat, lon);
+
+    // Listen for the result
+    ref.listen<GeocodeResult>(geocodeResultProvider, (previous, next) {
+      if (next.address.isNotEmpty || next.city.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _detectedAddress = next.address;
+            _detectedCity = next.city;
+
+            if (_detectedAddress!.isNotEmpty) {
+              _addressController.text = _detectedAddress!;
+            } else {
+              _addressController.text = 'PINNED ON MAP';
+            }
+
+            if (_detectedCity!.isNotEmpty) {
+              _cityController.text = _detectedCity!;
+            } else {
+              _cityController.text = 'DETECTED ON PUBLISH';
+            }
+          });
+          _updateDraft();
+        }
+      }
+
+      // Stop listening after we get a result
+      if (mounted) {
+        setState(() => _isReverseGeocoding = false);
+      }
+    });
+  }
+
+  /// Detect city from current pinned location (called on publish)
+  Future<String> _detectCityFromPinnedLocation() async {
+    if (_geoLat == null || _geoLon == null) return '';
+
+    // If we already have a detected city, use it
+    if (_detectedCity != null && _detectedCity!.isNotEmpty) {
+      return _detectedCity!;
+    }
+
+    // Request reverse geocoding and wait for result
+    _requestReverseGeocode(_geoLat!, _geoLon!);
+
+    // Wait for result with timeout - check current provider value periodically
+    for (int i = 0; i < 10; i++) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      final result = ref.read(geocodeResultProvider);
+      if (result.city.isNotEmpty) {
+        return result.city;
+      }
+    }
+
+    return '';
+  }
+
   Future<void> _useMyLocation() async {
     setState(() => _isGettingLocation = true);
     try {
@@ -150,10 +229,10 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       setState(() {
         _geoLat = position.latitude;
         _geoLon = position.longitude;
-        _addressController.text = "MY CURRENT LOCATION";
-        _cityController.text = "DETECTED ON PUBLISH";
       });
-      _updateDraft();
+
+      // Auto-fill address and city from coordinates
+      await _autoFillLocationFromCoords(position.latitude, position.longitude);
     } catch (e) {
       _showError(e.toString());
     } finally {
@@ -183,10 +262,10 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       setState(() {
         _geoLat = picked.latitude;
         _geoLon = picked.longitude;
-        _addressController.text = "PINNED ON MAP";
-        _cityController.text = "DETECTED ON PUBLISH";
       });
-      _updateDraft();
+
+      // Auto-fill address and city from pinned coordinates
+      await _autoFillLocationFromCoords(picked.latitude, picked.longitude);
     }
   }
 
@@ -241,7 +320,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     }
   }
 
-  void _handleCreateParty() {
+  Future<void> _handleCreateParty() async {
     final user = ref.read(authProvider).value;
     if (user == null) return;
 
@@ -251,10 +330,6 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     }
     if (_descController.text.isEmpty) {
       _showError("Description is required");
-      return;
-    }
-    if (_cityController.text.isEmpty) {
-      _showError("City is required");
       return;
     }
     if (_addressController.text.isEmpty) {
@@ -283,6 +358,20 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     if (_selectedTags.isEmpty && _partyTypeController.text.isEmpty) {
       _showError("Select at least one party type or describe the party");
       return;
+    }
+
+    // If city is still a placeholder or empty, detect it from the pinned location
+    String finalCity = _cityController.text;
+    if (finalCity.isEmpty || finalCity == "DETECTED ON PUBLISH") {
+      // Try to detect city from pinned location
+      final detectedCity = await _detectCityFromPinnedLocation();
+      if (detectedCity.isNotEmpty) {
+        finalCity = detectedCity;
+      } else {
+        // If still can't detect, require manual input
+        _showError("Please enter a city (could not detect from location)");
+        return;
+      }
     }
 
     ref.read(partyCreationProvider.notifier).setLoading();
@@ -326,7 +415,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       status: PartyStatus.OPEN,
       isLocationRevealed: false,
       address: _addressController.text,
-      city: _cityController.text,
+      city: finalCity,
       geoLat: _geoLat ?? 0.0,
       geoLon: _geoLon ?? 0.0,
       maxCapacity: _capacity.toInt(),
@@ -494,15 +583,20 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                       ),
                       const SizedBox(width: 10),
                       GestureDetector(
-                        onTap: _openMapPicker,
+                        onTap: _isReverseGeocoding ? null : _openMapPicker,
                         child: WaterGlass(
                           width: 65,
                           height: 65,
                           borderRadius: 15,
-                          child: const Icon(
-                            FontAwesomeIcons.mapLocationDot,
-                            color: AppColors.textCyan,
-                          ),
+                          child: _isReverseGeocoding
+                              ? const CircularProgressIndicator(
+                                  color: AppColors.textCyan,
+                                  strokeWidth: 2,
+                                )
+                              : const Icon(
+                                  FontAwesomeIcons.mapLocationDot,
+                                  color: AppColors.textCyan,
+                                ),
                         ),
                       ),
                     ],

@@ -134,6 +134,8 @@ class SocketService {
         ref.read(chatProvider.notifier).removeRoom(chatRoomId);
         ref.read(partyFeedProvider.notifier).removeParty(partyId);
         ref.read(myPartiesProvider.notifier).removeParty(partyId);
+        // Set delete feedback to show SnackBar
+        ref.read(deleteFeedbackProvider.notifier).setDeleted(partyId);
         print('[WebSocket] Party removed from providers');
         break;
       case 'DELETE_PARTY_RESPONSE':
@@ -193,6 +195,23 @@ class SocketService {
         print(
           '[WebSocket] myPartiesProvider updated with ${parties.length} parties',
         );
+        break;
+      case 'GEOCODE_RESULT':
+        print('[WebSocket] GEOCODE_RESULT received: $payload');
+        // Extract address and city from the payload
+        final address = payload['Address'] as String? ?? '';
+        final city = payload['City'] as String? ?? '';
+        final lat = payload['Lat'] as String? ?? '';
+        final lon = payload['Lon'] as String? ?? '';
+        print(
+          '[WebSocket] Geocode result - Address: $address, City: $city, Lat: $lat, Lon: $lon',
+        );
+        // Store the geocode result in a provider for the party screen to consume
+        ref
+            .read(geocodeResultProvider.notifier)
+            .setGeocodeResult(
+              GeocodeResult(address: address, city: city, lat: lat, lon: lon),
+            );
         break;
     }
   }

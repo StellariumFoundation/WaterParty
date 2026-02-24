@@ -1024,8 +1024,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
               final uri = Uri.tryParse(url);
               if (uri != null) {
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                try {
+                  // Try with external application mode first (opens in browser/app)
+                  final launched = await launchUrl(
+                    uri,
+                    mode: LaunchMode.externalApplication,
+                  );
+
+                  if (!launched) {
+                    // Fallback: try platform default
+                    await launchUrl(uri);
+                  }
+                } catch (e) {
+                  // If all else fails, try with platform default
+                  try {
+                    await launchUrl(uri);
+                  } catch (_) {
+                    // Silently fail - don't show error to user
+                  }
                 }
               }
             }
@@ -1153,9 +1169,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _showDeleteConfirmation() {
+    print('[Profile] _showDeleteConfirmation called');
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: Colors.grey[900],
         title: const Text(
           "Delete Account",
@@ -1167,16 +1184,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text("CANCEL"),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
+              print('[Profile] Delete account confirmed by user');
               try {
                 await ref.read(authProvider.notifier).deleteAccount();
+                print(
+                  '[Profile] deleteAccount completed successfully - app will navigate to login',
+                );
               } catch (e) {
-                if (!context.mounted) return;
+                print('[Profile] deleteAccount failed: $e');
+                if (!mounted) return;
                 ScaffoldMessenger.of(
                   context,
                 ).showSnackBar(SnackBar(content: Text("Delete failed: $e")));

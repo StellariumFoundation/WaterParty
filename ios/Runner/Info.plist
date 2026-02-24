@@ -51,5 +51,13 @@
 	<string>WaterParty needs access to your photos so you can upload profile and party photos.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>WaterParty needs access to your camera so you can take profile and party photos.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>instagram</string>
+		<string>twitter</string>
+		<string>x-scheduler</string>
+		<string>tiktok</string>
+		<string>linkedin</string>
+	</array>
 </dict>
 </plist>
