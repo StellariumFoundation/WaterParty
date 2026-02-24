@@ -379,13 +379,6 @@ func DeleteUser(id string) error {
 		return err
 	}
 
-	// Delete party attendees
-	_, err = db.Exec(context.Background(),
-		"DELETE FROM party_attendees WHERE user_id = $1", id)
-	if err != nil {
-		return err
-	}
-
 	// Delete chat rooms where user is host
 	_, err = db.Exec(context.Background(),
 		"DELETE FROM chat_rooms WHERE host_id = $1", id)
