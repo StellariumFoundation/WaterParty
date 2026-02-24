@@ -360,10 +360,14 @@ func UpdateUserFull(u User) error {
 }
 
 func DeleteUser(id string) error {
+	if db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
 	// Delete related records first to avoid foreign key constraint violations
-	// Delete chat messages where user is sender or receiver
+	// Delete chat messages where user is sender
 	_, err := db.Exec(context.Background(),
-		"DELETE FROM chat_messages WHERE sender_id = $1 OR receiver_id = $1", id)
+		"DELETE FROM chat_messages WHERE sender_id = $1", id)
 	if err != nil {
 		return err
 	}
@@ -382,14 +386,14 @@ func DeleteUser(id string) error {
 		return err
 	}
 
-	// Delete chat rooms where user is host (this will cascade to messages if foreign keys are set)
+	// Delete chat rooms where user is host
 	_, err = db.Exec(context.Background(),
 		"DELETE FROM chat_rooms WHERE host_id = $1", id)
 	if err != nil {
 		return err
 	}
 
-	// Delete parties hosted by user (this will cascade to applications and attendees if set)
+	// Delete parties hosted by user
 	_, err = db.Exec(context.Background(),
 		"DELETE FROM parties WHERE host_id = $1", id)
 	if err != nil {
