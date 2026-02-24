@@ -41,25 +41,32 @@ jobs:
           channel: 'master'
           cache: true
       
-      - name: Build Android Universal APK
+      - name: Build Android APKs (All Architectures)
         run: |
+          flutter clean
+          flutter pub get
+          # Universal APK
           flutter build apk --release --obfuscate --split-debug-info=./debug-info
-      
-      - name: Build Android ARM64 APK
-        run: |
-          flutter build apk --release --target-platform android-arm64 --obfuscate --split-debug-info=./debug-info
-      
-      - name: Build Android ARMv7 APK
-        run: |
-          flutter build apk --release --target-platform android-arm --obfuscate --split-debug-info=./debug-info
-      
-      - name: Build Android x86_64 APK
-        run: |
-          flutter build apk --release --target-platform android-x64 --obfuscate --split-debug-info=./debug-info
+          # All ABI-specific APKs in one command
+          flutter build apk --release --split-per-abi --obfuscate --split-debug-info=./debug-info
       
       - name: Build Android App Bundle
         run: |
           flutter build appbundle --release --obfuscate --split-debug-info=./debug-info
+      
+      - name: Verify APK contains native libraries
+        run: |
+          echo "=== Checking Universal APK for .so files ==="
+          unzip -l build/app/outputs/flutter-apk/app-release.apk | grep "\.so$" || echo "ERROR: No .so files found in universal APK!"
+          echo ""
+          echo "=== Checking for libflutter.so ==="
+          unzip -l build/app/outputs/flutter-apk/app-release.apk | grep "libflutter.so" || echo "ERROR: libflutter.so NOT FOUND in universal APK!"
+          echo ""
+          echo "=== Checking ABI-specific APKs ==="
+          for arch in arm64-v8a armeabi-v7a x86_64 x86; do
+            echo "Checking app-${arch}-release.apk..."
+            unzip -l build/app/outputs/flutter-apk/app-${arch}-release.apk 2>/dev/null | grep "libflutter.so" && echo "  ✓ libflutter.so found" || echo "  ✗ libflutter.so NOT FOUND"
+          done
       
       - name: Prepare Artifacts
         run: |
