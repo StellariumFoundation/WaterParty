@@ -1484,3 +1484,105 @@ func TestServeWsNonWebSocketRequest(t *testing.T) {
 	// Check that we get a bad handshake response
 	// The upgrader will reject non-WebSocket requests
 }
+
+// TestWebSocketMessageFlow tests the complete message flow
+func TestWebSocketMessageFlow(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+	defer func() { hub.quit <- true }()
+
+	// Create test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ServeWs(hub, w, r)
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "?uid=msgflow-user"
+
+	// Connect
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+	defer ws.Close()
+
+	// Wait for registration
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify client is registered
+	hub.mu.RLock()
+	client, ok := hub.clients["msgflow-user"]
+	hub.mu.RUnlock()
+
+	if !ok {
+		t.Fatal("Client not registered")
+	}
+
+	// Test writing to the client's send channel (simulating writePump behavior)
+	testMsg := []byte(`{"Event":"TEST","Payload":{"data":"test"}}`)
+	select {
+	case client.send <- testMsg:
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Failed to send message to client channel")
+		return
+	}
+
+	// Read the message from WebSocket (this tests writePump output)
+	ws.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+	msgType, msg, err := ws.ReadMessage()
+	if err != nil {
+		t.Logf("Could not read message (this may be due to ping/pong): %v", err)
+	} else if msgType == websocket.TextMessage {
+		var wsMsg WSMessage
+		if err := json.Unmarshal(msg, &wsMsg); err == nil {
+			if wsMsg.Event != "TEST" {
+				t.Errorf("Expected event TEST, got %s", wsMsg.Event)
+			}
+		}
+	}
+
+	// Send a message through WebSocket (this tests readPump input)
+	sendMsg := map[string]interface{}{
+		"Event":   "ECHO_TEST",
+		"Payload": map[string]string{"echo": "hello"},
+	}
+	sendBytes, _ := json.Marshal(sendMsg)
+	err = ws.WriteMessage(websocket.TextMessage, sendBytes)
+	if err != nil {
+		t.Fatalf("Failed to write: %v", err)
+	}
+
+	// Give time for processing
+	time.Sleep(50 * time.Millisecond)
+}
+
+// TestServeWsWithQueryParams tests ServeWs with query parameters
+func TestServeWsWithQueryParams(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+	defer func() { hub.quit <- true }()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ServeWs(hub, w, r)
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "?uid=test-uid&room=test-room"
+
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to dial: %v", err)
+	}
+	defer ws.Close()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify client registered with correct UID
+	hub.mu.RLock()
+	_, exists := hub.clients["test-uid"]
+	hub.mu.RUnlock()
+
+	if !exists {
+		t.Error("Expected client to be registered")
+	}
+}

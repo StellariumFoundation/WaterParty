@@ -6,7 +6,7 @@ SERVER_BINARY = partyserver
 VERSION = $(shell grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
 GO_BUILD_FLAGS = -ldflags="-s -w" -trimpath
 
-.PHONY: all build build-server build-app build-app-native release release-server release-app install-deps clean build-linux build-android build-web build-macos
+.PHONY: all build build-server build-app build-app-native release release-server release-app install-deps clean build-linux build-android build-android-arm64 build-android-armv7 build-android-x86 build-android-x86_64 build-android-all build-web build-macos test test-server
 
 all: build
 
@@ -15,6 +15,13 @@ install-deps:
 	@echo "--- Installing Dependencies ---"
 	flutter pub get
 	cd $(SERVER_DIR) && go mod download
+
+# --- Testing ---
+test: test-server
+
+test-server:
+	@echo "--- Running Go Server Tests ---"
+	cd $(SERVER_DIR) && go test -v -cover ./...
 
 # Detect OS for native app build
 UNAME_S := $(shell uname -s)
@@ -45,6 +52,26 @@ build-android:
 build-aab:
 	@echo "--- Building Android App Bundle ---"
 	flutter build appbundle --release --obfuscate --split-debug-info=./debug-info
+
+# Android architecture-specific builds
+build-android-arm64:
+	@echo "--- Building Android ARM64 APK ---"
+	flutter build apk --release --target-platform android-arm64 --obfuscate --split-debug-info=./debug-info
+
+build-android-armv7:
+	@echo "--- Building Android ARMv7 APK ---"
+	flutter build apk --release --target-platform android-armv7 --obfuscate --split-debug-info=./debug-info
+
+build-android-x86:
+	@echo "--- Building Android x86 APK ---"
+	flutter build apk --release --target-platform android-x86 --obfuscate --split-debug-info=./debug-info
+
+build-android-x86_64:
+	@echo "--- Building Android x86_64 APK ---"
+	flutter build apk --release --target-platform android-x86_64 --obfuscate --split-debug-info=./debug-info
+
+# Build all Android architectures
+build-android-all: build-android-arm64 build-android-armv7 build-android-x86 build-android-x86_64
 
 build-ios:
 	@echo "--- Building iOS (No-Codesign) ---"
