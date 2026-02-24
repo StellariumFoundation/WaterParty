@@ -46,16 +46,15 @@ func runMigrations() error {
 	script := `-- ==========================================
 -- EXTENSIONS
 -- ==========================================
--- Enable UUID support for primary keys
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ==========================================
--- ASSET STORAGE (The "Hash" System)
+-- ASSET STORAGE
 -- ==========================================
 CREATE TABLE IF NOT EXISTS assets (
-    hash TEXT PRIMARY KEY,           -- The SHA256/MD5 hash used in URLs
-    data BYTEA NOT NULL,             -- Actual binary image data
-    mime_type TEXT NOT NULL,         -- e.g., 'image/jpeg', 'image/png'
+    hash TEXT PRIMARY KEY,
+    data BYTEA NOT NULL,
+    mime_type TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -68,103 +67,35 @@ CREATE TABLE IF NOT EXISTS users (
     phone_number TEXT,
     email TEXT UNIQUE,
     password_hash TEXT,
-    
-    -- Visuals: Stores an array of hashes referencing the assets table
-    profile_photos TEXT[] DEFAULT '{}', 
-    
-    -- Demographics
+    profile_photos TEXT[] DEFAULT '{}',
     age INTEGER,
     date_of_birth TIMESTAMP WITH TIME ZONE,
     height_cm INTEGER,
     gender TEXT,
-    
-    -- Vibe & Matching
     drinking_pref TEXT,
     smoking_pref TEXT,
     top_artists TEXT[] DEFAULT '{}',
-    
-    -- Professional
     job_title TEXT,
     company TEXT,
     school TEXT,
     degree TEXT,
-    
-    -- Social Handles
     instagram_handle TEXT,
     linkedin_handle TEXT,
     x_handle TEXT,
     tiktok_handle TEXT,
-    
-    -- Safety & Stats
     is_verified BOOLEAN DEFAULT FALSE,
     trust_score DOUBLE PRECISION DEFAULT 0.0,
     elo_score DOUBLE PRECISION DEFAULT 0.0,
     parties_hosted INTEGER DEFAULT 0,
     flake_count INTEGER DEFAULT 0,
-    
-    -- Financial & Geo
     wallet_data JSONB DEFAULT '{}',
     location_lat DOUBLE PRECISION,
     location_lon DOUBLE PRECISION,
-    
-    -- Bio
     bio TEXT,
-    
     last_active_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     thumbnail TEXT
 );
-
--- Ensure thumbnail column exists
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='thumbnail') THEN
-        ALTER TABLE users ADD COLUMN thumbnail TEXT;
-    END IF;
-END $$;
-
--- Ensure password_hash column exists
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='password_hash') THEN
-        ALTER TABLE users ADD COLUMN password_hash TEXT;
-    END IF;
-END $$;
-
--- Ensure wallet_data column exists
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='wallet_data') THEN
-        ALTER TABLE users ADD COLUMN wallet_data JSONB DEFAULT '{}';
-    END IF;
-END $$;
-
--- Drop obsolete username column if it exists to prevent NULL constraint errors
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='username') THEN
-        ALTER TABLE users DROP COLUMN username;
-    END IF;
-END $$;
-
--- Fix potentially misnamed column from previous attempts
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='wallet data') THEN
-        ALTER TABLE users RENAME COLUMN "wallet data" TO wallet_data;
-    END IF;
-END $$;
-
--- Drop obsolete MusicGenres and TwitterHandle columns
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='music_genres') THEN
-        ALTER TABLE users DROP COLUMN music_genres;
-    END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='twitter_handle') THEN
-        ALTER TABLE users DROP COLUMN twitter_handle;
-    END IF;
-END $$;
 
 -- ==========================================
 -- PARTIES TABLE
@@ -174,88 +105,39 @@ CREATE TABLE IF NOT EXISTS parties (
     host_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     description TEXT,
-    party_photos TEXT[] DEFAULT '{}', -- Array of asset hashes
-    
-    -- Logistics
+    party_photos TEXT[] DEFAULT '{}',
     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
     duration_hours INTEGER DEFAULT 2,
-    status TEXT NOT NULL DEFAULT 'OPEN', -- OPEN, LOCKED, LIVE, COMPLETED, CANCELLED
-    
-    -- Location Privacy
+    status TEXT NOT NULL DEFAULT 'OPEN',
     is_location_revealed BOOLEAN DEFAULT FALSE,
     address TEXT,
     city TEXT,
     geo_lat DOUBLE PRECISION,
     geo_lon DOUBLE PRECISION,
-    
-    -- Slot Mechanics
     max_capacity INTEGER DEFAULT 0,
     current_guest_count INTEGER DEFAULT 0,
     auto_lock_on_full BOOLEAN DEFAULT FALSE,
-    
-    -- Curation
     vibe_tags TEXT[] DEFAULT '{}',
     rules TEXT[] DEFAULT '{}',
-    
-    -- Social
-    chat_room_id UUID, 
-    
+    chat_room_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     thumbnail TEXT
 );
 
--- Ensure thumbnail column exists for parties
-DO $$
-BEGIN
-    -- Add duration_hours column if it doesn't exist
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parties' AND column_name = 'duration_hours') THEN
-        ALTER TABLE parties ADD COLUMN duration_hours INTEGER DEFAULT 2;
-        -- Migrate existing data: calculate duration from end_time - start_time
-        UPDATE parties SET duration_hours = EXTRACT(EPOCH FROM (end_time - start_time))/3600 WHERE duration_hours IS NULL OR duration_hours = 0;
-    END IF;
-END $$
-
--- Drop old end_time column if it exists (after migration)
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parties' AND column_name = 'end_time') THEN
-        ALTER TABLE parties DROP COLUMN IF EXISTS end_time;
-    END IF;
-
-    -- Ensure thumbnail column exists for parties
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='parties' AND column_name='thumbnail') THEN
-        ALTER TABLE parties ADD COLUMN thumbnail TEXT;
-    END IF;
-END $$
-
--- Drop obsolete party columns
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='parties' AND column_name='slot_requirements') THEN
-        ALTER TABLE parties DROP COLUMN slot_requirements;
-    END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='parties' AND column_name='music_genres') THEN
-        ALTER TABLE parties DROP COLUMN music_genres;
-    END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='parties' AND column_name='mood') THEN
-        ALTER TABLE parties DROP COLUMN mood;
-    END IF;
-END $$;
-
 -- ==========================================
--- PARTY APPLICATIONS (The Swipe logic)
+-- PARTY APPLICATIONS
 -- ==========================================
 CREATE TABLE IF NOT EXISTS party_applications (
     party_id UUID NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, ACCEPTED, DECLINED, WAITLIST
+    status TEXT NOT NULL DEFAULT 'PENDING',
     applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     PRIMARY KEY (party_id, user_id)
 );
 
 -- ==========================================
--- CROWDFUNDING (Rotation Pools)
+-- CROWDFUNDING
 -- ==========================================
 CREATE TABLE IF NOT EXISTS crowdfunding (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -263,8 +145,7 @@ CREATE TABLE IF NOT EXISTS crowdfunding (
     target_amount DOUBLE PRECISION DEFAULT 0.0,
     current_amount DOUBLE PRECISION DEFAULT 0.0,
     currency TEXT DEFAULT 'USD',
-    -- JSONB for slice of Contribution structs
-    contributors JSONB DEFAULT '[]', 
+    contributors JSONB DEFAULT '[]',
     is_funded BOOLEAN DEFAULT FALSE
 );
 
@@ -285,24 +166,19 @@ CREATE TABLE IF NOT EXISTS chat_rooms (
 
 CREATE TABLE IF NOT EXISTS chat_messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    chat_id UUID NOT NULL, -- References chat_rooms(id)
+    chat_id UUID NOT NULL,
     sender_id UUID NOT NULL REFERENCES users(id),
-    type TEXT NOT NULL DEFAULT 'TEXT', -- TEXT, IMAGE, VIDEO, AUDIO, SYSTEM, AI, PAYMENT
+    type TEXT NOT NULL DEFAULT 'TEXT',
     content TEXT,
-    
-    -- Media (Stores hashes/urls)
     media_url TEXT,
     thumbnail_url TEXT,
-    
-    -- JSONB for map[string]interface{} (AI context or payment metadata)
     metadata JSONB DEFAULT '{}',
-    
-    reply_to_id UUID, -- References another message ID
+    reply_to_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- ==========================================
--- INDEXES FOR HIGH EFFICIENCY
+-- INDEXES
 -- ==========================================
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_parties_status ON parties(status);
@@ -313,18 +189,15 @@ CREATE INDEX IF NOT EXISTS idx_assets_hash ON assets(hash);
 -- ==========================================
 -- TRIGGERS & FUNCTIONS
 -- ==========================================
-
--- Create or Replace the function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER AS $func$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$func$ language 'plpgsql';
 
--- Trigger creation logic (Checks if trigger exists first)
-DO $$
+DO $trigger$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_party_modtime') THEN
         CREATE TRIGGER update_party_modtime
@@ -332,8 +205,8 @@ BEGIN
             FOR EACH ROW
             EXECUTE PROCEDURE update_updated_at_column();
     END IF;
-END $$;
-`
+END $trigger$;
+`;
 	_, err := db.Exec(context.Background(), script)
 	return err
 }
