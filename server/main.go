@@ -39,7 +39,7 @@ func main() {
 	http.HandleFunc("/register", corsMiddleware(handleRegister))
 	http.HandleFunc("/login", corsMiddleware(handleLogin))
 	http.HandleFunc("/upload", corsMiddleware(handleUpload))
-	http.HandleFunc("/profile", corsMiddleware(handleGetProfile))
+	http.HandleFunc("/profile", corsMiddleware(handleProfile))
 
 	// 5. Image/Asset Handler
 	http.HandleFunc("/assets/", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
@@ -217,26 +217,35 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
-func handleGetProfile(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func handleProfile(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
 		http.Error(w, "User ID required", http.StatusBadRequest)
 		return
 	}
 
-	user, err := GetUser(id)
-	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)
-		return
-	}
+	switch r.Method {
+	case http.MethodGet:
+		user, err := GetUser(id)
+		if err != nil {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(user)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	case http.MethodDelete:
+		err := DeleteUser(id)
+		if err != nil {
+			http.Error(w, "Failed to delete user: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
