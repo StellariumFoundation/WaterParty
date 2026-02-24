@@ -55,7 +55,7 @@ jobs:
       
       - name: Build Android x86_64 APK
         run: |
-          flutter build apk --release --target-platform android-x86_64 --obfuscate --split-debug-info=./debug-info
+          flutter build apk --release --target-platform android-x64 --obfuscate --split-debug-info=./debug-info
       
       - name: Build Android App Bundle
         run: |

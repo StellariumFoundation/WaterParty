@@ -24,24 +24,6 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     final myParties = ref.watch(myPartiesProvider);
     final currentUser = ref.watch(authProvider).value;
 
-    print('[MatchesScreen] chatProvider state: ${allChatRooms.length} rooms');
-    print(
-      '[MatchesScreen] myPartiesProvider state: ${myParties.length} parties',
-    );
-
-    // Debug: print each party details
-    for (var party in myParties) {
-      print(
-        '[MatchesScreen] Party from myPartiesProvider: id=${party.id}, title=${party.title}, hostId=${party.hostId}, currentUserId=${currentUser?.id}',
-      );
-    }
-
-    for (var room in allChatRooms) {
-      print(
-        '[MatchesScreen] Room: ${room.id}, partyId: ${room.partyId}, title: ${room.title}',
-      );
-    }
-
     // Get parties where user is admin (host) or matched (guest)
     final userParties = myParties.where((party) {
       if (currentUser == null) return false;
@@ -204,6 +186,45 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
 
   Widget _buildPartyTile(Party party) {
     final allChatRooms = ref.watch(chatProvider);
+    final currentUser = ref.watch(authProvider).value;
+
+    // Determine if user is the host/admin
+    final isHost = currentUser != null && party.hostId == currentUser.id;
+
+    // Get thumbnail
+    String? thumbnailUrl;
+    if (party.thumbnail.isNotEmpty) {
+      thumbnailUrl = party.thumbnail.startsWith("http")
+          ? party.thumbnail
+          : AppConstants.assetUrl(party.thumbnail);
+    } else if (party.partyPhotos.isNotEmpty) {
+      thumbnailUrl = party.partyPhotos.first.startsWith("http")
+          ? party.partyPhotos.first
+          : AppConstants.assetUrl(party.partyPhotos.first);
+    }
+
+    // Calculate ETA
+    String etaLabel = _formatETA(party.startTime);
+
+    // Status color
+    Color statusColor;
+    switch (party.status) {
+      case PartyStatus.OPEN:
+        statusColor = AppColors.textCyan;
+        break;
+      case PartyStatus.LOCKED:
+        statusColor = Colors.orange;
+        break;
+      case PartyStatus.LIVE:
+        statusColor = Colors.green;
+        break;
+      case PartyStatus.COMPLETED:
+        statusColor = Colors.grey;
+        break;
+      case PartyStatus.CANCELLED:
+        statusColor = Colors.red;
+        break;
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
@@ -238,22 +259,62 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: CachedNetworkImage(
-                  imageUrl: party.partyPhotos.isNotEmpty
-                      ? AppConstants.assetUrl(party.partyPhotos.first)
-                      : "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000",
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) =>
-                      Container(color: Colors.black12),
-                  errorWidget: (context, url, error) => const Icon(Icons.error),
-                ),
+                child: thumbnailUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: thumbnailUrl,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: Colors.black12,
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.textCyan,
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) =>
+                            _buildDefaultAvatar(true),
+                      )
+                    : _buildDefaultAvatar(true),
               ),
-              const Positioned(
+              // Host badge
+              if (isHost)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: AppColors.gold,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.star,
+                      color: Colors.white,
+                      size: 10,
+                    ),
+                  ),
+                ),
+              // Party status indicator
+              Positioned(
                 bottom: 0,
                 right: 0,
-                child: Icon(Icons.celebration, color: AppColors.gold, size: 18),
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.celebration, color: statusColor, size: 14),
+                ),
               ),
             ],
           ),
@@ -261,29 +322,72 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  party.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontSize: AppFontSizes.md,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        party.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: AppFontSizes.md,
+                        ),
+                      ),
+                    ),
+                    if (isHost) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.gold.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          "HOST",
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: AppColors.gold,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // ETA badge
+              if (etaLabel.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    etaLabel,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: statusColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
-              Text(
-                party.status.name,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textCyan,
-                  fontSize: AppFontSizes.xs + 1,
-                ),
-              ),
             ],
           ),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const SizedBox(height: 4),
               Text(
                 party.description,
                 maxLines: 1,
@@ -293,12 +397,36 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                 ).textTheme.bodyMedium?.copyWith(color: Colors.white54),
               ),
               const SizedBox(height: 4),
-              Text(
-                "${party.currentGuestCount}/${party.maxCapacity} guests • ${party.city}",
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white38,
-                  fontSize: AppFontSizes.xs,
-                ),
+              Row(
+                children: [
+                  Icon(Icons.people_outline, color: Colors.white38, size: 12),
+                  const SizedBox(width: 4),
+                  Text(
+                    "${party.currentGuestCount}/${party.maxCapacity}",
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white38,
+                      fontSize: AppFontSizes.xs,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(
+                    Icons.location_on_outlined,
+                    color: Colors.white38,
+                    size: 12,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      party.city,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white38,
+                        fontSize: AppFontSizes.xs,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -311,33 +439,68 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     String timeLabel = _formatDateTime(room.lastMessageAt);
     final partyCache = ref.watch(partyCacheProvider);
     final myParties = ref.watch(myPartiesProvider);
+    final currentUser = ref.watch(authProvider).value;
 
-    // Resolve dynamic title if it's a party
+    // Resolve dynamic title and party details if it's a party
     String displayTitle = room.title;
+    String? partyThumbnail;
+    DateTime? partyStartTime;
     if (room.isGroup && room.partyId.isNotEmpty) {
       // First check party cache
       final party = partyCache[room.partyId];
-      print(
-        '[MatchesScreen] Looking up party ${room.partyId} in cache: ${party?.title ?? "NOT FOUND"}',
-      );
       if (party != null) {
         displayTitle = party.title;
+        partyThumbnail = party.thumbnail.isNotEmpty
+            ? party.thumbnail
+            : (party.partyPhotos.isNotEmpty ? party.partyPhotos.first : null);
+        partyStartTime = party.startTime;
       } else {
-        // Fallback: check myPartiesProvider (parties user is registered with as admin or matched)
+        // Fallback: check myPartiesProvider
         final myParty = myParties
             .where((p) => p.id == room.partyId)
             .firstOrNull;
         if (myParty != null) {
           displayTitle = myParty.title;
-          print(
-            '[MatchesScreen] Found party in myPartiesProvider: ${displayTitle}',
-          );
+          partyThumbnail = myParty.thumbnail.isNotEmpty
+              ? myParty.thumbnail
+              : (myParty.partyPhotos.isNotEmpty
+                    ? myParty.partyPhotos.first
+                    : null);
+          partyStartTime = myParty.startTime;
         }
       }
     }
 
     if (displayTitle.isEmpty || displayTitle == "PARTY CHAT") {
       displayTitle = room.isGroup ? "PARTY CHAT" : "DIRECT MESSAGE";
+    }
+
+    // Calculate ETA for party chats
+    String? etaLabel;
+    if (room.isGroup && partyStartTime != null) {
+      etaLabel = _formatETA(partyStartTime);
+    }
+
+    // Check if last message is from current user
+    String lastMessageText = room.lastMessageContent;
+    bool isLastMessageFromMe =
+        currentUser != null &&
+        room.recentMessages.isNotEmpty &&
+        room.recentMessages.last.senderId == currentUser.id;
+    if (isLastMessageFromMe) {
+      lastMessageText = "You: ${room.lastMessageContent}";
+    }
+
+    // Determine thumbnail URL
+    String? thumbnailUrl;
+    if (partyThumbnail != null) {
+      thumbnailUrl = partyThumbnail.startsWith("http")
+          ? partyThumbnail
+          : AppConstants.assetUrl(partyThumbnail);
+    } else if (room.imageUrl.isNotEmpty) {
+      thumbnailUrl = room.imageUrl.startsWith("http")
+          ? room.imageUrl
+          : AppConstants.assetUrl(room.imageUrl);
     }
 
     return Padding(
@@ -359,28 +522,41 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(room.isGroup ? 12 : 30),
-                child: CachedNetworkImage(
-                  imageUrl: room.imageUrl.isEmpty
-                      ? "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000"
-                      : (room.imageUrl.startsWith("http")
-                            ? room.imageUrl
-                            : AppConstants.assetUrl(room.imageUrl)),
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) =>
-                      Container(color: Colors.black12),
-                  errorWidget: (context, url, error) => const Icon(Icons.error),
-                ),
+                child: thumbnailUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: thumbnailUrl,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: Colors.black12,
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.textCyan,
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) =>
+                            _buildDefaultAvatar(room.isGroup),
+                      )
+                    : _buildDefaultAvatar(room.isGroup),
               ),
               if (room.isGroup && room.partyId.isNotEmpty)
-                const Positioned(
+                Positioned(
                   bottom: 0,
                   right: 0,
-                  child: Icon(
-                    Icons.celebration,
-                    color: AppColors.gold,
-                    size: 18,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.celebration,
+                      color: AppColors.gold,
+                      size: 14,
+                    ),
                   ),
                 ),
             ],
@@ -389,22 +565,51 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  displayTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontSize: AppFontSizes.md,
-                  ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        displayTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: AppFontSizes.md,
+                        ),
+                      ),
+                    ),
+                    if (etaLabel != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.textCyan.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          etaLabel,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: AppColors.textCyan,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 timeLabel,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.white30,
-                  fontSize: AppFontSizes.xs + 1, // 11
+                  fontSize: AppFontSizes.xs + 1,
                 ),
               ),
             ],
@@ -412,13 +617,36 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                room.lastMessageContent,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: room.unreadCount > 0 ? Colors.white : Colors.white54,
-                ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  if (isLastMessageFromMe)
+                    const Icon(
+                      Icons.check_circle_outline,
+                      color: AppColors.textCyan,
+                      size: 14,
+                    ),
+                  if (isLastMessageFromMe) const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      lastMessageText.isEmpty
+                          ? "No messages yet"
+                          : lastMessageText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: isLastMessageFromMe
+                            ? AppColors.textCyan
+                            : (room.unreadCount > 0
+                                  ? Colors.white
+                                  : Colors.white54),
+                        fontStyle: lastMessageText.isEmpty
+                            ? FontStyle.italic
+                            : FontStyle.normal,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -441,6 +669,53 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildDefaultAvatar(bool isGroup) {
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isGroup
+              ? [
+                  AppColors.gold.withValues(alpha: 0.3),
+                  AppColors.textCyan.withValues(alpha: 0.3),
+                ]
+              : [
+                  AppColors.textCyan.withValues(alpha: 0.3),
+                  Colors.purple.withValues(alpha: 0.3),
+                ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(isGroup ? 12 : 30),
+      ),
+      child: Icon(
+        isGroup ? Icons.celebration : Icons.person,
+        color: Colors.white54,
+        size: 28,
+      ),
+    );
+  }
+
+  String _formatETA(DateTime? startTime) {
+    if (startTime == null) return "";
+    final now = DateTime.now();
+    final diff = startTime.difference(now);
+
+    if (diff.isNegative) {
+      // Party has started
+      if (diff.inMinutes.abs() < 60) return "NOW";
+      if (diff.inHours.abs() < 24) return "${diff.inHours.abs()}h";
+      return "${diff.inDays.abs()}d";
+    }
+
+    // Party hasn't started yet
+    if (diff.inMinutes < 60) return "${diff.inMinutes}m";
+    if (diff.inHours < 24) return "${diff.inHours}h";
+    if (diff.inDays < 7) return "${diff.inDays}d";
+    return "${(diff.inDays / 7).floor()}w";
   }
 
   String _formatDateTime(DateTime? dt) {

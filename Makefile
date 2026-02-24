@@ -68,7 +68,7 @@ build-android-x86:
 
 build-android-x86_64:
 	@echo "--- Building Android x86_64 APK ---"
-	flutter build apk --release --target-platform android-x86_64 --obfuscate --split-debug-info=./debug-info
+	flutter build apk --release --target-platform android-x64 --obfuscate --split-debug-info=./debug-info
 
 # Build all Android architectures
 build-android-all: build-android-arm64 build-android-armv build-android-x86 build-android-x86_64
