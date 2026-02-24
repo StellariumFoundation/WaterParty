@@ -16,6 +16,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
+          cache-dependency-path: server/go.sum
       - name: Run Go Server Tests
         run: |
           cd server && go test -v -cover ./...
@@ -50,7 +51,7 @@ jobs:
       
       - name: Build Android ARMv7 APK
         run: |
-          flutter build apk --release --target-platform android-armv7 --obfuscate --split-debug-info=./debug-info
+          flutter build apk --release --target-platform android-arm --obfuscate --split-debug-info=./debug-info
       
       - name: Build Android x86_64 APK
         run: |
