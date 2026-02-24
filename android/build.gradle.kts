@@ -22,7 +22,3 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
-
-base {
-    archivesName.set("WaterParty")
-}

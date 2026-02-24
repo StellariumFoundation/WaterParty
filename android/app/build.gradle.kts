@@ -47,3 +47,8 @@ android {
 flutter {
     source = "../.."
 }
+
+
+base {
+    archivesName.set("WaterParty")
+}
