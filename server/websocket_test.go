@@ -1180,7 +1180,7 @@ func TestHandleLogin_InvalidJSON(t *testing.T) {
 
 func TestHandleGetProfile_MethodNotAllowed(t *testing.T) {
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", "/profile", nil)
+	req := httptest.NewRequest("PUT", "/profile?id=test123", nil)
 
 	handleProfile(rec, req)
 
