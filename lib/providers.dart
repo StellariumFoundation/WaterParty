@@ -484,7 +484,16 @@ class MyPartiesNotifier extends Notifier<List<Party>> {
   }
 
   void addParty(Party party) {
-    state = [...state, party];
+    // Check if party already exists, if so update it
+    final existingIndex = state.indexWhere((p) => p.id == party.id);
+    if (existingIndex >= 0) {
+      state = [
+        for (int i = 0; i < state.length; i++)
+          if (i == existingIndex) party else state[i],
+      ];
+    } else {
+      state = [...state, party];
+    }
   }
 
   void removeParty(String partyId) {
@@ -598,4 +607,253 @@ class GeocodeResultNotifier extends Notifier<GeocodeResult> {
 final geocodeResultProvider =
     NotifierProvider<GeocodeResultNotifier, GeocodeResult>(
       GeocodeResultNotifier.new,
+    );
+
+// ============================================
+// Notification System
+// ============================================
+
+class NotificationsNotifier extends Notifier<List<Notification>> {
+  @override
+  List<Notification> build() => [];
+
+  void setNotifications(List<Notification> notifications) {
+    state = notifications;
+  }
+
+  void addNotification(Notification notification) {
+    state = [notification, ...state];
+  }
+
+  void markAsRead(String notificationId) {
+    state = [
+      for (final n in state)
+        if (n.id == notificationId) n.copyWith(isRead: true) else n,
+    ];
+  }
+
+  void markAllAsRead() {
+    state = [for (final n in state) n.copyWith(isRead: true)];
+  }
+
+  void clear() {
+    state = [];
+  }
+}
+
+final notificationsProvider =
+    NotifierProvider<NotificationsNotifier, List<Notification>>(
+      NotificationsNotifier.new,
+    );
+
+// ============================================
+// DM Conversations System
+// ============================================
+
+class DMConversationsNotifier extends Notifier<List<DMConversation>> {
+  @override
+  List<DMConversation> build() => [];
+
+  void setConversations(List<DMConversation> conversations) {
+    state = conversations;
+  }
+
+  void addConversation(DMConversation conversation) {
+    if (!state.any((c) => c.chatId == conversation.chatId)) {
+      state = [conversation, ...state];
+    }
+  }
+
+  void updateConversation(DMConversation conversation) {
+    state = [
+      for (final c in state)
+        if (c.chatId == conversation.chatId) conversation else c,
+    ];
+  }
+
+  void removeConversation(String chatId) {
+    state = state.where((c) => c.chatId != chatId).toList();
+  }
+
+  void clear() {
+    state = [];
+  }
+}
+
+final dmConversationsProvider =
+    NotifierProvider<DMConversationsNotifier, List<DMConversation>>(
+      DMConversationsNotifier.new,
+    );
+
+// ============================================
+// Party Analytics System
+// ============================================
+
+class PartyAnalyticsNotifier extends Notifier<Map<String, PartyAnalytics>> {
+  @override
+  Map<String, PartyAnalytics> build() => {};
+
+  void setAnalytics(String partyId, PartyAnalytics analytics) {
+    state = {...state, partyId: analytics};
+  }
+
+  void clear() {
+    state = {};
+  }
+}
+
+final partyAnalyticsProvider =
+    NotifierProvider<PartyAnalyticsNotifier, Map<String, PartyAnalytics>>(
+      PartyAnalyticsNotifier.new,
+    );
+
+// ============================================
+// Matched Users System
+// ============================================
+
+class MatchedUsersNotifier extends Notifier<List<MatchedUser>> {
+  @override
+  List<MatchedUser> build() => [];
+
+  void setMatchedUsers(List<MatchedUser> users) {
+    state = users;
+  }
+
+  void removeUser(String userId) {
+    state = state.where((u) => u.userId != userId).toList();
+  }
+
+  void clear() {
+    state = [];
+  }
+}
+
+final matchedUsersProvider =
+    NotifierProvider<MatchedUsersNotifier, List<MatchedUser>>(
+      MatchedUsersNotifier.new,
+    );
+
+// ============================================
+// Blocked Users System
+// ============================================
+
+class BlockedUsersNotifier extends Notifier<List<String>> {
+  @override
+  List<String> build() => [];
+
+  void setBlockedUsers(List<String> userIds) {
+    state = userIds;
+  }
+
+  void addBlockedUser(String userId) {
+    if (!state.contains(userId)) {
+      state = [...state, userId];
+    }
+  }
+
+  void removeBlockedUser(String userId) {
+    state = state.where((id) => id != userId).toList();
+  }
+
+  bool isBlocked(String userId) {
+    return state.contains(userId);
+  }
+
+  void clear() {
+    state = [];
+  }
+}
+
+final blockedUsersProvider =
+    NotifierProvider<BlockedUsersNotifier, List<String>>(
+      BlockedUsersNotifier.new,
+    );
+
+// ============================================
+// Search Results System
+// ============================================
+
+class UserSearchNotifier extends Notifier<List<User>> {
+  @override
+  List<User> build() => [];
+
+  void setResults(List<User> users) {
+    state = users;
+  }
+
+  void clear() {
+    state = [];
+  }
+}
+
+final userSearchProvider = NotifierProvider<UserSearchNotifier, List<User>>(
+  UserSearchNotifier.new,
+);
+
+// ============================================
+// Chat History System
+// ============================================
+
+class ChatHistoryNotifier extends Notifier<Map<String, List<ChatMessage>>> {
+  @override
+  Map<String, List<ChatMessage>> build() => {};
+
+  void setMessages(String chatId, List<ChatMessage> messages) {
+    state = {...state, chatId: messages};
+  }
+
+  void addMessage(String chatId, ChatMessage message) {
+    final currentMessages = state[chatId] ?? [];
+    state = {
+      ...state,
+      chatId: [...currentMessages, message],
+    };
+  }
+
+  void removeMessage(String chatId, String messageId) {
+    final currentMessages = state[chatId] ?? [];
+    state = {
+      ...state,
+      chatId: currentMessages.where((m) => m.id != messageId).toList(),
+    };
+  }
+
+  void clear() {
+    state = {};
+  }
+}
+
+final chatHistoryProvider =
+    NotifierProvider<ChatHistoryNotifier, Map<String, List<ChatMessage>>>(
+      ChatHistoryNotifier.new,
+    );
+
+// ============================================
+// DM History System
+// ============================================
+
+class DMHistoryNotifier extends Notifier<Map<String, List<ChatMessage>>> {
+  @override
+  Map<String, List<ChatMessage>> build() => {};
+
+  void setMessages(String otherUserId, List<ChatMessage> messages) {
+    state = {...state, otherUserId: messages};
+  }
+
+  void addMessage(String otherUserId, ChatMessage message) {
+    final currentMessages = state[otherUserId] ?? [];
+    state = {
+      ...state,
+      otherUserId: [...currentMessages, message],
+    };
+  }
+
+  void clear() {
+    state = {};
+  }
+}
+
+final dmHistoryProvider =
+    NotifierProvider<DMHistoryNotifier, Map<String, List<ChatMessage>>>(
+      DMHistoryNotifier.new,
     );

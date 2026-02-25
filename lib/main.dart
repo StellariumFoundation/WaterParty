@@ -8,7 +8,7 @@ import 'matches.dart'; // Chat
 import 'party.dart'; // Create
 import 'profile.dart'; // Profile
 import 'auth.dart'; // Auth Screen
-import 'websocket.dart';
+import 'api.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

@@ -8,7 +8,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
-import 'websocket.dart';
+import 'api.dart';
 import 'constants.dart';
 
 import 'package:flutter_map/flutter_map.dart';

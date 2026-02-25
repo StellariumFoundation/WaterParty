@@ -765,3 +765,243 @@ class DraftParty {
     );
   }
 }
+
+// ============================================
+// Notification Model
+// ============================================
+
+enum NotificationType {
+  applicationAccepted,
+  applicationRejected,
+  newApplication,
+  newMessage,
+  partyDeleted,
+  partyUpdated,
+  partyStarting,
+  reminder,
+  system,
+}
+
+extension NotificationTypeExt on NotificationType {
+  String get value => toString().split('.').last;
+
+  static NotificationType fromString(String value) {
+    return NotificationType.values.firstWhere(
+      (e) => e.toString().split('.').last == value,
+      orElse: () => NotificationType.system,
+    );
+  }
+}
+
+class Notification {
+  final String id;
+  final String userId;
+  final NotificationType type;
+  final String title;
+  final String message;
+  final String? partyId;
+  final String? senderId;
+  final bool isRead;
+  final DateTime createdAt;
+
+  const Notification({
+    required this.id,
+    required this.userId,
+    required this.type,
+    required this.title,
+    required this.message,
+    this.partyId,
+    this.senderId,
+    this.isRead = false,
+    required this.createdAt,
+  });
+
+  factory Notification.fromMap(Map<String, dynamic> map) {
+    return Notification(
+      id: map['ID'] ?? map['id'] ?? '',
+      userId: map['UserID'] ?? map['user_id'] ?? '',
+      type: NotificationTypeExt.fromString(
+        map['Type'] ?? map['type'] ?? 'system',
+      ),
+      title: map['Title'] ?? map['title'] ?? '',
+      message: map['Message'] ?? map['message'] ?? '',
+      partyId: map['PartyID'] ?? map['party_id'],
+      senderId: map['SenderID'] ?? map['sender_id'],
+      isRead: map['IsRead'] ?? map['is_read'] ?? false,
+      createdAt: map['CreatedAt'] != null
+          ? DateTime.parse(map['CreatedAt'])
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'ID': id,
+      'UserID': userId,
+      'Type': type.value,
+      'Title': title,
+      'Message': message,
+      'PartyID': partyId,
+      'SenderID': senderId,
+      'IsRead': isRead,
+      'CreatedAt': createdAt.toUtc().toIso8601String(),
+    };
+  }
+
+  Notification copyWith({bool? isRead}) {
+    return Notification(
+      id: id,
+      userId: userId,
+      type: type,
+      title: title,
+      message: message,
+      partyId: partyId,
+      senderId: senderId,
+      isRead: isRead ?? this.isRead,
+      createdAt: createdAt,
+    );
+  }
+}
+
+// ============================================
+// DM Conversation Model
+// ============================================
+
+class DMConversation {
+  final String chatId;
+  final String otherUserId;
+  final String otherUserName;
+  final String otherUserThumbnail;
+  final String lastMessage;
+  final DateTime? lastMessageAt;
+  final int unreadCount;
+
+  const DMConversation({
+    required this.chatId,
+    required this.otherUserId,
+    this.otherUserName = '',
+    this.otherUserThumbnail = '',
+    this.lastMessage = '',
+    this.lastMessageAt,
+    this.unreadCount = 0,
+  });
+
+  factory DMConversation.fromMap(Map<String, dynamic> map) {
+    return DMConversation(
+      chatId: map['ChatID'] ?? map['chat_id'] ?? '',
+      otherUserId: map['OtherUserID'] ?? map['other_user_id'] ?? '',
+      otherUserName: map['OtherUserName'] ?? map['other_user_name'] ?? '',
+      otherUserThumbnail:
+          map['OtherUserThumbnail'] ?? map['other_user_thumbnail'] ?? '',
+      lastMessage: map['LastMessage'] ?? map['last_message'] ?? '',
+      lastMessageAt: map['LastMessageAt'] != null
+          ? DateTime.parse(map['LastMessageAt'])
+          : null,
+      unreadCount: map['UnreadCount'] ?? map['unread_count'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'ChatID': chatId,
+      'OtherUserID': otherUserId,
+      'OtherUserName': otherUserName,
+      'OtherUserThumbnail': otherUserThumbnail,
+      'LastMessage': lastMessage,
+      'LastMessageAt': lastMessageAt?.toUtc().toIso8601String(),
+      'UnreadCount': unreadCount,
+    };
+  }
+}
+
+// ============================================
+// Party Analytics Model
+// ============================================
+
+class PartyAnalytics {
+  final String partyId;
+  final int totalViews;
+  final int totalApplications;
+  final int acceptedCount;
+  final int rejectedCount;
+  final int pendingCount;
+  final int messagesCount;
+  final int uniqueChatters;
+
+  const PartyAnalytics({
+    required this.partyId,
+    this.totalViews = 0,
+    this.totalApplications = 0,
+    this.acceptedCount = 0,
+    this.rejectedCount = 0,
+    this.pendingCount = 0,
+    this.messagesCount = 0,
+    this.uniqueChatters = 0,
+  });
+
+  factory PartyAnalytics.fromMap(Map<String, dynamic> map) {
+    return PartyAnalytics(
+      partyId: map['PartyID'] ?? map['party_id'] ?? '',
+      totalViews: map['TotalViews'] ?? map['total_views'] ?? 0,
+      totalApplications:
+          map['TotalApplications'] ?? map['total_applications'] ?? 0,
+      acceptedCount: map['AcceptedCount'] ?? map['accepted_count'] ?? 0,
+      rejectedCount: map['RejectedCount'] ?? map['rejected_count'] ?? 0,
+      pendingCount: map['PendingCount'] ?? map['pending_count'] ?? 0,
+      messagesCount: map['MessagesCount'] ?? map['messages_count'] ?? 0,
+      uniqueChatters: map['UniqueChatters'] ?? map['unique_chatters'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'PartyID': partyId,
+      'TotalViews': totalViews,
+      'TotalApplications': totalApplications,
+      'AcceptedCount': acceptedCount,
+      'RejectedCount': rejectedCount,
+      'PendingCount': pendingCount,
+      'MessagesCount': messagesCount,
+      'UniqueChatters': uniqueChatters,
+    };
+  }
+}
+
+// ============================================
+// Matched User Model
+// ============================================
+
+class MatchedUser {
+  final String userId;
+  final String userName;
+  final String userThumbnail;
+  final ApplicantStatus status;
+
+  const MatchedUser({
+    required this.userId,
+    this.userName = '',
+    this.userThumbnail = '',
+    this.status = ApplicantStatus.ACCEPTED,
+  });
+
+  factory MatchedUser.fromMap(Map<String, dynamic> map) {
+    return MatchedUser(
+      userId: map['UserID'] ?? map['user_id'] ?? '',
+      userName: map['UserName'] ?? map['user_name'] ?? '',
+      userThumbnail: map['UserThumbnail'] ?? map['user_thumbnail'] ?? '',
+      status: ApplicantStatus.values.firstWhere(
+        (e) => e.toString().split('.').last == (map['Status'] ?? map['status']),
+        orElse: () => ApplicantStatus.ACCEPTED,
+      ),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'UserID': userId,
+      'UserName': userName,
+      'UserThumbnail': userThumbnail,
+      'Status': status.toString().split('.').last,
+    };
+  }
+}

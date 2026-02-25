@@ -5,7 +5,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
-import 'websocket.dart';
+import 'api.dart';
 import 'matches.dart'; // To access ExternalProfileScreen
 import 'constants.dart';
 
