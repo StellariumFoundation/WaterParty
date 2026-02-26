@@ -82,7 +82,7 @@ type User struct {
 	WalletData      WalletInfo `json:"WalletData" db:"wallet_data"`
 	LocationLat     float64    `json:"LocationLat" db:"location_lat"`
 	LocationLon     float64    `json:"LocationLon" db:"location_lon"`
-	LastActiveAt    *time.Time `json:"LastActiveAt,omitempty" db:"last_active_at"`
+	UpdatedAt       *time.Time `json:"UpdatedAt,omitempty" db:"updated_at"`
 	CreatedAt       *time.Time `json:"CreatedAt,omitempty" db:"created_at"`
 	Bio             string     `json:"Bio" db:"bio"`
 	Thumbnail       string     `json:"Thumbnail" db:"thumbnail"`

@@ -309,12 +309,12 @@ func CreateThumbnail(data []byte) ([]byte, error) {
 func CreateUser(u User) (string, error) {
 	walletJSON, _ := json.Marshal(u.WalletData)
 	query := `INSERT INTO users (
-		real_name, phone_number, email, profile_photos, age, date_of_birth,
-		height_cm, gender, drinking_pref, smoking_pref,
+		real_name, phone_number, email, profile_photos, age, 
+		date_of_birth,height_cm, gender, drinking_pref, smoking_pref,
 		top_artists, job_title, company, school, degree,
-		instagram_handle, linkedin_handle, x_handle, tiktok_handle,
-		is_verified, trust_score, elo_score, parties_hosted, flake_count,
-		wallet_data, location_lat, location_lon, bio, last_active_at, thumbnail
+		instagram_handle, linkedin_handle, x_handle, tiktok_handle,is_verified, 
+		trust_score, elo_score, parties_hosted, flake_count,wallet_data, 
+		location_lat, location_lon, bio, updated_at, thumbnail
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 
 		$13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32) 
 	RETURNING id`
@@ -322,12 +322,12 @@ func CreateUser(u User) (string, error) {
 	var id string
 	now := time.Now()
 	err := db.QueryRow(context.Background(), query,
-		u.RealName, u.PhoneNumber, u.Email, u.ProfilePhotos, u.Age, u.DateOfBirth,
-		u.HeightCm, u.Gender, u.DrinkingPref, u.SmokingPref,
+		u.RealName, u.PhoneNumber, u.Email, u.ProfilePhotos, u.Age,
+		u.DateOfBirth, u.HeightCm, u.Gender, u.DrinkingPref, u.SmokingPref,
 		u.TopArtists, u.JobTitle, u.Company, u.School, u.Degree,
-		u.InstagramHandle, u.LinkedinHandle, u.XHandle, u.TikTokHandle,
-		u.IsVerified, u.TrustScore, u.EloScore, u.PartiesHosted, u.FlakeCount,
-		walletJSON, u.LocationLat, u.LocationLon, u.Bio, &now, u.Thumbnail,
+		u.InstagramHandle, u.LinkedinHandle, u.XHandle, u.TikTokHandle, u.IsVerified,
+		u.TrustScore, u.EloScore, u.PartiesHosted, u.FlakeCount, walletJSON,
+		u.LocationLat, u.LocationLon, u.Bio, &now, u.Thumbnail,
 	).Scan(&id)
 	return id, err
 }
@@ -340,7 +340,7 @@ func GetUser(id string) (User, error) {
 		top_artists, job_title, company, school, degree, instagram_handle, 
 		linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, elo_score,
 		parties_hosted, flake_count, wallet_data, location_lat, location_lon, COALESCE(bio, ''),
-		last_active_at, created_at, COALESCE(thumbnail, '') FROM users WHERE id = $1`
+		updated_at, created_at, COALESCE(thumbnail, '') FROM users WHERE id = $1`
 
 	err := db.QueryRow(context.Background(), query, id).Scan(
 		&u.ID, &u.RealName, &u.PhoneNumber, &u.Email, &u.ProfilePhotos, &u.Age, &u.DateOfBirth,
@@ -348,7 +348,7 @@ func GetUser(id string) (User, error) {
 		&u.TopArtists, &u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle,
 		&u.LinkedinHandle, &u.XHandle, &u.TikTokHandle, &u.IsVerified, &u.TrustScore, &u.EloScore,
 		&u.PartiesHosted, &u.FlakeCount, &walletJSON, &u.LocationLat, &u.LocationLon, &u.Bio,
-		&u.LastActiveAt, &u.CreatedAt, &u.Thumbnail,
+		&u.UpdatedAt, &u.CreatedAt, &u.Thumbnail,
 	)
 	if err == nil {
 		json.Unmarshal(walletJSON, &u.WalletData)
@@ -365,7 +365,7 @@ func GetUserByEmail(email string) (User, string, error) {
 		top_artists, job_title, company, school, degree, instagram_handle, 
 		linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, 
 		elo_score, parties_hosted, flake_count, wallet_data, location_lat, location_lon, 
-		last_active_at, created_at, COALESCE(bio, ''), COALESCE(thumbnail, '') 
+		updated_at, created_at, COALESCE(bio, ''), COALESCE(thumbnail, '') 
 		FROM users WHERE email = $1`
 
 	err := db.QueryRow(context.Background(), query, email).Scan(
@@ -374,7 +374,7 @@ func GetUserByEmail(email string) (User, string, error) {
 		&u.TopArtists, &u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle,
 		&u.LinkedinHandle, &u.XHandle, &u.TikTokHandle, &u.IsVerified, &u.TrustScore,
 		&u.EloScore, &u.PartiesHosted, &u.FlakeCount, &walletJSON, &u.LocationLat, &u.LocationLon,
-		&u.LastActiveAt, &u.CreatedAt, &u.Bio, &u.Thumbnail,
+		&u.UpdatedAt, &u.CreatedAt, &u.Bio, &u.Thumbnail,
 	)
 	if err == nil {
 		json.Unmarshal(walletJSON, &u.WalletData)
@@ -414,7 +414,7 @@ func UpdateUser(u User) error {
 		bio=CAST($4 AS TEXT),
 		location_lat=$5, 
 		location_lon=$6, 
-		last_active_at=$7,
+		updated_at=$7,
 		instagram_handle=CAST($8 AS TEXT), 
 		linkedin_handle=CAST($9 AS TEXT), 
 		x_handle=CAST($10 AS TEXT), 
