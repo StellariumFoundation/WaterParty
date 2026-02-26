@@ -13,7 +13,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func migrate() {
+func main() {
 	// 1. Configuration (Use environment variables for production)
 	connStr := strings.TrimSpace(getEnv("DATABASE_URL", ""))
 	if connStr == "" {

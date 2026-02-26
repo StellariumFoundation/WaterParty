@@ -47,6 +47,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // DEBUG
+    print('AUTH: initState');
 
     // Add listeners for real-time draft saving
     final ctrls = [
@@ -76,6 +78,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   }
 
   Future<void> _loadDraft() async {
+    // DEBUG
+    print('AUTH: _loadDraft start');
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       currentStep = prefs.getInt('reg_step') ?? 0;
@@ -98,9 +102,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
       final bday = prefs.getString('reg_bday');
       if (bday != null) _selectedBirthDate = DateTime.parse(bday);
     });
+    // DEBUG
+    print('AUTH: _loadDraft done');
   }
 
   Future<void> _saveDraft() async {
+    // DEBUG
+    print('AUTH: _saveDraft start');
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('reg_step', currentStep);
     await prefs.setString('reg_name', _realNameCtrl.text);
@@ -122,6 +130,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     if (_selectedBirthDate != null) {
       await prefs.setString('reg_bday', _selectedBirthDate!.toIso8601String());
     }
+    // DEBUG
+    print('AUTH: _saveDraft done');
   }
 
   @override
@@ -149,6 +159,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // DEBUG
+    print('AUTH: lifecycle state=' + state.toString());
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
       _saveDraft();
@@ -177,62 +189,103 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   }
 
   Future<void> _handleAuth() async {
+    // DEBUG
+    print('AUTH: _handleAuth start isLogin=' + isLogin.toString());
     setState(() => errorMessage = null);
     if (isLogin) {
+      // DEBUG
+      print('AUTH: login flow');
       if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
+        // DEBUG
+        print('AUTH: login empty creds');
         _showError("Credentials required");
         return;
       }
       if (!_isValidEmail(_emailCtrl.text)) {
+        // DEBUG
+        print('AUTH: login invalid email');
         _showError("Please enter a valid email address");
         return;
       }
+      // DEBUG
+      print('AUTH: calling login API');
       setState(() => isLoading = true);
       try {
         await ref
             .read(authProvider.notifier)
             .login(_emailCtrl.text, _passCtrl.text);
+        // DEBUG
+        print('AUTH: login success');
       } catch (e) {
+        // DEBUG
+        print('AUTH: login error ' + e.toString());
+        // DEBUG - show full error details
+        print('AUTH: login error type: ' + e.runtimeType.toString());
         if (mounted) _showError(e.toString().replaceAll("Exception: ", ""));
       } finally {
         if (mounted) setState(() => isLoading = false);
       }
     } else {
+      // DEBUG
+      print('AUTH: registration flow step=' + currentStep.toString());
       // Registration logic
       if (currentStep == 0) {
+        // DEBUG
+        print('AUTH: reg step0 validation');
         if (_realNameCtrl.text.isEmpty ||
             _emailCtrl.text.isEmpty ||
             _passCtrl.text.isEmpty) {
+          // DEBUG
+          print('AUTH: reg step0 empty required');
           _showError("Name, Email and Password are required");
           return;
         }
         if (!_isValidEmail(_emailCtrl.text)) {
+          // DEBUG
+          print('AUTH: reg step0 invalid email');
           _showError("Please enter a valid email address");
           return;
         }
         if (!_isPasswordStrong(_passCtrl.text)) {
+          // DEBUG
+          print('AUTH: reg step0 weak password');
           _showError("Password must be 8+ chars with letters & numbers");
           return;
         }
+        // DEBUG
+        print('AUTH: reg step0 passed');
       }
 
       if (currentStep == 1) {
+        // DEBUG
+        print('AUTH: reg step1 validation');
         if (_selectedBirthDate == null) {
+          // DEBUG
+          print('AUTH: reg step1 no birthday');
           _showError("Your birthday is required");
           return;
         }
+        // DEBUG
+        print('AUTH: reg step1 passed');
       }
 
       if (currentStep < 3) {
+        // DEBUG
+        print('AUTH: advancing to step ' + (currentStep + 1).toString());
         _saveDraft();
         setState(() => currentStep++);
         return;
       }
 
       if (_selectedBirthDate == null) {
+        // DEBUG
+        print('AUTH: final validation no birthday');
         _showError("Please select your birthday");
         return;
       }
+
+      // DEBUG
+      print('AUTH: all validation passed, calling register');
 
       setState(() => isLoading = true);
       try {
@@ -273,12 +326,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
         );
 
         await ref.read(authProvider.notifier).register(newUser, _passCtrl.text);
+        // DEBUG
+        print('AUTH: register success');
 
         if (!mounted) return;
 
         // Clear draft on success
         final prefs = await SharedPreferences.getInstance();
         final keys = prefs.getKeys().where((k) => k.startsWith('reg_'));
+        // DEBUG
+        print('AUTH: clearing ' + keys.length.toString() + ' draft keys');
         for (var k in keys) {
           await prefs.remove(k);
         }
@@ -295,6 +352,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
         // On success, switch to profile tab
         ref.read(navIndexProvider.notifier).setIndex(3);
       } catch (e) {
+        // DEBUG
+        print('AUTH: register error ' + e.toString());
+        // DEBUG - show full error details
+        print('AUTH: register error type: ' + e.runtimeType.toString());
         if (mounted) _showError(e.toString().replaceAll("Exception: ", ""));
       } finally {
         if (mounted) setState(() => isLoading = false);
@@ -303,6 +364,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   }
 
   void _showError(String m) {
+    // DEBUG
+    print('AUTH: _showError ' + m);
     setState(() => errorMessage = m);
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -325,6 +388,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
 
   @override
   Widget build(BuildContext context) {
+    // DEBUG
+    print(
+      'AUTH: build isLogin=' +
+          isLogin.toString() +
+          ' step=' +
+          currentStep.toString(),
+    );
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Container(

@@ -199,13 +199,13 @@ class AuthNotifier extends AsyncNotifier<User?> {
       final thumbnailHash = data['thumbnailHash'] as String?;
 
       // Construct full URLs from hash
-      final imageUrl = "$apiBase/uploads/$hash";
+      final imageUrl = "$apiBase/assets/$hash";
 
       final result = <String, String>{'hash': hash, 'url': imageUrl};
 
       if (thumbnailHash != null) {
         result['thumbnailHash'] = thumbnailHash;
-        result['thumbnailUrl'] = "$apiBase/uploads/$thumbnailHash";
+        result['thumbnailUrl'] = "$apiBase/assets/$thumbnailHash";
       }
 
       return result;
