@@ -13,7 +13,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func main() {
+func migrate() {
 	// 1. Configuration (Use environment variables for production)
 	connStr := strings.TrimSpace(getEnv("DATABASE_URL", ""))
 	if connStr == "" {
@@ -201,7 +201,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Login lookup error for %s: %v", req.Email, err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "User not found"})
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 
