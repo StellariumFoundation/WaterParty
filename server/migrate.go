@@ -30,7 +30,7 @@ func migrate() {
 	}
 	defer conn.Close(context.Background())
 
-	fmt.Println("✅ Connected successfully!\n")
+	fmt.Printf("✅ Connected successfully!\n\n")
 
 	// Define expected schema - tables and their columns
 	// Format: tableName -> columnName -> columnType
@@ -65,7 +65,7 @@ func migrate() {
 			"location_lat":     "DOUBLE PRECISION",
 			"location_lon":     "DOUBLE PRECISION",
 			"bio":              "TEXT",
-			"last_active_at":   "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+			"updated_at":       "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
 			"created_at":       "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
 			"thumbnail":        "TEXT",
 		},
