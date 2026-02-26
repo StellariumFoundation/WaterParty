@@ -23,11 +23,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   int _currentPhotoIndex = 0;
   final PageController _pageController = PageController();
 
-  Future<void> _pickAndUploadPhoto() async {
-    final user = ref.read(authProvider).value;
-    if (user == null) return;
+  // Global user variable - gets current user from Riverpod authProvider
+  // Use ref.watch for reactivity - UI will rebuild when user data changes
+  User? get user => ref.watch(authProvider).value;
 
-    int remaining = 12 - user.profilePhotos.length;
+  Future<void> _pickAndUploadPhoto() async {
+    final currentUser = user!;
+
+    int remaining = 12 - currentUser.profilePhotos.length;
     if (remaining <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Maximum 12 profile photos allowed")),
@@ -38,78 +41,105 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final picker = ImagePicker();
     final images = await picker.pickMultiImage(imageQuality: 70);
 
-    if (images.isNotEmpty) {
-      setState(() => _isUploading = true);
-      try {
-        // Limit to remaining capacity
-        final toUpload = images.length > remaining
-            ? images.sublist(0, remaining)
-            : images;
+    if (images.isEmpty) {
+      debugPrint('[DEBUG] No images selected or user cancelled');
+      return;
+    }
 
-        List<String> newHashes = [];
-        String? firstThumbHash;
-        for (int i = 0; i < toUpload.length; i++) {
-          final bytes = await toUpload[i].readAsBytes();
-          // Generate thumbnail only for the first photo if user doesn't have one yet
-          bool shouldGenThumb =
-              (user.thumbnail.isEmpty && i == 0 && user.profilePhotos.isEmpty);
-          final uploadResult = await ref
-              .read(authProvider.notifier)
-              .uploadImage(bytes, "image/jpeg", thumbnail: shouldGenThumb);
+    setState(() => _isUploading = true);
+    try {
+      // Limit to remaining capacity
+      final toUpload = images.length > remaining
+          ? images.sublist(0, remaining)
+          : images;
 
-          final hash = uploadResult['hash']!;
-          newHashes.add(hash);
-          if (shouldGenThumb) {
-            firstThumbHash = uploadResult['thumbnailHash'];
-          }
+      List<String> newUrls = [];
+      String? firstThumbUrl;
+      for (int i = 0; i < toUpload.length; i++) {
+        final bytes = await toUpload[i].readAsBytes();
+        // Generate thumbnail only for the first photo if user doesn't have one yet
+        bool shouldGenThumb = (i == 0 && currentUser.profilePhotos.isEmpty);
+        final uploadResult = await ref
+            .read(authProvider.notifier)
+            .uploadImage(bytes, "image/jpeg", thumbnail: true);
+
+        final url = uploadResult['url']!;
+        newUrls.add(url);
+        if (shouldGenThumb) {
+          firstThumbUrl = uploadResult['thumbnailUrl'];
+          debugPrint('[thumbnail] Uploaded image successfully');
         }
+        debugPrint('[Profile] Uploaded image successfully');
+      }
 
-        final updatedPhotos = [...user.profilePhotos, ...newHashes];
-        final updatedUser = user.copyWith(
-          profilePhotos: updatedPhotos,
-          thumbnail: firstThumbHash ?? user.thumbnail,
-        );
-        await ref.read(authProvider.notifier).updateUserProfile(updatedUser);
+      final updatedPhotos = [...currentUser.profilePhotos, ...newUrls];
+      final updatedUser = currentUser.copyWith(
+        profilePhotos: updatedPhotos,
+        thumbnail: firstThumbUrl ?? currentUser.thumbnail,
+      );
 
-        // Wire to backend
-        ref
-            .read(socketServiceProvider)
-            .sendMessage('UPDATE_PROFILE', updatedUser.toMap());
+      // Send to server and wait for PROFILE_UPDATED event
+      // Do NOT update local state here - let the server confirmation handle it
+      final socketService = ref.read(socketServiceProvider);
+      debugPrint('[Profile] Socket connected: ${socketService.isConnected}');
+      debugPrint('[Profile] Sending UPDATE_PROFILE with pictures to server');
+      socketService.sendMessage('UPDATE_PROFILE', updatedUser.toMap());
 
-        if (mounted && images.length > remaining) {
+      // Wait for the server to send back PROFILE_UPDATED before completing
+      // The api.dart handler will update local state upon receiving PROFILE_UPDATED
+      debugPrint('[Profile] Waiting for PROFILE_UPDATED event...');
+      await ref.read(socketServiceProvider).waitForEvent('PROFILE_UPDATED');
+      debugPrint('[Profile] Received PROFILE_UPDATED event');
+
+      // Check if there was a validation error
+      final validationError = ref
+          .read(socketServiceProvider)
+          .getLastProfileValidationError();
+      if (validationError != null) {
+        ref.read(socketServiceProvider).clearLastProfileValidationError();
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                "Only $remaining photos were added (max 12 reached)",
-              ),
-            ),
+            SnackBar(content: Text("Upload failed: $validationError")),
           );
         }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text("Upload failed: $e")));
-        }
-      } finally {
-        if (mounted) setState(() => _isUploading = false);
+        return; // Don't proceed with further processing
       }
+
+      if (mounted && images.length > remaining) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Only $remaining photos were added (max 12 reached)"),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('[DEBUG] Upload error: $e');
+      debugPrint('[DEBUG] Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Upload failed: $e")));
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
     }
   }
 
   void _deletePhoto(int index) async {
-    final user = ref.read(authProvider).value;
-    if (user == null) return;
+    final currentUser = user;
+    if (currentUser == null) return;
 
-    final updatedPhotos = List<String>.from(user.profilePhotos);
+    final updatedPhotos = List<String>.from(currentUser.profilePhotos);
     updatedPhotos.removeAt(index);
 
-    final updatedUser = user.copyWith(profilePhotos: updatedPhotos);
+    final updatedUser = currentUser.copyWith(profilePhotos: updatedPhotos);
     await ref.read(authProvider.notifier).updateUserProfile(updatedUser);
 
-    ref
-        .read(socketServiceProvider)
-        .sendMessage('UPDATE_PROFILE', updatedUser.toMap());
+    final socketService = ref.read(socketServiceProvider);
+    debugPrint(
+      '[Profile] _deletePhoto - Socket connected: ${socketService.isConnected}',
+    );
+    socketService.sendMessage('UPDATE_PROFILE', updatedUser.toMap());
     setState(() {});
   }
 
@@ -143,26 +173,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _initializeFields() {
-    final user = ref.read(authProvider).value;
-    if (user == null) return;
+    final currentUser = user;
+    if (currentUser == null) return;
 
-    _realNameCtrl = TextEditingController(text: user.realName);
-    _phoneCtrl = TextEditingController(text: user.phoneNumber);
-    _bioCtrl = TextEditingController(text: user.bio);
-    _jobCtrl = TextEditingController(text: user.jobTitle);
-    _companyCtrl = TextEditingController(text: user.company);
-    _schoolCtrl = TextEditingController(text: user.school);
-    _degreeCtrl = TextEditingController(text: user.degree);
-    _instaCtrl = TextEditingController(text: user.instagramHandle);
-    _linkedInCtrl = TextEditingController(text: user.linkedinHandle);
-    _xCtrl = TextEditingController(text: user.xHandle);
-    _tiktokCtrl = TextEditingController(text: user.tiktokHandle);
+    _realNameCtrl = TextEditingController(text: currentUser.realName);
+    _phoneCtrl = TextEditingController(text: currentUser.phoneNumber);
+    _bioCtrl = TextEditingController(text: currentUser.bio);
+    _jobCtrl = TextEditingController(text: currentUser.jobTitle);
+    _companyCtrl = TextEditingController(text: currentUser.company);
+    _schoolCtrl = TextEditingController(text: currentUser.school);
+    _degreeCtrl = TextEditingController(text: currentUser.degree);
+    _instaCtrl = TextEditingController(text: currentUser.instagramHandle);
+    _linkedInCtrl = TextEditingController(text: currentUser.linkedinHandle);
+    _xCtrl = TextEditingController(text: currentUser.xHandle);
+    _tiktokCtrl = TextEditingController(text: currentUser.tiktokHandle);
 
-    _age = user.age == 0 ? 18 : user.age;
-    _heightCm = user.heightCm == 0 ? 170 : user.heightCm;
-    _gender = user.gender.isEmpty ? "OTHER" : user.gender;
-    _drinking = user.drinkingPref.isEmpty ? "Social" : user.drinkingPref;
-    _smoking = user.smokingPref.isEmpty ? "No" : user.smokingPref;
+    _age = currentUser.age == 0 ? 18 : currentUser.age;
+    _heightCm = currentUser.heightCm == 0 ? 170 : currentUser.heightCm;
+    _gender = currentUser.gender.isEmpty ? "OTHER" : currentUser.gender;
+    _drinking = currentUser.drinkingPref.isEmpty
+        ? "Social"
+        : currentUser.drinkingPref;
+    _smoking = currentUser.smokingPref.isEmpty ? "No" : currentUser.smokingPref;
   }
 
   @override
@@ -211,26 +243,48 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       smokingPref: _smoking,
     );
 
-    // Update locally through the provider
-    await ref.read(authProvider.notifier).updateUserProfile(updatedUser);
+    // Send to server and wait for PROFILE_UPDATED event
+    // Do NOT update local state here - let the server confirmation handle it
+    final socketService = ref.read(socketServiceProvider);
+    debugPrint(
+      '[Profile] _saveChanges - Socket connected: ${socketService.isConnected}',
+    );
+    debugPrint('[Profile] _saveChanges - Sending UPDATE_PROFILE to server');
+    socketService.sendMessage('UPDATE_PROFILE', updatedUser.toMap());
 
-    // Update ALL fields on the backend via WebSocket
-    ref
+    // Wait for the server to send back PROFILE_UPDATED before completing
+    // The api.dart handler will update local state upon receiving PROFILE_UPDATED
+    await ref.read(socketServiceProvider).waitForEvent('PROFILE_UPDATED');
+
+    // Check if there was a validation error
+    final validationError = ref
         .read(socketServiceProvider)
-        .sendMessage('UPDATE_PROFILE', updatedUser.toMap());
+        .getLastProfileValidationError();
+    if (validationError != null) {
+      ref.read(socketServiceProvider).clearLastProfileValidationError();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Update failed: $validationError")),
+        );
+      }
+      return; // Don't proceed with further processing
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authProvider).value;
-    if (user == null) return const SizedBox();
+    // Check if user is loaded - return loading indicator if not
+    final currentUser = user;
+    if (currentUser == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Column(
           children: [
-            if (user.profilePhotos.isEmpty)
+            if (currentUser.profilePhotos.isEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(
@@ -264,15 +318,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     isEditing
-                        ? _buildPhotoGrid(user)
-                        : _buildTinderCarousel(user),
+                        ? _buildPhotoGrid(currentUser)
+                        : _buildTinderCarousel(currentUser),
                     const SizedBox(height: 20),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildIdentitySection(user),
+                          _buildIdentitySection(),
                           const SizedBox(height: 20),
                           _buildBioSection(),
                           const SizedBox(height: 20),
@@ -589,7 +643,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _buildIdentitySection(User user) {
+  Widget _buildIdentitySection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -608,7 +662,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     )
                   : Text(
-                      user.realName,
+                      user!.realName,
                       style: Theme.of(
                         context,
                       ).textTheme.displayMedium?.copyWith(fontSize: 32),

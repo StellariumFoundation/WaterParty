@@ -156,6 +156,13 @@ func (c *Client) readPump() {
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("error: %v", err)
+				errorMsg, _ := json.Marshal(WSMessage{
+					Event: "ERROR",
+					Payload: map[string]string{
+						"message": "Failed" + err.Error(),
+					},
+				})
+				c.send <- errorMsg
 			}
 			break
 		}
@@ -200,6 +207,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			_, err := SaveMessage(m)
 			if err != nil {
 				log.Printf("DB Save Error: %v", err)
+				errorMsg, _ := json.Marshal(WSMessage{
+					Event: "ERROR",
+					Payload: map[string]string{
+						"message": "Failed" + err.Error(),
+					},
+				})
+				c.send <- errorMsg
 			}
 		}(chatMsg)
 
@@ -262,6 +276,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		payloadMap, ok := wsMsg.Payload.(map[string]interface{})
 		if !ok {
 			log.Printf("CREATE_PARTY: Failed to cast payload to map")
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + "CREATE_PARTY: Failed to cast payload to map",
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 
@@ -410,11 +431,10 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		id, err := CreateParty(p)
 		if err != nil {
 			log.Printf("Create Party DB Error: %v", err)
-			// Send error feedback to client
 			errorMsg, _ := json.Marshal(WSMessage{
 				Event: "ERROR",
 				Payload: map[string]string{
-					"message": "Failed to create party: " + err.Error(),
+					"message": "Failed" + err.Error(),
 				},
 			})
 			c.send <- errorMsg
@@ -453,6 +473,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		rooms, err := GetChatRoomsForUser(c.UID)
 		if err != nil {
 			log.Printf("Get Chats DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 		response, _ := json.Marshal(WSMessage{
@@ -493,6 +520,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		err := UpdateUserFull(u)
 		if err != nil {
 			log.Printf("Update Profile DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 
@@ -507,6 +541,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		u, err := GetUser(c.UID)
 		if err != nil {
 			log.Printf("Get User DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 		response, _ := json.Marshal(WSMessage{
@@ -582,6 +623,14 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		_, err := db.Exec(context.Background(), query, swipe.PartyID, c.UID, status)
 		if err != nil {
 			log.Printf("Swipe Save Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to swipe: " + err.Error(),
+				},
+			})
+			c.send <- errorMsg
+			return
 		}
 
 	case "GET_FEED":
@@ -633,6 +682,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 
 		if err != nil {
 			log.Printf("Feed Query Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to get feed: " + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 		defer rows.Close()
@@ -648,6 +704,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			)
 			if err != nil {
 				log.Printf("Feed Scan Error: %v", err)
+				errorMsg, _ := json.Marshal(WSMessage{
+					Event: "ERROR",
+					Payload: map[string]string{
+						"message": "Failed" + err.Error(),
+					},
+				})
+				c.send <- errorMsg
 				continue
 			}
 			parties = append(parties, p)
@@ -669,6 +732,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		apps, err := GetApplicantsForParty(partyID)
 		if err != nil {
 			log.Printf("Get Applicants DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 
@@ -694,6 +764,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		err := UpdateApplicationStatus(req.PartyID, req.UserID, req.Status)
 		if err != nil {
 			log.Printf("Update Application DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 
@@ -768,6 +845,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		messages, err := GetChatHistory(req.ChatID, req.Limit)
 		if err != nil {
 			log.Printf("GetChatHistory DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 
@@ -838,6 +922,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		partyID, _ := wsMsg.Payload.(map[string]interface{})["PartyID"].(string)
 		if partyID == "" {
 			log.Printf("DELETE_PARTY: No PartyID provided")
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + "DELETE_PARTY: No PartyID provided",
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 
@@ -845,11 +936,25 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		p, err := GetParty(partyID)
 		if err != nil {
 			log.Printf("DELETE_PARTY: Failed to get party: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to swipe: " + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 		if p.HostID != c.UID {
 			// Permission denied
 			log.Printf("DELETE_PARTY: Permission denied - user %s is not host %s", c.UID, p.HostID)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to swipe: " + fmt.Sprintf("DELETE_PARTY: Permission denied - user %s is not host %s", c.UID, p.HostID),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 
@@ -857,6 +962,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		err = DeleteParty(partyID)
 		if err != nil {
 			log.Printf("DELETE_PARTY: DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to swipe: " + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 		log.Printf("DELETE_PARTY: Party %s deleted successfully", partyID)
@@ -901,6 +1013,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		apps, err := GetAcceptedApplicants(partyID)
 		if err != nil {
 			log.Printf("GetMatchedUsers DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 
@@ -941,7 +1060,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			errorMsg, _ := json.Marshal(WSMessage{
 				Event: "ERROR",
 				Payload: map[string]string{
-					"message": "Failed to update party",
+					"message": "Failed" + err.Error(),
 				},
 			})
 			c.send <- errorMsg
@@ -986,6 +1105,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		err = UpdateApplicationStatus(req.PartyID, req.UserID, "DECLINED")
 		if err != nil {
 			log.Printf("UnmatchUser DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 
@@ -1024,7 +1150,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			errorMsg, _ := json.Marshal(WSMessage{
 				Event: "ERROR",
 				Payload: map[string]string{
-					"message": "Failed to delete user",
+					"message": "Failed" + err.Error(),
 				},
 			})
 			c.send <- errorMsg
@@ -1078,7 +1204,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			errorMsg, _ := json.Marshal(WSMessage{
 				Event: "ERROR",
 				Payload: map[string]string{
-					"message": "Failed to apply to party",
+					"message": "Failed" + err.Error(),
 				},
 			})
 			c.send <- errorMsg
@@ -1108,6 +1234,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		_, err := db.Exec(context.Background(), query, partyID, c.UID)
 		if err != nil {
 			log.Printf("RejectParty Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 
@@ -1161,6 +1294,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		messages, err := GetDMMessages(c.UID, req.OtherUserID, req.Limit)
 		if err != nil {
 			log.Printf("GetDMMessages DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 		response, _ := json.Marshal(WSMessage{
@@ -1187,7 +1327,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			errorMsg, _ := json.Marshal(WSMessage{
 				Event: "ERROR",
 				Payload: map[string]string{
-					"message": "Failed to delete message",
+					"message": "Failed" + err.Error(),
 				},
 			})
 			c.send <- errorMsg
@@ -1285,6 +1425,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		notifs, err := GetNotifications(c.UID, 20)
 		if err != nil {
 			log.Printf("GetNotifications DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 		response, _ := json.Marshal(WSMessage{
@@ -1305,6 +1452,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			err := MarkNotificationRead(req.NotificationID, c.UID)
 			if err != nil {
 				log.Printf("MarkNotificationRead Error: %v", err)
+				errorMsg, _ := json.Marshal(WSMessage{
+					Event: "ERROR",
+					Payload: map[string]string{
+						"message": "Failed" + err.Error(),
+					},
+				})
+				c.send <- errorMsg
 			}
 		}
 
@@ -1318,6 +1472,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		err := MarkAllNotificationsRead(c.UID)
 		if err != nil {
 			log.Printf("MarkAllNotificationsRead Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 		}
 		response, _ := json.Marshal(WSMessage{
 			Event:   "ALL_NOTIFICATIONS_MARKED_READ",
@@ -1341,6 +1502,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		users, err := SearchUsers(req.Query, req.Limit)
 		if err != nil {
 			log.Printf("SearchUsers DB Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 
@@ -1394,6 +1562,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		err := UnblockUser(c.UID, req.UserID)
 		if err != nil {
 			log.Printf("UnblockUser Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 
@@ -1407,6 +1582,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		blockedIDs, err := GetBlockedUsers(c.UID)
 		if err != nil {
 			log.Printf("GetBlockedUsers Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 		response, _ := json.Marshal(WSMessage{
@@ -1500,6 +1682,13 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		analytics, err := GetPartyAnalytics(partyID)
 		if err != nil {
 			log.Printf("GetPartyAnalytics Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed" + err.Error(),
+				},
+			})
+			c.send <- errorMsg
 			return
 		}
 

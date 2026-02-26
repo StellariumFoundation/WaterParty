@@ -938,7 +938,27 @@ class ExternalProfileScreen extends ConsumerWidget {
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          // TODO: Implement message action
+                          // Implement message action - open DM with this user
+                          final currentUser = ref.read(authProvider).value;
+                          if (currentUser != null) {
+                            // Create a DM room with the other user
+                            final dmRoom = ChatRoom(
+                              id: '', // Will be assigned by server
+                              partyId: '',
+                              hostId: currentUser.id,
+                              isGroup: false,
+                              participantIds: [currentUser.id, user.id],
+                              title: user.realName,
+                              imageUrl: user.profilePhotos.isNotEmpty
+                                  ? user.profilePhotos.first
+                                  : '',
+                            );
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(room: dmRoom),
+                              ),
+                            );
+                          }
                         },
                         icon: const Icon(Icons.chat_bubble_outline),
                         label: const Text("Message"),

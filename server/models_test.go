@@ -132,6 +132,7 @@ func containsToken(data []byte) bool {
 
 // containsField checks if a JSON field is present in the serialized data
 func containsField(data []byte, field string) bool {
+	_ = field // Acknowledge parameter is unused in this implementation
 	return len(data) > 0
 }
 

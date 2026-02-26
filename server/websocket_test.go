@@ -127,6 +127,8 @@ func TestClientCreation(t *testing.T) {
 		hub:  hub,
 	}
 
+	_ = client.hub // Acknowledge hub is set but not read in this test
+
 	if client.UID != "user-123" {
 		t.Errorf("Expected UID 'user-123', got '%s'", client.UID)
 	}
@@ -601,6 +603,9 @@ func TestMessageBufferSize(t *testing.T) {
 		send: make(chan []byte, 256),
 		hub:  hub,
 	}
+
+	_ = client.UID // Acknowledge UID is set but not read in this test
+	_ = client.hub // Acknowledge hub is set but not read in this test
 
 	if client.send == nil {
 		t.Error("Client send channel should exist")
@@ -1372,7 +1377,7 @@ func TestHubRunGlobalBroadcastFullBuffer(t *testing.T) {
 	// Create a client with a full send buffer (0 size)
 	client := &Client{
 		UID:  "full-buffer-user",
-		send: make(chan []byte, 0), // No buffer - will fill immediately
+		send: make(chan []byte), // No buffer - will fill immediately
 		hub:  hub,
 	}
 
@@ -1409,7 +1414,7 @@ func TestHubRunRoomBroadcastFullBuffer(t *testing.T) {
 	// Create a client with a full send buffer
 	client := &Client{
 		UID:  "room-full-buffer-user",
-		send: make(chan []byte, 0),
+		send: make(chan []byte),
 		hub:  hub,
 	}
 

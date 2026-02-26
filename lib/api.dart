@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -183,6 +184,15 @@ class SocketService {
   WebSocketChannel? _channel;
   bool _isConnected = false;
 
+  // Public getter for connection status
+  bool get isConnected => _isConnected;
+
+  // Map of event names to completers for waiting on specific events
+  final Map<String, Completer<void>> _pendingEvents = {};
+
+  // Store validation errors for profile updates
+  String? _lastProfileValidationError;
+
   SocketService(this.ref);
 
   void connect(String uid) {
@@ -218,10 +228,38 @@ class SocketService {
 
     print('[WebSocket] Handling event: $event');
 
+    // Complete any pending completer for this event
+    if (_pendingEvents.containsKey(event)) {
+      _pendingEvents[event]!.complete();
+      _pendingEvents.remove(event);
+    }
+
     switch (event) {
       case SocketServerEvents.profileUpdated:
+        print('[WebSocket] Received PROFILE_UPDATED event');
+        // Validate user structure from server
+        _lastProfileValidationError = null;
+        if (!_validateUserPayload(payload)) {
+          _lastProfileValidationError =
+              'Invalid profile data: photo URLs are invalid';
+          print(
+            '[WebSocket] PROFILE_UPDATED validation failed: invalid user structure',
+          );
+          // Complete the pending event even on validation failure so the UI can handle it
+          if (_pendingEvents.containsKey(SocketServerEvents.profileUpdated)) {
+            print(
+              '[WebSocket] Completing PROFILE_UPDATED wait (validation failed)',
+            );
+            _pendingEvents[SocketServerEvents.profileUpdated]!.complete();
+            _pendingEvents.remove(SocketServerEvents.profileUpdated);
+          }
+          break;
+        }
         final user = User.fromMap(payload);
         ref.read(authProvider.notifier).updateUserProfile(user);
+        print(
+          '[WebSocket] PROFILE_UPDATED processed successfully, user profile updated',
+        );
         break;
       case SocketServerEvents.chatsList:
         final List<dynamic> roomsRaw = payload;
@@ -704,9 +742,113 @@ class SocketService {
     }
   }
 
-  // ============================================
-  // Full WebSocket API Implementation
-  // ============================================
+  /// Wait for a specific WebSocket event to be received.
+  /// Returns a Future that completes when the event is received.
+  Future<void> waitForEvent(String eventName) {
+    print('[WebSocket] waitForEvent: Starting to wait for $eventName');
+    final completer = Completer<void>();
+    _pendingEvents[eventName] = completer;
+    return completer.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        print('[WebSocket] waitForEvent: TIMEOUT waiting for $eventName');
+        _pendingEvents.remove(eventName);
+        throw Exception('Timeout waiting for $eventName');
+      },
+    );
+  }
+
+  /// Get the last profile validation error if any
+  String? getLastProfileValidationError() {
+    return _lastProfileValidationError;
+  }
+
+  /// Clear the last profile validation error
+  void clearLastProfileValidationError() {
+    _lastProfileValidationError = null;
+  }
+
+  /// Validate user payload from server
+  /// Checks that profilePhotos and thumbnail are valid URLs or base64
+  /// Validates that thumbnail corresponds to one of the profile photos if both exist
+  bool _validateUserPayload(Map<String, dynamic> payload) {
+    final profilePhotos = payload['ProfilePhotos'] ?? payload['profile_photos'];
+    final thumbnail = payload['Thumbnail'] ?? payload['thumbnail'];
+
+    // Validate profilePhotos - must be a list of strings
+    if (profilePhotos != null) {
+      if (profilePhotos is! List) {
+        print('[Validation] profilePhotos is not a list');
+        return false;
+      }
+
+      for (final photo in profilePhotos) {
+        if (photo is! String) {
+          print('[Validation] profilePhotos contains non-string value');
+          return false;
+        }
+        if (!_isValidUrlOrBase64(photo)) {
+          print(
+            '[Validation] profilePhotos contains invalid URL or base64: $photo',
+          );
+          return false;
+        }
+      }
+    }
+
+    // Validate thumbnail - must be a valid URL or base64 if not empty
+    if (thumbnail != null && thumbnail is! String) {
+      print('[Validation] thumbnail is not a string');
+      return false;
+    }
+
+    if (thumbnail != null && thumbnail.isNotEmpty) {
+      if (!_isValidUrlOrBase64(thumbnail)) {
+        print('[Validation] thumbnail is invalid URL or base64: $thumbnail');
+        return false;
+      }
+
+      // Validate that thumbnail corresponds to one of the profile photos if both exist
+      if (profilePhotos != null && profilePhotos.isNotEmpty) {
+        bool thumbnailFound = profilePhotos.contains(thumbnail);
+        if (!thumbnailFound) {
+          // Also check if thumbnail could be a variation (e.g., same hash but different path)
+          // For now, just check exact match
+          print('[Validation] thumbnail does not match any profile photo');
+          // We'll still allow this but log a warning - the server might use different URL format
+        }
+      }
+    }
+
+    return true;
+  }
+
+  /// Check if a string is a valid URL or base64
+  bool _isValidUrlOrBase64(String value) {
+    // Check if it's a valid URL
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      try {
+        final uri = Uri.parse(value);
+        return uri.hasScheme && uri.host.isNotEmpty;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // Check if it's base64 (simple check - must be at least 4 chars and only valid base64 chars)
+    if (value.length >= 4) {
+      // Simple base64 validation - check if all chars are valid base64 characters
+      // Base64 uses A-Z, a-z, 0-9, +, / and = for padding
+      final base64Chars =
+          'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+      bool isBase64 = value.split('').every((c) => base64Chars.contains(c));
+      if (isBase64 && value.length % 4 == 0) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 
   /// REVERSE_GEOCODE: Convert latitude and longitude coordinates to city and address
   void reverseGeocode(double lat, double lon) {

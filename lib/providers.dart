@@ -195,7 +195,20 @@ class AuthNotifier extends AsyncNotifier<User?> {
     final response = await request.send();
     if (response.statusCode == 200) {
       final data = jsonDecode(await response.stream.bytesToString());
-      return Map<String, String>.from(data);
+      final hash = data['hash'] as String;
+      final thumbnailHash = data['thumbnailHash'] as String?;
+
+      // Construct full URLs from hash
+      final imageUrl = "$apiBase/uploads/$hash";
+
+      final result = <String, String>{'hash': hash, 'url': imageUrl};
+
+      if (thumbnailHash != null) {
+        result['thumbnailHash'] = thumbnailHash;
+        result['thumbnailUrl'] = "$apiBase/uploads/$thumbnailHash";
+      }
+
+      return result;
     }
     throw Exception("Upload failed");
   }

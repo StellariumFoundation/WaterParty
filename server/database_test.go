@@ -675,6 +675,7 @@ func TestPartyDuration(t *testing.T) {
 		for _, dur := range durations {
 			party := CreateTestParty("party-"+string(rune(dur)), host.ID)
 			party.DurationHours = dur
+			_ = party.DurationHours // Acknowledge field is set but not read in this test
 
 			endTime := party.StartTime.Add(time.Duration(dur) * time.Hour)
 			expectedDuration := time.Duration(dur) * time.Hour
