@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS users (
     location_lat DOUBLE PRECISION,
     location_lon DOUBLE PRECISION,
     bio TEXT,
-    last_active_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     thumbnail TEXT
 );
@@ -414,7 +414,7 @@ func UpdateUser(u User) error {
 		bio=CAST($4 AS TEXT),
 		location_lat=$5, 
 		location_lon=$6, 
-		updated_at=$7,
+		last_active_at=$7,
 		instagram_handle=CAST($8 AS TEXT), 
 		linkedin_handle=CAST($9 AS TEXT), 
 		x_handle=CAST($10 AS TEXT), 
