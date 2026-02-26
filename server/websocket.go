@@ -186,6 +186,17 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			c.hub.JoinRoom(roomID, c)
 		}
 
+	case "LEAVE_ROOM":
+		// Payload: {"RoomID": "uuid"}
+		roomID, _ := wsMsg.Payload.(map[string]interface{})["RoomID"].(string)
+		if roomID != "" {
+			c.hub.mu.Lock()
+			if clients, ok := c.hub.rooms[roomID]; ok {
+				delete(clients, c)
+			}
+			c.hub.mu.Unlock()
+		}
+
 	case "SEND_MESSAGE":
 		// 1. Convert payload to ChatMessage struct
 		payloadBytes, _ := json.Marshal(wsMsg.Payload)
@@ -232,6 +243,20 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		}
 		payloadBytes, _ := json.Marshal(wsMsg.Payload)
 		json.Unmarshal(payloadBytes, &dmReq)
+
+		// Check if either user has blocked the other
+		blocked1, _ := IsBlocked(c.UID, dmReq.RecipientID)
+		blocked2, _ := IsBlocked(dmReq.RecipientID, c.UID)
+		if blocked1 || blocked2 {
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Cannot send message to this user",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
 
 		// Create a synthetic ChatID for the DM (deterministic pair-wise ID)
 		u1, u2 := c.UID, dmReq.RecipientID
@@ -521,7 +546,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		// Ensure the user is updating their own profile
 		u.ID = c.UID
 
-		err := UpdateUserFull(u)
+		err := UpdateUser(u)
 		if err != nil {
 			log.Printf("Update Profile DB Error: %v", err)
 			errorMsg, _ := json.Marshal(WSMessage{
@@ -667,6 +692,8 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			WHERE status = 'OPEN' 
 			  AND host_id != $1
 			  AND id NOT IN (SELECT party_id FROM party_applications WHERE user_id = $1)
+			  AND host_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = $1)
+			  AND host_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = $1)
 		`
 
 		var rows pgx.Rows
@@ -726,7 +753,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		})
 		c.send <- response
 
-	case "GET_APPLICANTS":
+	case "GET_APPLICANTS", "GET_PARTY_APPLICANTS":
 		// Payload: {"PartyID": "uuid"}
 		partyID, _ := wsMsg.Payload.(map[string]interface{})["PartyID"].(string)
 		if partyID == "" {
@@ -1256,6 +1283,36 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			},
 		})
 		c.send <- response
+
+	case "CANCEL_APPLICATION":
+		// Payload: {"PartyID": "uuid"}
+		partyID, _ := wsMsg.Payload.(map[string]interface{})["PartyID"].(string)
+		if partyID == "" {
+			return
+		}
+
+		// Set the application status to DECLINED
+		err := UpdateApplicationStatus(partyID, c.UID, "DECLINED")
+		if err != nil {
+			log.Printf("CancelApplication Error: %v", err)
+			errorMsg, _ := json.Marshal(WSMessage{
+				Event: "ERROR",
+				Payload: map[string]string{
+					"message": "Failed to cancel application",
+				},
+			})
+			c.send <- errorMsg
+			return
+		}
+
+		cancelResponse, _ := json.Marshal(WSMessage{
+			Event: "APPLICATION_REJECTED",
+			Payload: map[string]string{
+				"PartyID": partyID,
+				"Status":  "DECLINED",
+			},
+		})
+		c.send <- cancelResponse
 
 	case "GET_DMS":
 		// Get direct message chats for the current user
