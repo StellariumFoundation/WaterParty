@@ -109,23 +109,43 @@ jobs:
           path: WaterParty-Web.zip
 
   # ---------------------------------------------------
-  # 4. AUTOMATIC APP RELEASE (Only on version tags)
+  # 4. AUTOMATIC APP RELEASE (On every push to master/main)
   # ---------------------------------------------------
   create-app-release:
     needs: [build-android, build-linux, build-web]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract Version from tag
+      - name: Extract or Generate Version
         id: get_version
         run: |
-          # Extract version from tag (e.g., v1.0.0 -> 1.0.0)
-          VERSION=${GITHUB_REF#refs/tags/v}
+          # First, get version from pubspec.yaml
+          PUBSPEC_VERSION=$(grep -m1 '^version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          
+          # Check if this is a tag push
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # Use tag version if it's a tag push (e.g., v1.0.0 -> 1.0.0)
+            VERSION=${GITHUB_REF#refs/tags/v}
+            TAG_NAME=${{ github.ref_name }}
+            IS_TAG=true
+          else
+            # Use pubspec version for branch pushes
+            VERSION="${PUBSPEC_VERSION}"
+            # Create a tag for the release
+            TAG_NAME="v${VERSION}"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag "$TAG_NAME"
+            git push origin "$TAG_NAME"
+            IS_TAG=false
+          fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "IS_TAG=$IS_TAG" >> $GITHUB_ENV
 
       - name: Download all Artifacts
         uses: actions/download-artifact@v4
@@ -147,12 +167,12 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Water Party App v${{ env.VERSION }}
+          tag_name: ${{ env.TAG_NAME }}
+          name: ${{ env.IS_TAG == 'true' && format('Water Party App v{0}', env.VERSION) || format('Water Party App Build {0} (Auto)', env.VERSION) }}
           body: |
-            ## 🚀 Water Party App v${{ env.VERSION }}
+            ${{ env.IS_TAG == 'true' && '## 🚀 Water Party App v' || '## 🚀 Water Party App Build ' }}${{ env.VERSION }}
             
-            This is an automated production build of the Water Party Client Ecosystem.
+            ${{ env.IS_TAG == 'true' && 'This is an official tagged release of the Water Party Client Ecosystem.' || 'This is an automated build from branch: ' }}${{ github.ref_name }}
             
             ### 📱 Mobile
             - **Android (Universal)**: All-in-one APK that works on any Android device.
@@ -165,7 +185,7 @@ jobs:
             - **Linux**: Compressed Linux binary bundle.
             - **Web**: Optimized JavaScript web build.
             
-            *Release version: ${{ env.VERSION }}*
+            ${{ env.IS_TAG == 'true' && format('*Release version: {0}*', env.VERSION) || format('*Build: {0} | Commit: {1}*', env.VERSION, github.sha) }}
           files: |
             *.apk
             *.aab
