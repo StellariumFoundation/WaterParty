@@ -9,11 +9,16 @@ import (
 	"errors"
 	"fmt"
 	"image"
+
 	_ "image/gif"
 	"image/jpeg"
 	_ "image/png"
 	"log"
+	"strings"
 	"time"
+
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/webp"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nfnt/resize"
@@ -43,6 +48,7 @@ func InitDB(connString string) {
 }
 
 func runMigrations() error {
+	Migrate()
 	script := `-- ==========================================
 -- EXTENSIONS
 -- ==========================================
@@ -63,26 +69,26 @@ CREATE TABLE IF NOT EXISTS assets (
 -- ==========================================
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    real_name TEXT,
-    phone_number TEXT,
+    real_name TEXT DEFAULT '',
+    phone_number TEXT DEFAULT '',
     email TEXT UNIQUE,
     password_hash TEXT,
     profile_photos TEXT[] DEFAULT '{}',
     age INTEGER,
     date_of_birth TIMESTAMP WITH TIME ZONE,
     height_cm INTEGER,
-    gender TEXT,
-    drinking_pref TEXT,
-    smoking_pref TEXT,
+    gender TEXT DEFAULT '',
+    drinking_pref TEXT DEFAULT '',
+    smoking_pref TEXT DEFAULT '',
     top_artists TEXT[] DEFAULT '{}',
-    job_title TEXT,
-    company TEXT,
-    school TEXT,
-    degree TEXT,
-    instagram_handle TEXT,
-    linkedin_handle TEXT,
-    x_handle TEXT,
-    tiktok_handle TEXT,
+    job_title TEXT DEFAULT '',
+    company TEXT DEFAULT '',
+    school TEXT DEFAULT '',
+    degree TEXT DEFAULT '',
+    instagram_handle TEXT DEFAULT '',
+    linkedin_handle TEXT DEFAULT '',
+    x_handle TEXT DEFAULT '',
+    tiktok_handle TEXT DEFAULT '',
     is_verified BOOLEAN DEFAULT FALSE,
     trust_score DOUBLE PRECISION DEFAULT 0.0,
     elo_score DOUBLE PRECISION DEFAULT 0.0,
@@ -91,10 +97,10 @@ CREATE TABLE IF NOT EXISTS users (
     wallet_data JSONB DEFAULT '{}',
     location_lat DOUBLE PRECISION,
     location_lon DOUBLE PRECISION,
-    bio TEXT,
+    bio TEXT DEFAULT '',
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    thumbnail TEXT
+    thumbnail TEXT DEFAULT ''
 );
 
 -- ==========================================
@@ -360,18 +366,20 @@ func GetUserByEmail(email string) (User, string, error) {
 	var u User
 	var passwordHash string
 	var walletJSON []byte
-	query := `SELECT id, real_name, phone_number, email, password_hash, profile_photos, age, 
-		date_of_birth, height_cm, gender, drinking_pref, smoking_pref, 
-		top_artists, job_title, company, school, degree, instagram_handle, 
-		linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, 
-		elo_score, parties_hosted, flake_count, wallet_data, location_lat, location_lon, 
+	var profilePhotos []string
+	var topArtists []string
+	query := `SELECT id, real_name, COALESCE(phone_number, ''), email, password_hash, COALESCE(profile_photos, '{}'), age, 
+		date_of_birth, height_cm, gender, COALESCE(drinking_pref, ''), COALESCE(smoking_pref, ''), 
+		COALESCE(top_artists, '{}'), COALESCE(job_title, ''), COALESCE(company, ''), COALESCE(school, ''), COALESCE(degree, ''), COALESCE(instagram_handle, ''), 
+		COALESCE(linkedin_handle, ''), COALESCE(x_handle, ''), COALESCE(tiktok_handle, ''), is_verified, trust_score, 
+		elo_score, parties_hosted, flake_count, COALESCE(wallet_data::text, '{}'), location_lat, location_lon, 
 		updated_at, created_at, COALESCE(bio, ''), COALESCE(thumbnail, '') 
 		FROM users WHERE email = $1`
 
 	err := db.QueryRow(context.Background(), query, email).Scan(
-		&u.ID, &u.RealName, &u.PhoneNumber, &u.Email, &passwordHash, &u.ProfilePhotos, &u.Age,
+		&u.ID, &u.RealName, &u.PhoneNumber, &u.Email, &passwordHash, &profilePhotos, &u.Age,
 		&u.DateOfBirth, &u.HeightCm, &u.Gender, &u.DrinkingPref, &u.SmokingPref,
-		&u.TopArtists, &u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle,
+		&topArtists, &u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle,
 		&u.LinkedinHandle, &u.XHandle, &u.TikTokHandle, &u.IsVerified, &u.TrustScore,
 		&u.EloScore, &u.PartiesHosted, &u.FlakeCount, &walletJSON, &u.LocationLat, &u.LocationLon,
 		&u.UpdatedAt, &u.CreatedAt, &u.Bio, &u.Thumbnail,
@@ -391,6 +399,41 @@ func UpdateUser(u User) error {
 	log.Printf("DEBUG UpdateUser: DrinkingPref=%q, SmokingPref=%q, JobTitle=%q",
 		u.DrinkingPref, u.SmokingPref, u.JobTitle)
 
+	// Auto-generate thumbnail from first profile photo if needed
+	_thumb := u.Thumbnail
+	// Get current user to check if we need to regenerate thumbnail
+	// Only auto-generate if first photo changed and no explicit thumbnail provided
+	if len(u.ProfilePhotos) > 0 {
+		url := u.ProfilePhotos[0]
+		// Strip /assets/ prefix if present (some clients send full URL)
+		parts := strings.Split(url, "/")
+
+		// 2. Grab the last item in that slice
+		hash := parts[len(parts)-1]
+		log.Printf("DEBUG UpdateUser: Auto-generating thumbnail from first photo: %s", hash)
+
+		// Get the original image data from assets table
+		imageData, mimeType, err := GetAsset(hash)
+		if err != nil {
+			log.Printf("DEBUG UpdateUser: Could not get original image: %v", err)
+		} else {
+			// Create thumbnail from image data
+			thumbData, err := CreateThumbnail(imageData)
+			if err != nil {
+				log.Printf("DEBUG UpdateUser: Could not create thumbnail: %v", err)
+			} else {
+				// Save thumbnail as new asset and get its hash
+				thumbHash, err := SaveAsset(thumbData, mimeType)
+				if err != nil {
+					log.Printf("DEBUG UpdateUser: Could not save thumbnail: %v", err)
+				} else {
+					_thumb = thumbHash
+					log.Printf("DEBUG UpdateUser: Auto-generated thumbnail: %s", thumbHash)
+				}
+			}
+		}
+	}
+
 	// Handle empty strings by using NULL for TEXT columns when empty
 	// This fixes "could not determine data type of parameter" error
 	phoneNumber := nullString(u.PhoneNumber)
@@ -404,7 +447,7 @@ func UpdateUser(u User) error {
 	linkedinHandle := nullString(u.LinkedinHandle)
 	xHandle := nullString(u.XHandle)
 	tiktokHandle := nullString(u.TikTokHandle)
-	thumbnail := nullString(u.Thumbnail)
+	thumbnail := nullString(_thumb)
 	bio := nullString(u.Bio)
 
 	query := `UPDATE users SET 

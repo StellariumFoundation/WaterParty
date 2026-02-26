@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func migrate() {
+func Migrate() {
 	fmt.Println("🗄️  Database Migration Script")
 	fmt.Println("==============================")
 
@@ -31,6 +31,21 @@ func migrate() {
 	defer conn.Close(context.Background())
 
 	fmt.Printf("✅ Connected successfully!\n\n")
+
+	// Migration: Convert NULL text values to empty strings for users table
+	fmt.Println("🔄 Converting NULL values to empty strings in users table...")
+	nullColumns := []string{"real_name", "phone_number", "gender", "drinking_pref", "smoking_pref",
+		"job_title", "company", "school", "degree", "instagram_handle",
+		"linkedin_handle", "x_handle", "tiktok_handle", "bio", "thumbnail"}
+	for _, col := range nullColumns {
+		updateSQL := fmt.Sprintf("UPDATE users SET %s = '' WHERE %s IS NULL", col, col)
+		_, err = conn.Exec(context.Background(), updateSQL)
+		if err != nil {
+			fmt.Printf("   ⚠️  Warning: Could not update %s: %v\n", col, err)
+		} else {
+			fmt.Printf("   ✅ Updated %s\n", col)
+		}
+	}
 
 	// Define expected schema - tables and their columns
 	// Format: tableName -> columnName -> columnType

@@ -198,8 +198,9 @@ class SocketService {
   void connect(String uid) {
     if (_isConnected) return;
 
-    final uri = Uri.parse('wss://$serverUrl/ws?uid=$uid');
-    print('[WebSocket] Connecting to: wss://$serverUrl/ws?uid=$uid');
+    final uri = Uri.parse('ws://$serverUrl/ws?uid=$uid');
+    print('[WebSocket] Connecting to: ws://$serverUrl/ws?uid=$uid');
+
     _channel = WebSocketChannel.connect(uri);
     _isConnected = true;
 
@@ -208,8 +209,14 @@ class SocketService {
         print('[WebSocket] Received data: $data');
         _handleIncomingMessage(data);
       },
-      onDone: () => _reconnect(uid),
-      onError: (err) => _reconnect(uid),
+      onDone: () {
+        print('[WebSocket] Connection closed - attempting reconnect');
+        _reconnect(uid);
+      },
+      onError: (err) {
+        print('[WebSocket] Connection error: $err');
+        _reconnect(uid);
+      },
     );
 
     // Request latest user data and chats from server immediately after connection
