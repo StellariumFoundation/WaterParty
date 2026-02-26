@@ -178,6 +178,55 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 );
 
 -- ==========================================
+-- BLOCKED USERS
+-- ==========================================
+CREATE TABLE IF NOT EXISTS blocked_users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    blocker_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(blocker_id, blocked_id)
+);
+
+-- ==========================================
+-- USER REPORTS
+-- ==========================================
+CREATE TABLE IF NOT EXISTS user_reports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    reporter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reported_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason TEXT NOT NULL,
+    details TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==========================================
+-- PARTY REPORTS
+-- ==========================================
+CREATE TABLE IF NOT EXISTS party_reports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    reporter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    party_id UUID NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
+    reason TEXT NOT NULL,
+    details TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==========================================
+-- NOTIFICATIONS
+-- ==========================================
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT,
+    data TEXT,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==========================================
 -- INDEXES
 -- ==========================================
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -185,6 +234,11 @@ CREATE INDEX IF NOT EXISTS idx_parties_status ON parties(status);
 CREATE INDEX IF NOT EXISTS idx_parties_host_id ON parties(host_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_chat_id ON chat_messages(chat_id);
 CREATE INDEX IF NOT EXISTS idx_assets_hash ON assets(hash);
+CREATE INDEX IF NOT EXISTS idx_blocked_users_blocker ON blocked_users(blocker_id);
+CREATE INDEX IF NOT EXISTS idx_blocked_users_blocked ON blocked_users(blocked_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_reports_reported ON user_reports(reported_id);
+CREATE INDEX IF NOT EXISTS idx_party_reports_party ON party_reports(party_id);
 
 -- ==========================================
 -- TRIGGERS & FUNCTIONS
@@ -330,62 +384,69 @@ func GetUserByEmail(email string) (User, string, error) {
 
 func UpdateUser(u User) error {
 	walletJSON, _ := json.Marshal(u.WalletData)
+
+	// Debug logging to diagnose parameter type issues
+	log.Printf("DEBUG UpdateUser: RealName=%q, PhoneNumber=%q, ProfilePhotos=%v, Thumbnail=%q",
+		u.RealName, u.PhoneNumber, u.ProfilePhotos, u.Thumbnail)
+	log.Printf("DEBUG UpdateUser: DrinkingPref=%q, SmokingPref=%q, JobTitle=%q",
+		u.DrinkingPref, u.SmokingPref, u.JobTitle)
+
+	// Handle empty strings by using NULL for TEXT columns when empty
+	// This fixes "could not determine data type of parameter" error
+	phoneNumber := nullString(u.PhoneNumber)
+	drinkingPref := nullString(u.DrinkingPref)
+	smokingPref := nullString(u.SmokingPref)
+	jobTitle := nullString(u.JobTitle)
+	company := nullString(u.Company)
+	school := nullString(u.School)
+	degree := nullString(u.Degree)
+	instagramHandle := nullString(u.InstagramHandle)
+	linkedinHandle := nullString(u.LinkedinHandle)
+	xHandle := nullString(u.XHandle)
+	tiktokHandle := nullString(u.TikTokHandle)
+	thumbnail := nullString(u.Thumbnail)
+	bio := nullString(u.Bio)
+
 	query := `UPDATE users SET 
-		real_name=$1, 
-		phone_number=$2, 
-		profile_photos=$3, 
-		bio=$4,
+		real_name=CAST($1 AS TEXT), 
+		phone_number=CAST($2 AS TEXT), 
+		profile_photos=CAST($3 AS TEXT[]), 
+		bio=CAST($4 AS TEXT),
 		location_lat=$5, 
 		location_lon=$6, 
 		updated_at=$7,
-		instagram_handle=$8, 
-		linkedin_handle=$9, 
-		x_handle=$10, 
-		tiktok_handle=$11, 
-		wallet_data=$12, 
-		thumbnail=$13
-		WHERE id=$14`
-	_, err := db.Exec(context.Background(), query, u.RealName, u.PhoneNumber, u.ProfilePhotos,
-		u.Bio, u.LocationLat, u.LocationLon, time.Now(),
-		u.InstagramHandle, u.LinkedinHandle, u.XHandle,
-		u.TikTokHandle, walletJSON, u.Thumbnail, u.ID)
+		instagram_handle=CAST($8 AS TEXT), 
+		linkedin_handle=CAST($9 AS TEXT), 
+		x_handle=CAST($10 AS TEXT), 
+		tiktok_handle=CAST($11 AS TEXT), 
+		wallet_data=$12,
+		job_title=CAST($13 AS TEXT), 
+		company=CAST($14 AS TEXT), 
+		school=CAST($15 AS TEXT), 
+		degree=CAST($16 AS TEXT), 
+		age=$17,
+		height_cm=$18, 
+		gender=CAST($19 AS TEXT), 
+		drinking_pref=CAST($20 AS TEXT), 
+		smoking_pref=CAST($21 AS TEXT), 
+		thumbnail=CAST($22 AS TEXT)
+		WHERE id=$23`
+	_, err := db.Exec(context.Background(), query,
+		u.RealName, phoneNumber, u.ProfilePhotos, bio,
+		u.LocationLat, u.LocationLon, time.Now(),
+		instagramHandle, linkedinHandle, xHandle,
+		tiktokHandle, walletJSON, jobTitle, company, school,
+		degree, u.Age, u.HeightCm, u.Gender, drinkingPref,
+		smokingPref, thumbnail, u.ID)
 	return err
 }
 
-func UpdateUserFull(u User) error {
-	walletJSON, _ := json.Marshal(u.WalletData)
-	query := `UPDATE users SET 
-		real_name=$1, 
-		phone_number=$2, 
-		profile_photos=$3, 
-		bio=$4,
-		location_lat=$5, 
-		location_lon=$6, 
-		updated_at=$7,
-		instagram_handle=$8, 
-		linkedin_handle=$9, 
-		x_handle=$10, 
-		tiktok_handle=$11, 
-		wallet_data=$12,
-		job_title=$13, 
-		company=$14, 
-		school=$15, 
-		degree=$16, 
-		age=$17,
-		height_cm=$18, 
-		gender=$19, 
-		drinking_pref=$20, 
-		smoking_pref=$21, 
-		thumbnail=$22
-		WHERE id=$23`
-	_, err := db.Exec(context.Background(), query,
-		u.RealName, u.PhoneNumber, u.ProfilePhotos, u.Bio,
-		u.LocationLat, u.LocationLon, time.Now(),
-		u.InstagramHandle, u.LinkedinHandle, u.XHandle,
-		u.TikTokHandle, walletJSON, u.JobTitle, u.Company, u.School,
-		u.Degree, u.Age, u.HeightCm, u.Gender, u.DrinkingPref,
-		u.SmokingPref, u.Thumbnail, u.ID)
-	return err
+// nullString converts empty string to nil for proper NULL handling in PostgreSQL
+func nullString(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 func DeleteUser(id string) error {
@@ -394,8 +455,36 @@ func DeleteUser(id string) error {
 	}
 
 	// Delete related records first to avoid foreign key constraint violations
-	// Delete chat messages where user is sender
+	// Delete blocked user relationships
 	_, err := db.Exec(context.Background(),
+		"DELETE FROM blocked_users WHERE blocker_id = $1 OR blocked_id = $1", id)
+	if err != nil {
+		return err
+	}
+
+	// Delete user reports
+	_, err = db.Exec(context.Background(),
+		"DELETE FROM user_reports WHERE reporter_id = $1 OR reported_id = $1", id)
+	if err != nil {
+		return err
+	}
+
+	// Delete party reports by this user
+	_, err = db.Exec(context.Background(),
+		"DELETE FROM party_reports WHERE reporter_id = $1", id)
+	if err != nil {
+		return err
+	}
+
+	// Delete notifications
+	_, err = db.Exec(context.Background(),
+		"DELETE FROM notifications WHERE user_id = $1", id)
+	if err != nil {
+		return err
+	}
+
+	// Delete chat messages where user is sender
+	_, err = db.Exec(context.Background(),
 		"DELETE FROM chat_messages WHERE sender_id = $1", id)
 	if err != nil {
 		return err

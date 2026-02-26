@@ -131,6 +131,34 @@ func migrate() {
 			"mime_type":  "TEXT",
 			"created_at": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
 		},
+		"blocked_users": {
+			"blocker_id": "UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE",
+			"blocked_id": "UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE",
+			"created_at": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+		},
+		"user_reports": {
+			"reporter_id": "UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE",
+			"reported_id": "UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE",
+			"reason":      "TEXT NOT NULL",
+			"details":     "TEXT",
+			"created_at":  "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+		},
+		"party_reports": {
+			"reporter_id": "UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE",
+			"party_id":    "UUID NOT NULL REFERENCES parties(id) ON DELETE CASCADE",
+			"reason":      "TEXT NOT NULL",
+			"details":     "TEXT",
+			"created_at":  "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+		},
+		"notifications": {
+			"user_id":    "UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE",
+			"type":       "TEXT NOT NULL",
+			"title":      "TEXT NOT NULL",
+			"body":       "TEXT",
+			"data":       "TEXT",
+			"is_read":    "BOOLEAN DEFAULT FALSE",
+			"created_at": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+		},
 	}
 
 	totalMigrations := 0
