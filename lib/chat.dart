@@ -729,6 +729,10 @@ class PartySettingsScreen extends ConsumerWidget {
     Party? party;
     if (room.isGroup && room.partyId.isNotEmpty) {
       party = partyCache[room.partyId];
+      // DEBUG: Log party null safety status after cache lookup
+      print(
+        '[DEBUG] After cache lookup - party: ${party == null ? "NULL" : "FOUND"}',
+      );
     }
 
     // Resolve dynamic title
@@ -743,6 +747,17 @@ class PartySettingsScreen extends ConsumerWidget {
     }
     if (displayTitle.isEmpty || displayTitle == "PARTY CHAT")
       displayTitle = "PARTY CHAT";
+
+    String? thumbnailUrl;
+    if (party != null && party.thumbnail.isNotEmpty) {
+      thumbnailUrl = party.thumbnail.startsWith("http")
+          ? party.thumbnail
+          : AppConstants.assetUrl(party.thumbnail);
+    } else if (party != null && party.partyPhotos.isNotEmpty) {
+      thumbnailUrl = party.partyPhotos.first.startsWith("http")
+          ? party.partyPhotos.first
+          : AppConstants.assetUrl(party.partyPhotos.first);
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -777,11 +792,7 @@ class PartySettingsScreen extends ConsumerWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: CachedNetworkImage(
-                      imageUrl: room.imageUrl.isEmpty
-                          ? "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000"
-                          : (room.imageUrl.startsWith("http")
-                                ? room.imageUrl
-                                : AppConstants.assetUrl(room.imageUrl)),
+                      imageUrl: thumbnailUrl!,
                       width: 120,
                       height: 120,
                       fit: BoxFit.cover,

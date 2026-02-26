@@ -60,28 +60,30 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
         slivers: [
           // Custom App Bar
           SliverAppBar(
-            expandedHeight: 120,
+            expandedHeight: 60,
             floating: false,
             pinned: true,
             backgroundColor: Colors.transparent,
             elevation: 0,
+            centerTitle: true,
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
-              title: Text(
-                "CONNECTIONS",
-                style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  fontSize: AppFontSizes.display,
-                  letterSpacing: 2,
-                  color: Colors.white,
-                ),
-              ),
+              collapseMode: CollapseMode.pin,
               background: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
                     colors: [Colors.transparent, Colors.black54],
+                  ),
+                ),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      "CHATS",
+                      style: AppTypography.titleStyle,
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ),
               ),

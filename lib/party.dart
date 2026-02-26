@@ -504,8 +504,8 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeader(),
-                  const SizedBox(height: 30),
+                  Center(child: _buildHeader()),
+                  const SizedBox(height: 0),
                   _sectionHeader("DETAILS"),
                   WaterGlass(
                     height: 220,
@@ -905,12 +905,9 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
 
   Widget _buildHeader() {
     return Text(
-      "HOST\nA PARTY",
-      style: Theme.of(context).textTheme.displayMedium?.copyWith(
-        fontWeight: FontWeight.w900,
-        height: 1.0,
-        letterSpacing: 2,
-      ),
+      "HOST A PARTY",
+      style: AppTypography.titleStyle,
+      textAlign: TextAlign.center,
     );
   }
 

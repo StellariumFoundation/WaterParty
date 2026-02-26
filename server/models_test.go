@@ -190,7 +190,7 @@ func TestUserSerialization(t *testing.T) {
 		WalletData:      WalletInfo{Type: "PayPal", Data: "john@example.com"},
 		LocationLat:     40.7128,
 		LocationLon:     -74.0060,
-		LastActiveAt:    &now,
+		UpdatedAt:       &now,
 		CreatedAt:       &now,
 		Bio:             "Test bio",
 		Thumbnail:       "thumb_hash",
@@ -628,11 +628,11 @@ func TestEmptyArraysSerialization(t *testing.T) {
 
 func TestNilPointersSerialization(t *testing.T) {
 	user := User{
-		ID:           "test-id",
-		RealName:     "Test",
-		DateOfBirth:  nil,
-		LastActiveAt: nil,
-		CreatedAt:    nil,
+		ID:          "test-id",
+		RealName:    "Test",
+		DateOfBirth: nil,
+		UpdatedAt:   nil,
+		CreatedAt:   nil,
 	}
 
 	data, err := json.Marshal(user)
