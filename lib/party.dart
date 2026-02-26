@@ -431,6 +431,8 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     ref
         .read(socketServiceProvider)
         .sendMessage('CREATE_PARTY', newParty.toMap());
+    print('[CreateParty] Sent CREATE_PARTY with title: ${newParty.title}');
+    print('[CreateParty] Party map keys: ${newParty.toMap().keys.toList()}');
   }
 
   void _showError(String m) {

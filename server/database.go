@@ -331,8 +331,19 @@ func GetUserByEmail(email string) (User, string, error) {
 func UpdateUser(u User) error {
 	walletJSON, _ := json.Marshal(u.WalletData)
 	query := `UPDATE users SET 
+		real_name=$1, 
+		phone_number=$2, 
+		profile_photos=$3, 
+		bio=$4,
+		location_lat=$5, 
+		location_lon=$6, 
+		updated_at=$7,
 		instagram_handle=$8, 
-		linkedin_handle=$9, x_handle=$10, tiktok_handle=$11, wallet_data=$12, thumbnail=$13
+		linkedin_handle=$9, 
+		x_handle=$10, 
+		tiktok_handle=$11, 
+		wallet_data=$12, 
+		thumbnail=$13
 		WHERE id=$14`
 	_, err := db.Exec(context.Background(), query, u.RealName, u.PhoneNumber, u.ProfilePhotos,
 		u.Bio, u.LocationLat, u.LocationLon, time.Now(),
@@ -344,10 +355,28 @@ func UpdateUser(u User) error {
 func UpdateUserFull(u User) error {
 	walletJSON, _ := json.Marshal(u.WalletData)
 	query := `UPDATE users SET 
+		real_name=$1, 
+		phone_number=$2, 
+		profile_photos=$3, 
+		bio=$4,
+		location_lat=$5, 
+		location_lon=$6, 
+		updated_at=$7,
 		instagram_handle=$8, 
-		linkedin_handle=$9, x_handle=$10, tiktok_handle=$11, wallet_data=$12,
-		job_title=$13, company=$14, school=$15, degree=$16, age=$17,
-		height_cm=$18, gender=$19, drinking_pref=$20, smoking_pref=$21, thumbnail=$22
+		linkedin_handle=$9, 
+		x_handle=$10, 
+		tiktok_handle=$11, 
+		wallet_data=$12,
+		job_title=$13, 
+		company=$14, 
+		school=$15, 
+		degree=$16, 
+		age=$17,
+		height_cm=$18, 
+		gender=$19, 
+		drinking_pref=$20, 
+		smoking_pref=$21, 
+		thumbnail=$22
 		WHERE id=$23`
 	_, err := db.Exec(context.Background(), query,
 		u.RealName, u.PhoneNumber, u.ProfilePhotos, u.Bio,

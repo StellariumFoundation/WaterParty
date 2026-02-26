@@ -20,6 +20,8 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool isEditing = false;
   bool _isUploading = false;
+  bool _fieldsInitialized =
+      false; // Flag to track if fields have been initialized
   int _currentPhotoIndex = 0;
   final PageController _pageController = PageController();
 
@@ -169,7 +171,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeFields();
+    // Note: Don't call _initializeFields() here - ref is not available yet
+    // Initialization will happen in didChangeDependencies()
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Initialize fields here - ref is now available
+    // Use flag to prevent re-initialization on every dependency change
+    if (!_fieldsInitialized) {
+      _initializeFields();
+      _fieldsInitialized = true;
+    }
   }
 
   void _initializeFields() {

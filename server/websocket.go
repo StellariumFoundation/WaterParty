@@ -371,7 +371,9 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		}
 
 		// DEBUG: Log what was received
-		log.Printf("CREATE_PARTY received - Title: %q, Description: %q", p.Title, p.Description)
+		log.Printf("CREATE_PARTY received - Title: %q, Description: %q, StartTime: %q, ChatRoomID: %q, MaxCapacity: %v",
+			p.Title, p.Description, p.StartTime, p.ChatRoomID, p.MaxCapacity)
+		log.Printf("CREATE_PARTY raw payload: %+v", payloadMap)
 
 		// Validate required fields
 		errors := []string{}
@@ -399,6 +401,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		}
 
 		if len(errors) > 0 {
+			log.Printf("CREATE_PARTY validation errors: %v", errors)
 			errorMsg, _ := json.Marshal(WSMessage{
 				Event: "ERROR",
 				Payload: map[string]interface{}{
@@ -430,6 +433,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 
 		id, err := CreateParty(p)
 		if err != nil {
+			log.Printf("CREATE_PARTY DB Error: %v", err)
 			log.Printf("Create Party DB Error: %v", err)
 			errorMsg, _ := json.Marshal(WSMessage{
 				Event: "ERROR",
