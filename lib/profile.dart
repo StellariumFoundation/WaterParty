@@ -55,8 +55,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ? images.sublist(0, remaining)
           : images;
 
-      List<String> newUrls = [];
-      String? firstThumbUrl;
+      List<String> newHashes = [];
+      String? firstThumbHash;
       for (int i = 0; i < toUpload.length; i++) {
         final bytes = await toUpload[i].readAsBytes();
         // Generate thumbnail only for the first photo if user doesn't have one yet
@@ -65,19 +65,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             .read(authProvider.notifier)
             .uploadImage(bytes, "image/jpeg", thumbnail: true);
 
-        final url = uploadResult['url']!;
-        newUrls.add(url);
+        // Store only the hash, not the full URL
+        final hash = uploadResult['hash']!;
+        newHashes.add(hash);
         if (shouldGenThumb) {
-          firstThumbUrl = uploadResult['thumbnailUrl'];
-          debugPrint('[thumbnail] Uploaded image successfully');
+          firstThumbHash = uploadResult['thumbnailHash'];
         }
-        debugPrint('[Profile] Uploaded image successfully');
       }
 
-      final updatedPhotos = [...currentUser.profilePhotos, ...newUrls];
+      final updatedPhotos = [...currentUser.profilePhotos, ...newHashes];
       final updatedUser = currentUser.copyWith(
         profilePhotos: updatedPhotos,
-        thumbnail: firstThumbUrl ?? currentUser.thumbnail,
+        thumbnail: firstThumbHash ?? currentUser.thumbnail,
       );
 
       // Send to server and wait for PROFILE_UPDATED event
@@ -430,11 +429,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             itemCount: photos.length,
             onPageChanged: (idx) => setState(() => _currentPhotoIndex = idx),
             itemBuilder: (context, index) {
-              final photoUrl = photos[index].startsWith("http")
-                  ? photos[index]
-                  : AppConstants.assetUrl(photos[index]);
               return CachedNetworkImage(
-                imageUrl: photoUrl,
+                imageUrl: AppConstants.assetUrl(photos[index]),
                 fit: BoxFit.cover,
                 placeholder: (context, url) => Container(color: Colors.black12),
                 errorWidget: (context, url, error) => const Icon(Icons.error),

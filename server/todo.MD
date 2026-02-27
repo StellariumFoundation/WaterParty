@@ -4,6 +4,4 @@ make sure matching, and the user management screen works correctly
 
 make sure the match screen works correctly
 
-Fix the profile page to upload images
-
-Fix the providers on startup on make it keep and get things from cache on the riverpod
+Fix the providers.dart file on startup on make it keep and get, and save objects on the cache, update objects from the server and keep the keep and update the objects on riverpod on the riverpod
