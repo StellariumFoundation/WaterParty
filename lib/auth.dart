@@ -624,6 +624,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
             _stepHeader("SOCIAL HANDLES"),
             _input(_instaCtrl, "INSTAGRAM", FontAwesomeIcons.instagram),
             const SizedBox(height: 15),
+            _input(_xCtrl, "X (TWITTER)", FontAwesomeIcons.xTwitter),
+            const SizedBox(height: 15),
             _input(_tiktokCtrl, "TIKTOK", FontAwesomeIcons.tiktok),
             const SizedBox(height: 15),
             _input(_linkedInCtrl, "LINKEDIN", FontAwesomeIcons.linkedinIn),
@@ -806,11 +808,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
           ),
           const SizedBox(height: 25),
           GestureDetector(
-            onTap: () => setState(() {
-              isLogin = !isLogin;
-              currentStep = 0;
-              errorMessage = null;
-            }),
+            onTap: () async {
+              // If switching from login to register mode, clear any existing session
+              if (isLogin) {
+                await ref.read(authProvider.notifier).logout();
+              }
+              setState(() {
+                isLogin = !isLogin;
+                currentStep = 0;
+                errorMessage = null;
+              });
+            },
             child: RichText(
               text: TextSpan(
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(

@@ -342,7 +342,7 @@ func GetUser(id string) (User, error) {
 	var u User
 	var walletJSON []byte
 	query := `SELECT id, real_name, phone_number, email, profile_photos, age, date_of_birth,
-		height_cm, gender, drinking_pref, smoking_pref,
+		height_cm, gender, COALESCE(drinking_pref, ''), COALESCE(smoking_pref, ''),
 		top_artists, job_title, company, school, degree, instagram_handle, 
 		linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, elo_score,
 		parties_hosted, flake_count, wallet_data, location_lat, location_lon, COALESCE(bio, ''),

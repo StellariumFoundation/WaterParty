@@ -156,16 +156,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late TextEditingController _linkedInCtrl;
   late TextEditingController _xCtrl;
   late TextEditingController _tiktokCtrl;
+  late TextEditingController _heightCtrl;
 
   // --- Local State for Non-Text Fields ---
   int _age = 18;
   int _heightCm = 170;
   String _gender = "OTHER";
-  String _drinking = "Social";
-  String _smoking = "No";
+  String _drinking = "";
+  String _smoking = "";
 
-  // Options for Dropdowns
-  final List<String> _habitOptions = ["No", "Social", "Yes"];
+  // Options for Dropdowns - includes "Do not disclose" option
+  final List<String> _habitOptions = ["", "No", "Social", "Yes"];
+  final Map<String, String> _habitLabels = {
+    "": "Do not disclose",
+    "No": "No",
+    "Social": "Social",
+    "Yes": "Yes",
+  };
+
+  // Gender options with "Prefer not to say"
+  final List<String> _genderOptions = ["", "MALE", "FEMALE", "OTHER"];
+  final Map<String, String> _genderLabels = {
+    "": "Prefer not to say",
+    "MALE": "Male",
+    "FEMALE": "Female",
+    "OTHER": "Other",
+  };
 
   @override
   void initState() {
@@ -200,14 +216,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _linkedInCtrl = TextEditingController(text: currentUser.linkedinHandle);
     _xCtrl = TextEditingController(text: currentUser.xHandle);
     _tiktokCtrl = TextEditingController(text: currentUser.tiktokHandle);
+    _heightCtrl = TextEditingController(
+      text: currentUser.heightCm > 0 ? currentUser.heightCm.toString() : '',
+    );
 
+    // Initialize fields - allow empty/undisclosed values
     _age = currentUser.age == 0 ? 18 : currentUser.age;
-    _heightCm = currentUser.heightCm == 0 ? 170 : currentUser.heightCm;
-    _gender = currentUser.gender.isEmpty ? "OTHER" : currentUser.gender;
-    _drinking = currentUser.drinkingPref.isEmpty
-        ? "Social"
-        : currentUser.drinkingPref;
-    _smoking = currentUser.smokingPref.isEmpty ? "No" : currentUser.smokingPref;
+    _heightCm = currentUser.heightCm;
+    _gender = currentUser.gender;
+    _drinking = currentUser.drinkingPref;
+    _smoking = currentUser.smokingPref;
   }
 
   @override
@@ -223,14 +241,90 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _linkedInCtrl.dispose();
     _xCtrl.dispose();
     _tiktokCtrl.dispose();
+    _heightCtrl.dispose();
     super.dispose();
   }
 
   void _toggleEdit() {
     if (isEditing) {
+      // Validate all fields before saving
+      if (!_validateFields()) {
+        // Validation failed, don't exit edit mode
+        return;
+      }
       _saveChanges();
     }
     setState(() => isEditing = !isEditing);
+  }
+
+  /// Validates all required fields before saving profile
+  /// Returns true if validation passes, false otherwise
+  bool _validateFields() {
+    final currentUser = ref.read(authProvider).value;
+    if (currentUser == null) return false;
+
+    // Validate required fields
+    final validations = <String, String>{'Name': _realNameCtrl.text.trim()};
+
+    final errors = <String>[];
+    validations.forEach((fieldName, value) {
+      if (value.isEmpty) {
+        errors.add('$fieldName is required');
+      }
+    });
+
+    // Validate age (must be reasonable)
+    if (_age < 13 || _age > 120) {
+      errors.add('Age must be between 13 and 120');
+    }
+
+    // Validate height if provided (must be reasonable)
+    if (_heightCm > 0 && (_heightCm < 50 || _heightCm > 300)) {
+      errors.add('Height must be between 50cm and 300cm');
+    }
+
+    // Validate phone number if provided (must contain only digits and be valid length)
+    final phone = _phoneCtrl.text.trim();
+    if (phone.isNotEmpty) {
+      // Remove common phone formatting characters for validation
+      final digitsOnly = phone.replaceAll(RegExp(r'[^\d]'), '');
+      if (digitsOnly.length < 8 || digitsOnly.length > 15) {
+        errors.add('Phone number must be between 8 and 15 digits');
+      }
+      // Check if phone contains only allowed characters (digits, +, -, space, parentheses)
+      if (!RegExp(r'^[\d\+\-\s\(\)]+$').hasMatch(phone)) {
+        errors.add(
+          'Phone number can only contain numbers, +, -, spaces, and parentheses',
+        );
+      }
+    }
+
+    if (errors.isNotEmpty) {
+      // Show validation errors
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Please fix the following:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                ...errors.map((e) => Text('• $e')),
+              ],
+            ),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return false;
+    }
+
+    return true;
   }
 
   void _saveChanges() async {
@@ -726,21 +820,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildLifestyleSection() {
-    // Lifestyle fields often have defaults, but let's check if they are "unset" or default
-    // _heightCm (default 170), _drinking (default "Social"), _smoking (default "No")
-    // If the user hasn't touched them, they might still be at defaults.
-    // However, the request is to hide if "no data".
-    // Usually, this refers to optional fields. Lifestyle fields here seem to have defaults.
-    // Let's assume height 0 or empty gender/prefs means no data.
-
+    // Lifestyle fields can now be empty (undisclosed)
+    // Show section if editing OR if there's any data to display
     bool hasData =
         _heightCm > 0 ||
-        _gender != "OTHER" ||
-        _drinking != "Social" ||
-        _smoking != "No";
-    // Actually, "Social" and "No" are data points.
-    // Maybe the user wants to hide the section if it's just defaults?
-    // Let's stick to hiding if NOT editing and everything is at default.
+        _gender.isNotEmpty ||
+        _drinking.isNotEmpty ||
+        _smoking.isNotEmpty;
 
     if (!isEditing && !hasData) return const SizedBox();
 
@@ -757,23 +843,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              _genderEditChip("MALE"),
-              const SizedBox(width: 10),
-              _genderEditChip("FEMALE"),
-              const SizedBox(width: 10),
-              _genderEditChip("OTHER"),
-            ],
-          ),
+          _buildGenderDropdown(),
           const SizedBox(height: 20),
+        ],
+        // Show gender in view mode if set
+        if (!isEditing && _gender.isNotEmpty) ...[
+          _buildInfoTile(
+            Icons.person_outline,
+            "Gender",
+            _genderLabels[_gender] ?? _gender,
+          ),
+          const SizedBox(height: 10),
         ],
         Row(
           children: [
             Expanded(
               child: isEditing
                   ? _buildHeightEditTile()
-                  : _buildInfoTile(Icons.straighten, "Height", "$_heightCm cm"),
+                  : _heightCm > 0
+                  ? _buildInfoTile(Icons.straighten, "Height", "$_heightCm cm")
+                  : const SizedBox(),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -805,30 +894,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _genderEditChip(String label) {
-    bool active = _gender == label;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _gender = label),
-        child: Container(
-          height: 45,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: active ? AppColors.textCyan : Colors.white10,
-            ),
-            color: active
-                ? AppColors.textCyan.withValues(alpha: 0.1)
-                : Colors.transparent,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: active ? Colors.white : Colors.white24,
-              fontWeight: FontWeight.bold,
-              fontSize: 10,
-            ),
+  Widget _buildGenderDropdown() {
+    return WaterGlass(
+      height: 60,
+      borderRadius: 15,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 15),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: _genderOptions.contains(_gender) ? _gender : "",
+            dropdownColor: Colors.grey[900],
+            isExpanded: true,
+            icon: const Icon(Icons.arrow_drop_down, color: Colors.white54),
+            items: _genderOptions.map((opt) {
+              return DropdownMenuItem(
+                value: opt,
+                child: Text(
+                  _genderLabels[opt] ?? opt,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: _gender == opt
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
+              );
+            }).toList(),
+            onChanged: (v) {
+              if (v != null) setState(() => _gender = v);
+            },
           ),
         ),
       ),
@@ -847,6 +941,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: TextField(
+                controller: _heightCtrl,
                 keyboardType: TextInputType.number,
                 style: const TextStyle(
                   color: Colors.white,
@@ -854,11 +949,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   fontSize: 13,
                 ),
                 decoration: const InputDecoration(
-                  hintText: "Height",
+                  hintText: "Height (cm) - optional",
+                  hintStyle: TextStyle(color: Colors.white30, fontSize: 12),
                   border: InputBorder.none,
                   isDense: true,
                 ),
-                onChanged: (v) => _heightCm = int.tryParse(v) ?? _heightCm,
+                onChanged: (v) {
+                  if (v.trim().isEmpty) {
+                    _heightCm = 0; // 0 means not disclosed
+                  } else {
+                    final parsed = int.tryParse(v);
+                    if (parsed != null) {
+                      _heightCm = parsed;
+                    }
+                  }
+                },
               ),
             ),
           ],
@@ -873,9 +978,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     String value,
     Function(String) onChanged,
   ) {
+    // In view mode, don't show tile if value is empty (undisclosed)
     if (!isEditing) {
-      return _buildInfoTile(icon, label, value);
+      if (value.isEmpty) return const SizedBox();
+      return _buildInfoTile(icon, label, _habitLabels[value] ?? value);
     }
+
     return WaterGlass(
       height: 60,
       borderRadius: 15,
@@ -888,23 +996,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             Expanded(
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: _habitOptions.contains(value)
-                      ? value
-                      : _habitOptions.first,
+                  value: _habitOptions.contains(value) ? value : "",
                   dropdownColor: Colors.grey[900],
                   isDense: true,
-                  items: _habitOptions
-                      .map(
-                        (opt) => DropdownMenuItem(
-                          value: opt,
-                          child: Text(
-                            opt,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: Colors.white),
-                          ),
+                  isExpanded: true,
+                  icon: const Icon(
+                    Icons.arrow_drop_down,
+                    color: Colors.white54,
+                    size: 20,
+                  ),
+                  items: _habitOptions.map((opt) {
+                    return DropdownMenuItem(
+                      value: opt,
+                      child: Text(
+                        _habitLabels[opt] ?? opt,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: value == opt
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
-                      )
-                      .toList(),
+                      ),
+                    );
+                  }).toList(),
                   onChanged: (v) {
                     if (v != null) onChanged(v);
                   },
@@ -988,12 +1102,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           "Add Degree",
         ),
         const SizedBox(height: 10),
-        _buildListInput(
-          _phoneCtrl,
-          Icons.phone_outlined,
-          "Phone Number",
-          "Add Phone",
-        ),
+        _buildPhoneInput(),
       ],
     );
   }
@@ -1137,6 +1246,41 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               horizontal: 10,
               vertical: 15,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhoneInput() {
+    if (!isEditing && _phoneCtrl.text.trim().isEmpty) {
+      return const SizedBox();
+    }
+
+    return WaterGlass(
+      height: 55,
+      borderRadius: 15,
+      child: TextField(
+        controller: _phoneCtrl,
+        enabled: isEditing,
+        keyboardType: TextInputType.phone,
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: Colors.white),
+        decoration: InputDecoration(
+          prefixIcon: Icon(
+            Icons.phone_outlined,
+            color: AppColors.textCyan.withValues(alpha: 0.4),
+            size: 18,
+          ),
+          hintText: "Phone Number",
+          hintStyle: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: Colors.white24),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 15,
           ),
         ),
       ),

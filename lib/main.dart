@@ -10,8 +10,12 @@ import 'profile.dart'; // Profile
 import 'auth.dart'; // Auth Screen
 import 'api.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize cache manager before app starts
+  await CacheManager.initialize();
+
   runApp(const ProviderScope(child: WaterPartyApp()));
 }
 
