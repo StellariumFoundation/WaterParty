@@ -181,6 +181,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         displayTitle = party.title;
       }
     }
+    final thumb = partyCache[currentRoom.partyId]?.thumbnail;
 
     if (displayTitle.isEmpty || displayTitle == 'PARTY CHAT') {
       displayTitle = currentRoom.isGroup ? 'PARTY CHAT' : 'DIRECT MESSAGE';
@@ -224,9 +225,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               : (currentRoom.imageUrl.startsWith("http")
                                     ? NetworkImage(currentRoom.imageUrl)
                                     : NetworkImage(
-                                        AppConstants.assetUrl(
-                                          currentRoom.imageUrl,
-                                        ),
+                                        AppConstants.assetUrl(thumb!),
                                       )))
                           as ImageProvider,
                   radius: 18,
@@ -504,12 +503,33 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Failed to load applicants. Pull down to retry.';
-        });
+        setState(() => _isLoading = false);
+        _showErrorSnackBar('Failed to load applicants. Pull down to retry.');
       }
     }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(message, style: const TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.redAccent,
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'RETRY',
+          textColor: Colors.white,
+          onPressed: _fetchApplicants,
+        ),
+      ),
+    );
   }
 
   @override
@@ -661,33 +681,16 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
       );
     }
 
-    // Show error state
+    // Show error state via SnackBar, return empty list here
     if (_errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
-            const SizedBox(height: 16),
-            Text(
-              _errorMessage!,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: AppFontSizes.md,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _fetchApplicants,
-              icon: const Icon(Icons.refresh),
-              label: const Text('RETRY'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.textCyan,
-                foregroundColor: Colors.black,
-              ),
-            ),
-          ],
+      return const Center(
+        child: Text(
+          'PULL DOWN TO REFRESH',
+          style: TextStyle(
+            color: Colors.white38,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+          ),
         ),
       );
     }
@@ -811,34 +814,8 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
             padding: const EdgeInsets.all(15),
             child: Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    width: 70,
-                    height: 70,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      width: 70,
-                      height: 70,
-                      color: Colors.grey[800],
-                      child: const Center(
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) {
-                      debugPrint(
-                        '[UserManagementScreen] Image load error: $url - $error',
-                      );
-                      return Container(
-                        width: 70,
-                        height: 70,
-                        color: Colors.grey[800],
-                        child: const Icon(Icons.person, color: Colors.white54),
-                      );
-                    },
-                  ),
-                ),
+                // Photo carousel showing all user photos
+                _buildUserPhotoCarousel(user),
                 const SizedBox(width: 15),
                 Expanded(
                   child: Column(
@@ -853,27 +830,56 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                           fontSize: AppFontSizes.md,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      // Show job/school info if available
+                      const SizedBox(height: 6),
+                      // Show job/school info with icons
                       if (user.jobTitle.isNotEmpty)
-                        Text(
-                          "${user.jobTitle}${user.company.isNotEmpty ? ' at ${user.company}' : ''}",
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: AppFontSizes.sm,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.work_outline,
+                              size: 12,
+                              color: Colors.white.withOpacity(0.5),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                "${user.jobTitle}${user.company.isNotEmpty ? ' at ${user.company}' : ''}",
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.8),
+                                  fontSize: AppFontSizes.sm,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       if (user.school.isNotEmpty)
-                        Text(
-                          "${user.school}${user.degree.isNotEmpty ? ' - ${user.degree}' : ''}",
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: AppFontSizes.sm,
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.school_outlined,
+                                size: 12,
+                                color: Colors.white.withOpacity(0.5),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  "${user.school}${user.degree.isNotEmpty ? ' - ${user.degree}' : ''}",
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.8),
+                                    fontSize: AppFontSizes.sm,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       const SizedBox(height: 4),
                       Row(
@@ -996,6 +1002,91 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Builds a horizontal photo carousel for user card showing all profile photos
+  Widget _buildUserPhotoCarousel(User user) {
+    // Collect all available photos
+    final List<String> allPhotos = [];
+
+    // Add all profile photos
+    for (final photo in user.profilePhotos) {
+      if (photo.isNotEmpty && !allPhotos.contains(photo)) {
+        allPhotos.add(photo);
+      }
+    }
+
+    // If no photos available, show placeholder
+    if (allPhotos.isEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 70,
+          height: 70,
+          color: Colors.grey[600],
+          child: const Icon(Icons.person, color: Colors.white54),
+        ),
+      );
+    }
+
+    // If only one photo, show it directly
+    if (allPhotos.length == 1) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: CachedNetworkImage(
+          imageUrl: AppConstants.assetUrl(allPhotos.first),
+          width: 70,
+          height: 70,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(
+            width: 70,
+            height: 70,
+            color: Colors.grey[800],
+            child: const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+          errorWidget: (context, url, error) => Container(
+            width: 70,
+            height: 70,
+            color: Colors.grey[800],
+            child: const Icon(Icons.person, color: Colors.white54),
+          ),
+        ),
+      );
+    }
+
+    // Multiple photos - show horizontal scrollable carousel
+    return Container(
+      width: 70,
+      height: 70,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.grey[800],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: PageView.builder(
+          itemCount: allPhotos.length,
+          itemBuilder: (context, index) {
+            return CachedNetworkImage(
+              imageUrl: AppConstants.assetUrl(allPhotos[index]),
+              fit: BoxFit.cover,
+              placeholder: (context, url) => Container(
+                color: Colors.grey[800],
+                child: const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: Colors.grey[800],
+                child: const Icon(Icons.person, color: Colors.white54),
+              ),
+            );
+          },
         ),
       ),
     );

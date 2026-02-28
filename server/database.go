@@ -358,16 +358,16 @@ func CreateParty(p Party) (string, error) {
 
 	// Insert party
 	partyQuery := `INSERT INTO parties (
-		host_id, host_id, title, description, party_photos, start_time, duration_hours, status,
+		host_id, title, description, party_photos, start_time, duration_hours, status,
 		is_location_revealed, address, city, geo_lat, geo_lon, max_capacity, current_guest_count,
 		vibe_tags, rules, chat_room_id, thumbnail, created_at, updated_at
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) 
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) 
 	RETURNING id`
 
 	var partyID string
 	now := time.Now()
 	err = tx.QueryRow(context.Background(), partyQuery,
-		p.HostID, p.HostID, p.Title, p.Description, p.PartyPhotos, p.StartTime, p.DurationHours, p.Status,
+		p.HostID, p.Title, p.Description, p.PartyPhotos, p.StartTime, p.DurationHours, p.Status,
 		p.IsLocationRevealed, p.Address, p.City, p.GeoLat, p.GeoLon, p.MaxCapacity, 1, // current_guest_count = 1 (creator)
 		p.VibeTags, p.Rules, p.ChatRoomID, p.Thumbnail, now, now,
 	).Scan(&partyID)
