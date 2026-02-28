@@ -183,6 +183,7 @@ class SocketService {
   final Ref ref;
   WebSocketChannel? _channel;
   bool _isConnected = false;
+  bool _shouldReconnect = true;
 
   // Public getter for connection status
   bool get isConnected => _isConnected;
@@ -196,7 +197,12 @@ class SocketService {
   SocketService(this.ref);
 
   void connect(String uid) {
-    if (_isConnected) return;
+    print('[SocketService] connect() called with uid: $uid');
+    if (_isConnected) {
+      print('[SocketService] Already connected, skipping');
+      return;
+    }
+    _shouldReconnect = true;
 
     final uri = Uri.parse('ws://$serverUrl/ws?uid=$uid');
     print('[WebSocket] Connecting to: ws://$serverUrl/ws?uid=$uid');
@@ -210,20 +216,33 @@ class SocketService {
         _handleIncomingMessage(data);
       },
       onDone: () {
-        print('[WebSocket] Connection closed - attempting reconnect');
-        _reconnect(uid);
+        print('[WebSocket] Connection closed');
+        if (_shouldReconnect) {
+          print('[WebSocket] Attempting reconnect');
+          _reconnect(uid);
+        } else {
+          print('[WebSocket] Reconnect skipped (intentional disconnect)');
+        }
       },
       onError: (err) {
         print('[WebSocket] Connection error: $err');
-        _reconnect(uid);
+        if (_shouldReconnect) {
+          _reconnect(uid);
+        } else {
+          print('[WebSocket] Reconnect skipped (intentional disconnect)');
+        }
       },
     );
 
-    // Request latest user data and chats from server immediately after connection
-    sendMessage(SocketEvents.getUser, {});
+    // Request all user data from server immediately after connection
+    // Note: getUser is NOT called here - user data comes from login response
+    // PROFILE_UPDATED should only fire when user edits their profile
     sendMessage(SocketEvents.getChats, {});
-    // Request user's parties (hosted and matched)
     sendMessage(SocketEvents.getMyParties, {});
+    sendMessage(SocketEvents.getNotifications, {});
+    sendMessage(SocketEvents.getMatchedUsers, {});
+    sendMessage(SocketEvents.getBlockedUsers, {});
+    sendMessage(SocketEvents.getDMs, {});
   }
 
   void _handleIncomingMessage(dynamic rawData) {
@@ -263,15 +282,33 @@ class SocketService {
           break;
         }
         final user = User.fromMap(payload);
+        print(
+          '[WebSocket] PROFILE_UPDATED: UserID=${user.id}, Name=${user.realName}, Email=${user.email}',
+        );
         ref.read(authProvider.notifier).updateUserProfile(user);
         print(
           '[WebSocket] PROFILE_UPDATED processed successfully, user profile updated',
         );
         break;
       case SocketServerEvents.chatsList:
+        print('[WebSocket] CHATS_LIST received: $payload');
+        if (payload == null) {
+          print('[WebSocket] CHATS_LIST payload is null, setting empty list');
+          ref.read(chatProvider.notifier).setRooms([]);
+          break;
+        }
         final List<dynamic> roomsRaw = payload;
         final rooms = roomsRaw.map((r) => ChatRoom.fromMap(r)).toList();
+        print('[WebSocket] CHATS_LIST: Received ${rooms.length} rooms');
+        for (final room in rooms) {
+          print(
+            '[WebSocket] CHATS_LIST: RoomID=${room.id}, Title=${room.title}, PartyID=${room.partyId}',
+          );
+        }
         ref.read(chatProvider.notifier).setRooms(rooms);
+        print(
+          '[WebSocket] CHATS_LIST: Stored ${rooms.length} rooms in provider',
+        );
         break;
       case SocketServerEvents.newChatRoom:
         print('[WebSocket] Processing NEW_CHAT_ROOM: $payload');
@@ -376,6 +413,12 @@ class SocketService {
         break;
       case SocketServerEvents.myParties:
         print('[WebSocket] MY_PARTIES received: $payload');
+        if (payload == null) {
+          print('[WebSocket] MY_PARTIES payload is null, setting empty list');
+          ref.read(myPartiesProvider.notifier).setParties([]);
+          ref.read(partyCacheProvider.notifier).clear();
+          break;
+        }
         final List<dynamic> partiesRaw = payload as List<dynamic>;
         final parties = partiesRaw
             .map((p) => Party.fromMap(p as Map<String, dynamic>))
@@ -416,11 +459,17 @@ class SocketService {
         break;
       case SocketServerEvents.geocodeResult:
         print('[WebSocket] GEOCODE_RESULT received: $payload');
-        // Extract address and city from the payload
-        final address = payload['Address'] as String? ?? '';
-        final city = payload['City'] as String? ?? '';
-        final lat = payload['Lat'] as String? ?? '';
-        final lon = payload['Lon'] as String? ?? '';
+        // Extract address and city from the payload (server sends lowercase)
+        final address =
+            payload['address'] as String? ??
+            payload['Address'] as String? ??
+            '';
+        final city =
+            payload['city'] as String? ?? payload['City'] as String? ?? '';
+        final lat =
+            payload['lat'] as String? ?? payload['Lat'] as String? ?? '';
+        final lon =
+            payload['lon'] as String? ?? payload['Lon'] as String? ?? '';
         print(
           '[WebSocket] Geocode result - Address: $address, City: $city, Lat: $lat, Lon: $lon',
         );
@@ -552,6 +601,11 @@ class SocketService {
 
       case SocketServerEvents.dmsList:
         print('[WebSocket] DMS_LIST received: $payload');
+        if (payload == null) {
+          print('[WebSocket] DMS_LIST payload is null, setting empty list');
+          ref.read(dmConversationsProvider.notifier).setConversations([]);
+          break;
+        }
         final List<dynamic> dmsRaw = payload as List<dynamic>;
         final dmConversations = dmsRaw
             .map((d) => DMConversation.fromMap(d as Map<String, dynamic>))
@@ -649,6 +703,13 @@ class SocketService {
 
       case SocketServerEvents.notificationsList:
         print('[WebSocket] NOTIFICATIONS_LIST received: $payload');
+        if (payload == null) {
+          print(
+            '[WebSocket] NOTIFICATIONS_LIST payload is null, setting empty list',
+          );
+          ref.read(notificationsProvider.notifier).setNotifications([]);
+          break;
+        }
         final List<dynamic> notificationsRaw = payload as List<dynamic>;
         final notifications = notificationsRaw
             .map((n) => Notification.fromMap(n as Map<String, dynamic>))
@@ -704,6 +765,13 @@ class SocketService {
 
       case SocketServerEvents.blockedUsersList:
         print('[WebSocket] BLOCKED_USERS_LIST received: $payload');
+        if (payload == null) {
+          print(
+            '[WebSocket] BLOCKED_USERS_LIST payload is null, setting empty list',
+          );
+          ref.read(blockedUsersProvider.notifier).setBlockedUsers([]);
+          break;
+        }
         final List<dynamic> blockedIDs = payload as List<dynamic>;
         final blockedUserIds = blockedIDs.map((id) => id.toString()).toList();
         ref.read(blockedUsersProvider.notifier).setBlockedUsers(blockedUserIds);
@@ -1292,8 +1360,10 @@ class SocketService {
   }
 
   void disconnect() {
+    _shouldReconnect = false;
     _channel?.sink.close();
     _isConnected = false;
+    print('[SocketService] Disconnected (reconnect disabled)');
   }
 }
 

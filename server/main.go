@@ -147,14 +147,13 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		is_verified, trust_score, elo_score, parties_hosted, flake_count,
 		wallet_data, location_lat, location_lon, bio, last_active_at, created_at
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 
-		$14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31) 
+		$14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30) 
 	RETURNING id, last_active_at`
 
 	var lastActiveAt time.Time
 	err := db.QueryRow(context.Background(), query,
 		u.RealName, u.PhoneNumber, u.Email, string(hash), u.ProfilePhotos, u.Age, u.DateOfBirth,
-		u.HeightCm, u.Gender, u.DrinkingPref, u.SmokingPref,
-		u.TopArtists, u.JobTitle, u.Company, u.School, u.Degree,
+		u.HeightCm, u.Gender, u.DrinkingPref, u.SmokingPref, u.JobTitle, u.Company, u.School, u.Degree,
 		u.InstagramHandle, u.LinkedinHandle, u.XHandle, u.TikTokHandle,
 		u.IsVerified, u.TrustScore, u.EloScore, u.PartiesHosted, u.FlakeCount,
 		walletJSON, u.LocationLat, u.LocationLon, u.Bio, now, now,

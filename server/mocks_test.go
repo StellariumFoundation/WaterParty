@@ -148,7 +148,6 @@ func CreateTestUser(id string) User {
 		Gender:          "Male",
 		DrinkingPref:    "Socially",
 		SmokingPref:     "Never",
-		TopArtists:      []string{"Artist1", "Artist2"},
 		JobTitle:        "Engineer",
 		Company:         "Test Corp",
 		School:          "Test University",

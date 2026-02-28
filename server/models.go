@@ -65,7 +65,6 @@ type User struct {
 	Gender          string     `json:"Gender" db:"gender"`
 	DrinkingPref    string     `json:"DrinkingPref" db:"drinking_pref"`
 	SmokingPref     string     `json:"SmokingPref" db:"smoking_pref"`
-	TopArtists      []string   `json:"TopArtists" db:"top_artists"`
 	JobTitle        string     `json:"JobTitle" db:"job_title"`
 	Company         string     `json:"Company" db:"company"`
 	School          string     `json:"School" db:"school"`

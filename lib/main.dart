@@ -1,7 +1,7 @@
 // main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'theme.dart';
+import 'theme.dart' show AppTheme, AppColors;
 import 'providers.dart';
 import 'match.dart'; // Feed
 import 'matches.dart'; // Chat
@@ -12,9 +12,6 @@ import 'api.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize cache manager before app starts
-  await CacheManager.initialize();
 
   runApp(const ProviderScope(child: WaterPartyApp()));
 }
@@ -52,7 +49,11 @@ class WaterPartyApp extends ConsumerWidget {
             ),
           );
         },
-        error: (e, st) => const AuthScreen(),
+        error: (e, st) {
+          debugPrint('[AuthProvider] Error: $e');
+          debugPrint('[AuthProvider] Stack trace: $st');
+          return const AuthScreen();
+        },
       ),
     );
   }

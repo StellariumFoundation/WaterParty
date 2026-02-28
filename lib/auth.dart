@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -216,6 +217,24 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
             .login(_emailCtrl.text, _passCtrl.text);
         // DEBUG
         print('AUTH: login success');
+
+        // Print the user object received from server
+        final user = ref.read(authProvider).value;
+        if (user != null) {
+          print('AUTH: Logged in user JSON:');
+          print(jsonEncode(user.toMap()));
+        } else {
+          print('AUTH: ERROR - User is null after login!');
+        }
+
+        // Clear registration draft on successful login
+        final prefs = await SharedPreferences.getInstance();
+        final keys = prefs.getKeys().where((k) => k.startsWith('reg_'));
+        for (var k in keys) {
+          await prefs.remove(k);
+        }
+        // DEBUG
+        print('AUTH: cleared registration draft after login');
       } catch (e) {
         // DEBUG
         print('AUTH: login error ' + e.toString());
@@ -812,6 +831,25 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
               // If switching from login to register mode, clear any existing session
               if (isLogin) {
                 await ref.read(authProvider.notifier).logout();
+                // Clear all registration controllers
+                _emailCtrl.clear();
+                _passCtrl.clear();
+                _realNameCtrl.clear();
+                _phoneCtrl.clear();
+                _heightCtrl.clear();
+                _bioCtrl.clear();
+                _jobCtrl.clear();
+                _compCtrl.clear();
+                _schoolCtrl.clear();
+                _degreeCtrl.clear();
+                _instaCtrl.clear();
+                _linkedInCtrl.clear();
+                _xCtrl.clear();
+                _tiktokCtrl.clear();
+                _walletTypeCtrl.clear();
+                _walletDataCtrl.clear();
+                _selectedBirthDate = null;
+                _selectedGender = "OTHER";
               }
               setState(() {
                 isLogin = !isLogin;

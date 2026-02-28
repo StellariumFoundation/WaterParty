@@ -40,235 +40,11 @@ func InitDB(connString string) {
 	}
 
 	// Run the schema setup
-	if err := runMigrations(); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
+	if err := Migrate(); err != nil {
+		log.Fatalf("❌ Database migration failed: %v", err)
 	}
 
 	fmt.Println("✅ Database initialized and schema verified.")
-}
-
-func runMigrations() error {
-	Migrate()
-	script := `-- ==========================================
--- EXTENSIONS
--- ==========================================
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- ==========================================
--- ASSET STORAGE
--- ==========================================
-CREATE TABLE IF NOT EXISTS assets (
-    hash TEXT PRIMARY KEY,
-    data BYTEA NOT NULL,
-    mime_type TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ==========================================
--- USERS TABLE
--- ==========================================
-CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    real_name TEXT DEFAULT '',
-    phone_number TEXT DEFAULT '',
-    email TEXT UNIQUE,
-    password_hash TEXT,
-    profile_photos TEXT[] DEFAULT '{}',
-    age INTEGER,
-    date_of_birth TIMESTAMP WITH TIME ZONE,
-    height_cm INTEGER,
-    gender TEXT DEFAULT '',
-    drinking_pref TEXT DEFAULT '',
-    smoking_pref TEXT DEFAULT '',
-    top_artists TEXT[] DEFAULT '{}',
-    job_title TEXT DEFAULT '',
-    company TEXT DEFAULT '',
-    school TEXT DEFAULT '',
-    degree TEXT DEFAULT '',
-    instagram_handle TEXT DEFAULT '',
-    linkedin_handle TEXT DEFAULT '',
-    x_handle TEXT DEFAULT '',
-    tiktok_handle TEXT DEFAULT '',
-    is_verified BOOLEAN DEFAULT FALSE,
-    trust_score DOUBLE PRECISION DEFAULT 0.0,
-    elo_score DOUBLE PRECISION DEFAULT 0.0,
-    parties_hosted INTEGER DEFAULT 0,
-    flake_count INTEGER DEFAULT 0,
-    wallet_data JSONB DEFAULT '{}',
-    location_lat DOUBLE PRECISION,
-    location_lon DOUBLE PRECISION,
-    bio TEXT DEFAULT '',
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    thumbnail TEXT DEFAULT ''
-);
-
--- ==========================================
--- PARTIES TABLE
--- ==========================================
-CREATE TABLE IF NOT EXISTS parties (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    host_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title TEXT NOT NULL,
-    description TEXT,
-    party_photos TEXT[] DEFAULT '{}',
-    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    duration_hours INTEGER DEFAULT 2,
-    status TEXT NOT NULL DEFAULT 'OPEN',
-    is_location_revealed BOOLEAN DEFAULT FALSE,
-    address TEXT,
-    city TEXT,
-    geo_lat DOUBLE PRECISION,
-    geo_lon DOUBLE PRECISION,
-    max_capacity INTEGER DEFAULT 0,
-    current_guest_count INTEGER DEFAULT 0,
-    auto_lock_on_full BOOLEAN DEFAULT FALSE,
-    vibe_tags TEXT[] DEFAULT '{}',
-    rules TEXT[] DEFAULT '{}',
-    chat_room_id UUID,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    thumbnail TEXT
-);
-
--- ==========================================
--- PARTY APPLICATIONS
--- ==========================================
-CREATE TABLE IF NOT EXISTS party_applications (
-    party_id UUID NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    status TEXT NOT NULL DEFAULT 'PENDING',
-    applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    PRIMARY KEY (party_id, user_id)
-);
-
--- ==========================================
--- CROWDFUNDING
--- ==========================================
-CREATE TABLE IF NOT EXISTS crowdfunding (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    party_id UUID UNIQUE NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
-    target_amount DOUBLE PRECISION DEFAULT 0.0,
-    current_amount DOUBLE PRECISION DEFAULT 0.0,
-    currency TEXT DEFAULT 'USD',
-    contributors JSONB DEFAULT '[]',
-    is_funded BOOLEAN DEFAULT FALSE
-);
-
--- ==========================================
--- CHAT SYSTEM
--- ==========================================
-CREATE TABLE IF NOT EXISTS chat_rooms (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    party_id UUID REFERENCES parties(id) ON DELETE CASCADE,
-    host_id UUID NOT NULL REFERENCES users(id),
-    title TEXT,
-    image_url TEXT,
-    is_group BOOLEAN DEFAULT TRUE,
-    participant_ids UUID[] DEFAULT '{}',
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS chat_messages (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    chat_id UUID NOT NULL,
-    sender_id UUID NOT NULL REFERENCES users(id),
-    type TEXT NOT NULL DEFAULT 'TEXT',
-    content TEXT,
-    media_url TEXT,
-    thumbnail_url TEXT,
-    metadata JSONB DEFAULT '{}',
-    reply_to_id UUID,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ==========================================
--- BLOCKED USERS
--- ==========================================
-CREATE TABLE IF NOT EXISTS blocked_users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    blocker_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    blocked_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(blocker_id, blocked_id)
-);
-
--- ==========================================
--- USER REPORTS
--- ==========================================
-CREATE TABLE IF NOT EXISTS user_reports (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    reporter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    reported_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    reason TEXT NOT NULL,
-    details TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ==========================================
--- PARTY REPORTS
--- ==========================================
-CREATE TABLE IF NOT EXISTS party_reports (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    reporter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    party_id UUID NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
-    reason TEXT NOT NULL,
-    details TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ==========================================
--- NOTIFICATIONS
--- ==========================================
-CREATE TABLE IF NOT EXISTS notifications (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    type TEXT NOT NULL,
-    title TEXT NOT NULL,
-    body TEXT,
-    data TEXT,
-    is_read BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ==========================================
--- INDEXES
--- ==========================================
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_parties_status ON parties(status);
-CREATE INDEX IF NOT EXISTS idx_parties_host_id ON parties(host_id);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_chat_id ON chat_messages(chat_id);
-CREATE INDEX IF NOT EXISTS idx_assets_hash ON assets(hash);
-CREATE INDEX IF NOT EXISTS idx_blocked_users_blocker ON blocked_users(blocker_id);
-CREATE INDEX IF NOT EXISTS idx_blocked_users_blocked ON blocked_users(blocked_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_reports_reported ON user_reports(reported_id);
-CREATE INDEX IF NOT EXISTS idx_party_reports_party ON party_reports(party_id);
-
--- ==========================================
--- TRIGGERS & FUNCTIONS
--- ==========================================
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $func$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$func$ language 'plpgsql';
-
-DO $trigger$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_party_modtime') THEN
-        CREATE TRIGGER update_party_modtime
-            BEFORE UPDATE ON parties
-            FOR EACH ROW
-            EXECUTE PROCEDURE update_updated_at_column();
-    END IF;
-END $trigger$;
-`
-	_, err := db.Exec(context.Background(), script)
-	return err
 }
 
 // ==========================================
@@ -295,14 +71,21 @@ func GetAsset(hash string) ([]byte, string, error) {
 	return data, mimeType, err
 }
 
+// DeleteAsset removes an asset from the database by hash.
+func DeleteAsset(hash string) error {
+	_, err := db.Exec(context.Background(),
+		"DELETE FROM assets WHERE hash = $1", hash)
+	return err
+}
+
 // CreateThumbnail generates a 150x150 thumbnail from image data.
 func CreateThumbnail(data []byte) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
-	// Resize to 150x150
-	m := resize.Resize(150, 0, img, resize.Lanczos3)
+	// Resize to 300p
+	m := resize.Resize(300, 0, img, resize.Lanczos3)
 	buf := new(bytes.Buffer)
 	err = jpeg.Encode(buf, m, nil)
 	return buf.Bytes(), err
@@ -316,21 +99,19 @@ func CreateUser(u User) (string, error) {
 	walletJSON, _ := json.Marshal(u.WalletData)
 	query := `INSERT INTO users (
 		real_name, phone_number, email, profile_photos, age, 
-		date_of_birth,height_cm, gender, drinking_pref, smoking_pref,
-		top_artists, job_title, company, school, degree,
+		date_of_birth,height_cm, gender, drinking_pref, smoking_pref,job_title, company, school, degree,
 		instagram_handle, linkedin_handle, x_handle, tiktok_handle,is_verified, 
 		trust_score, elo_score, parties_hosted, flake_count,wallet_data, 
 		location_lat, location_lon, bio, updated_at, thumbnail
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 
-		$13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32) 
+		$13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30) 
 	RETURNING id`
 
 	var id string
 	now := time.Now()
 	err := db.QueryRow(context.Background(), query,
 		u.RealName, u.PhoneNumber, u.Email, u.ProfilePhotos, u.Age,
-		u.DateOfBirth, u.HeightCm, u.Gender, u.DrinkingPref, u.SmokingPref,
-		u.TopArtists, u.JobTitle, u.Company, u.School, u.Degree,
+		u.DateOfBirth, u.HeightCm, u.Gender, u.DrinkingPref, u.SmokingPref, u.JobTitle, u.Company, u.School, u.Degree,
 		u.InstagramHandle, u.LinkedinHandle, u.XHandle, u.TikTokHandle, u.IsVerified,
 		u.TrustScore, u.EloScore, u.PartiesHosted, u.FlakeCount, walletJSON,
 		u.LocationLat, u.LocationLon, u.Bio, &now, u.Thumbnail,
@@ -340,24 +121,28 @@ func CreateUser(u User) (string, error) {
 
 func GetUser(id string) (User, error) {
 	var u User
+	var passwordHash string
 	var walletJSON []byte
-	query := `SELECT id, real_name, phone_number, email, profile_photos, age, date_of_birth,
-		height_cm, gender, COALESCE(drinking_pref, ''), COALESCE(smoking_pref, ''),
-		top_artists, job_title, company, school, degree, instagram_handle, 
-		linkedin_handle, x_handle, tiktok_handle, is_verified, trust_score, elo_score,
-		parties_hosted, flake_count, wallet_data, location_lat, location_lon, COALESCE(bio, ''),
-		updated_at, created_at, COALESCE(thumbnail, '') FROM users WHERE id = $1`
+	var profilePhotos []string
+	query := `SELECT id, real_name, COALESCE(phone_number, ''), email, password_hash, COALESCE(profile_photos, '{}'), age, 
+		date_of_birth, height_cm, gender, COALESCE(drinking_pref, ''), COALESCE(smoking_pref, ''), 
+		COALESCE(job_title, ''), COALESCE(company, ''), COALESCE(school, ''), COALESCE(degree, ''), COALESCE(instagram_handle, ''), 
+		COALESCE(linkedin_handle, ''), COALESCE(x_handle, ''), COALESCE(tiktok_handle, ''), is_verified, trust_score, 
+		elo_score, parties_hosted, flake_count, COALESCE(wallet_data::text, '{}'), location_lat, location_lon, 
+		updated_at, created_at, COALESCE(bio, ''), COALESCE(thumbnail, '') 
+		FROM users WHERE id = $1`
 
 	err := db.QueryRow(context.Background(), query, id).Scan(
-		&u.ID, &u.RealName, &u.PhoneNumber, &u.Email, &u.ProfilePhotos, &u.Age, &u.DateOfBirth,
-		&u.HeightCm, &u.Gender, &u.DrinkingPref, &u.SmokingPref,
-		&u.TopArtists, &u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle,
-		&u.LinkedinHandle, &u.XHandle, &u.TikTokHandle, &u.IsVerified, &u.TrustScore, &u.EloScore,
-		&u.PartiesHosted, &u.FlakeCount, &walletJSON, &u.LocationLat, &u.LocationLon, &u.Bio,
-		&u.UpdatedAt, &u.CreatedAt, &u.Thumbnail,
+		&u.ID, &u.RealName, &u.PhoneNumber, &u.Email, &passwordHash, &profilePhotos, &u.Age,
+		&u.DateOfBirth, &u.HeightCm, &u.Gender, &u.DrinkingPref, &u.SmokingPref,
+		&u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle,
+		&u.LinkedinHandle, &u.XHandle, &u.TikTokHandle, &u.IsVerified, &u.TrustScore,
+		&u.EloScore, &u.PartiesHosted, &u.FlakeCount, &walletJSON, &u.LocationLat, &u.LocationLon,
+		&u.UpdatedAt, &u.CreatedAt, &u.Bio, &u.Thumbnail,
 	)
 	if err == nil {
 		json.Unmarshal(walletJSON, &u.WalletData)
+		u.ProfilePhotos = profilePhotos
 	}
 	return u, err
 }
@@ -367,10 +152,9 @@ func GetUserByEmail(email string) (User, string, error) {
 	var passwordHash string
 	var walletJSON []byte
 	var profilePhotos []string
-	var topArtists []string
 	query := `SELECT id, real_name, COALESCE(phone_number, ''), email, password_hash, COALESCE(profile_photos, '{}'), age, 
 		date_of_birth, height_cm, gender, COALESCE(drinking_pref, ''), COALESCE(smoking_pref, ''), 
-		COALESCE(top_artists, '{}'), COALESCE(job_title, ''), COALESCE(company, ''), COALESCE(school, ''), COALESCE(degree, ''), COALESCE(instagram_handle, ''), 
+		 COALESCE(job_title, ''), COALESCE(company, ''), COALESCE(school, ''), COALESCE(degree, ''), COALESCE(instagram_handle, ''), 
 		COALESCE(linkedin_handle, ''), COALESCE(x_handle, ''), COALESCE(tiktok_handle, ''), is_verified, trust_score, 
 		elo_score, parties_hosted, flake_count, COALESCE(wallet_data::text, '{}'), location_lat, location_lon, 
 		updated_at, created_at, COALESCE(bio, ''), COALESCE(thumbnail, '') 
@@ -379,13 +163,14 @@ func GetUserByEmail(email string) (User, string, error) {
 	err := db.QueryRow(context.Background(), query, email).Scan(
 		&u.ID, &u.RealName, &u.PhoneNumber, &u.Email, &passwordHash, &profilePhotos, &u.Age,
 		&u.DateOfBirth, &u.HeightCm, &u.Gender, &u.DrinkingPref, &u.SmokingPref,
-		&topArtists, &u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle,
+		&u.JobTitle, &u.Company, &u.School, &u.Degree, &u.InstagramHandle,
 		&u.LinkedinHandle, &u.XHandle, &u.TikTokHandle, &u.IsVerified, &u.TrustScore,
 		&u.EloScore, &u.PartiesHosted, &u.FlakeCount, &walletJSON, &u.LocationLat, &u.LocationLon,
 		&u.UpdatedAt, &u.CreatedAt, &u.Bio, &u.Thumbnail,
 	)
 	if err == nil {
 		json.Unmarshal(walletJSON, &u.WalletData)
+		u.ProfilePhotos = profilePhotos
 	}
 	return u, passwordHash, err
 }
@@ -564,44 +349,71 @@ func DeleteUser(id string) error {
 // ==========================================
 
 func CreateParty(p Party) (string, error) {
-	query := `INSERT INTO parties (
-		host_id, title, description, party_photos, start_time, duration_hours, status,
-		is_location_revealed, address, city, geo_lat, geo_lon, max_capacity,
-		vibe_tags, rules, chat_room_id, thumbnail
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) 
+	// Use atomic transaction to ensure party and chat room are created together
+	tx, err := db.Begin(context.Background())
+	if err != nil {
+		return "", fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(context.Background())
+
+	// Insert party
+	partyQuery := `INSERT INTO parties (
+		host_id, host_id, title, description, party_photos, start_time, duration_hours, status,
+		is_location_revealed, address, city, geo_lat, geo_lon, max_capacity, current_guest_count,
+		vibe_tags, rules, chat_room_id, thumbnail, created_at, updated_at
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) 
 	RETURNING id`
 
-	var id string
-	err := db.QueryRow(context.Background(), query,
-		p.HostID, p.Title, p.Description, p.PartyPhotos, p.StartTime, p.DurationHours, p.Status,
-		p.IsLocationRevealed, p.Address, p.City, p.GeoLat, p.GeoLon, p.MaxCapacity,
-		p.VibeTags, p.Rules, p.ChatRoomID, p.Thumbnail,
-	).Scan(&id)
+	var partyID string
+	now := time.Now()
+	err = tx.QueryRow(context.Background(), partyQuery,
+		p.HostID, p.HostID, p.Title, p.Description, p.PartyPhotos, p.StartTime, p.DurationHours, p.Status,
+		p.IsLocationRevealed, p.Address, p.City, p.GeoLat, p.GeoLon, p.MaxCapacity, 1, // current_guest_count = 1 (creator)
+		p.VibeTags, p.Rules, p.ChatRoomID, p.Thumbnail, now, now,
+	).Scan(&partyID)
 
-	if err == nil {
-		// Create ChatRoom for the party
-		_, chatErr := CreateChatRoom(ChatRoom{
-			ID:             p.ChatRoomID,
-			PartyID:        id,
-			HostID:         p.HostID,
-			Title:          p.Title,
-			IsGroup:        true,
-			ParticipantIDs: []string{p.HostID},
-		})
-		if chatErr != nil {
-			log.Printf("Warning: Failed to create chat room for party: %v", chatErr)
-		}
+	if err != nil {
+		return "", fmt.Errorf("failed to insert party: %w", err)
+	}
 
-		if p.RotationPool != nil {
-			p.RotationPool.PartyID = id
-			_, poolErr := CreateRotationPool(*p.RotationPool)
-			if poolErr != nil {
-				log.Printf("Warning: Failed to create rotation pool for party: %v", poolErr)
-			}
+	// Insert chat room with creator as participant (for authorization filtering)
+	chatRoomQuery := `INSERT INTO chat_rooms (
+		id, party_id, host_id, title, is_group, participant_ids, is_active, created_at
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
+
+	var chatRoomID string
+	err = tx.QueryRow(context.Background(), chatRoomQuery,
+		p.ChatRoomID, partyID, p.HostID, p.Title, true, []string{p.HostID}, true, now,
+	).Scan(&chatRoomID)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to create chat room: %w", err)
+	}
+
+	// Create crowdfunding/rotation pool if specified
+	if p.RotationPool != nil {
+		contribs, _ := json.Marshal(p.RotationPool.Contributors)
+		rotationQuery := `INSERT INTO crowdfunding (
+			party_id, target_amount, current_amount, currency, contributors, is_funded
+		) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+
+		var rotationID string
+		err = tx.QueryRow(context.Background(), rotationQuery,
+			partyID, p.RotationPool.TargetAmount, p.RotationPool.CurrentAmount,
+			p.RotationPool.Currency, contribs, p.RotationPool.IsFunded,
+		).Scan(&rotationID)
+		if err != nil {
+			return "", fmt.Errorf("failed to create rotation pool: %w", err)
 		}
 	}
 
-	return id, err
+	// Commit transaction
+	if err := tx.Commit(context.Background()); err != nil {
+		return "", fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	log.Printf("CreateParty: Successfully created party %s with chat room %s and participant record", partyID, chatRoomID)
+	return partyID, nil
 }
 
 func GetParty(id string) (Party, error) {
@@ -641,8 +453,18 @@ func DeleteParty(id string) error {
 }
 
 func GetApplicantsForParty(partyID string) ([]map[string]interface{}, error) {
-	query := `SELECT pa.party_id, pa.user_id, pa.status, pa.applied_at,
-		u.real_name, u.profile_photos, u.age, u.elo_score, COALESCE(u.bio, ''), u.trust_score, COALESCE(u.thumbnail, '')
+	// CRITICAL FIX: Select ALL User fields to prevent data truncation in UI
+	// Previously only selected 11 fields, now selecting all 33 fields
+	query := `SELECT 
+		pa.party_id, pa.user_id, pa.status, pa.applied_at,
+		-- Complete User object fields (all 33 fields)
+		u.id, u.real_name, u.phone_number, u.email, u.profile_photos, u.age, 
+		u.date_of_birth, u.height_cm, u.gender, u.drinking_pref, u.smoking_pref,
+		u.job_title, u.company, u.school, u.degree, u.instagram_handle, 
+		u.linkedin_handle, u.x_handle, u.tiktok_handle, u.is_verified, 
+		u.trust_score, u.elo_score, u.parties_hosted, u.flake_count, 
+		u.wallet_data, u.location_lat, u.location_lon, u.last_active_at,
+		u.created_at, u.bio, u.thumbnail
 		FROM party_applications pa
 		JOIN users u ON pa.user_id = u.id
 		WHERE pa.party_id = $1
@@ -656,42 +478,108 @@ func GetApplicantsForParty(partyID string) ([]map[string]interface{}, error) {
 
 	var apps []map[string]interface{}
 	for rows.Next() {
-		var appID, userID, status, realName, bio string
+		// Application fields
+		var partyID, userID, status string
 		var appliedAt time.Time
+
+		// Complete User fields (all 33 fields) - NOT NULL enforced by schema
+		var id, realName, phoneNumber, email string
+		var bio, thumbnail string
 		var profilePhotos []string
 		var age int
-		var eloScore, trustScore float64
-		var thumbnail string
+		var dateOfBirth *time.Time
+		var heightCm int
+		var gender, drinkingPref, smokingPref string
+		var jobTitle, company, school, degree string
+		var instagramHandle, linkedinHandle, xHandle, tiktokHandle string
+		var isVerified bool
+		var trustScore, eloScore float64
+		var partiesHosted, flakeCount int
+		var walletDataJSON []byte
+		var locationLat, locationLon float64
+		var lastActiveAt, createdAt *time.Time
 
-		err := rows.Scan(&appID, &userID, &status, &appliedAt, &realName, &profilePhotos, &age, &eloScore, &bio, &trustScore, &thumbnail)
+		// Scan all 33 User fields - no COALESCE needed due to schema constraints
+		err := rows.Scan(
+			// Application fields (4)
+			&partyID, &userID, &status, &appliedAt,
+			// User fields (29) - all text columns have NOT NULL DEFAULT ''
+			&id, &realName, &phoneNumber, &email, &profilePhotos, &age,
+			&dateOfBirth, &heightCm, &gender, &drinkingPref, &smokingPref,
+			&jobTitle, &company, &school, &degree, &instagramHandle,
+			&linkedinHandle, &xHandle, &tiktokHandle, &isVerified,
+			&trustScore, &eloScore, &partiesHosted, &flakeCount,
+			&walletDataJSON, &locationLat, &locationLon, &lastActiveAt,
+			&createdAt, &bio, &thumbnail,
+		)
 		if err != nil {
+			log.Printf("[ERROR] GetApplicantsForParty: Failed to scan row: %v", err)
 			return nil, err
 		}
 
+		// Parse wallet data JSON
+		var walletData map[string]interface{}
+		if len(walletDataJSON) > 0 {
+			json.Unmarshal(walletDataJSON, &walletData)
+		}
+
+		// Build complete User object with all fields (no NULL handling needed)
+		userMap := map[string]interface{}{
+			"ID":              id,
+			"RealName":        realName,
+			"PhoneNumber":     phoneNumber,
+			"Email":           email,
+			"ProfilePhotos":   profilePhotos,
+			"Age":             age,
+			"DateOfBirth":     dateOfBirth,
+			"HeightCm":        heightCm,
+			"Gender":          gender,
+			"DrinkingPref":    drinkingPref,
+			"SmokingPref":     smokingPref,
+			"JobTitle":        jobTitle,
+			"Company":         company,
+			"School":          school,
+			"Degree":          degree,
+			"InstagramHandle": instagramHandle,
+			"LinkedinHandle":  linkedinHandle,
+			"XHandle":         xHandle,
+			"TikTokHandle":    tiktokHandle,
+			"IsVerified":      isVerified,
+			"TrustScore":      trustScore,
+			"EloScore":        eloScore,
+			"PartiesHosted":   partiesHosted,
+			"FlakeCount":      flakeCount,
+			"WalletData":      walletData,
+			"LocationLat":     locationLat,
+			"LocationLon":     locationLon,
+			"LastActiveAt":    lastActiveAt,
+			"CreatedAt":       createdAt,
+			"Bio":             bio,
+			"Thumbnail":       thumbnail,
+		}
+
 		apps = append(apps, map[string]interface{}{
-			"PartyID":   appID,
+			"PartyID":   partyID,
 			"UserID":    userID,
 			"Status":    status,
 			"AppliedAt": appliedAt,
-			"User": map[string]interface{}{
-				"ID":            userID,
-				"RealName":      realName,
-				"ProfilePhotos": profilePhotos,
-				"Age":           age,
-				"EloScore":      eloScore,
-				"Bio":           bio,
-				"TrustScore":    trustScore,
-				"Thumbnail":     thumbnail,
-			},
+			"User":      userMap,
 		})
 	}
+
+	if err = rows.Err(); err != nil {
+		log.Printf("[ERROR] GetApplicantsForParty: Row iteration error: %v", err)
+		return nil, err
+	}
+
+	log.Printf("[DEBUG] GetApplicantsForParty: Retrieved %d applicants with complete User data for party %s", len(apps), partyID)
 	return apps, nil
 }
 
 // GetAcceptedApplicants returns users who have been accepted to a party
 func GetAcceptedApplicants(partyID string) ([]map[string]interface{}, error) {
 	query := `SELECT pa.party_id, pa.user_id, pa.status, pa.applied_at,
-		u.real_name, u.profile_photos, u.age, u.elo_score, COALESCE(u.bio, ''), u.trust_score, COALESCE(u.thumbnail, '')
+		u.real_name, u.profile_photos, u.age, u.elo_score, u.bio, u.trust_score, u.thumbnail
 		FROM party_applications pa
 		JOIN users u ON pa.user_id = u.id
 		WHERE pa.party_id = $1 AND pa.status = 'ACCEPTED'
@@ -839,6 +727,11 @@ func GetChatRoomsForUser(userID string) ([]map[string]interface{}, error) {
 		FROM chat_rooms cr
 		LEFT JOIN parties p ON cr.party_id = p.id
 		WHERE $1::UUID = ANY(cr.participant_ids)
+		  AND (
+			  p.host_id = $1
+			  OR EXISTS (SELECT 1 FROM party_applications WHERE party_id = p.id AND user_id = $1 AND status = 'ACCEPTED')
+			  OR EXISTS (SELECT 1 FROM party_matches WHERE party_id = p.id AND (creator_id = $1 OR matched_user_id = $1))
+		  )
 		ORDER BY last_message_at DESC NULLS LAST, cr.created_at DESC`
 
 	rows, err := db.Query(context.Background(), query, userID)
@@ -1276,7 +1169,7 @@ func AddContribution(partyID string, contrib Contribution) error {
 	return nil
 }
 
-// GetMyParties returns parties where user is host or has accepted application
+// GetMyParties returns parties where user is creator, participant, or matched
 func GetMyParties(userID string) ([]Party, error) {
 	query := `
 		SELECT id, host_id, title, description, party_photos, start_time, duration_hours, status,
@@ -1284,7 +1177,8 @@ func GetMyParties(userID string) ([]Party, error) {
 		       auto_lock_on_full, vibe_tags, rules, chat_room_id, created_at, updated_at, thumbnail
 		FROM parties
 		WHERE host_id = $1
-		   OR id IN (SELECT party_id FROM party_applications WHERE user_id = $1 AND status = 'ACCEPTED')
+		   OR EXISTS (SELECT 1 FROM party_applications WHERE party_id = parties.id AND user_id = $1 AND status = 'ACCEPTED')
+		   OR EXISTS (SELECT 1 FROM party_matches WHERE party_id = parties.id AND (host_id = $1 OR matched_user_id = $1))
 		ORDER BY created_at DESC
 	`
 

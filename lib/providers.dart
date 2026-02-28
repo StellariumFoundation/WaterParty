@@ -7,603 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'models.dart';
 import 'constants.dart';
+import 'api.dart';
 
 // ============================================
-// CACHE CONFIGURATION & KEYS
-// ============================================
-
-/// Cache keys for all providers to ensure consistency
-class CacheKeys {
-  CacheKeys._();
-
-  // Auth & User
-  static const String userSession = 'cache_user_session';
-  static const String userProfile = 'cache_user_profile';
-  static const String lastLocation = 'cache_last_location';
-
-  // Parties
-  static const String partyFeed = 'cache_party_feed';
-  static const String myParties = 'cache_my_parties';
-  static const String partiesAround = 'cache_parties_around';
-  static const String partyCache = 'cache_party_map';
-  static const String draftParty = 'cache_draft_party';
-
-  // Chat & Messaging
-  static const String chatRooms = 'cache_chat_rooms';
-  static const String chatHistory = 'cache_chat_history';
-  static const String dmConversations = 'cache_dm_conversations';
-  static const String dmHistory = 'cache_dm_history';
-
-  // Social
-  static const String notifications = 'cache_notifications';
-  static const String blockedUsers = 'cache_blocked_users';
-  static const String matchedUsers = 'cache_matched_users';
-
-  // Metadata
-  static const String cacheMetadata = 'cache_metadata';
-  static const String providerVersions = 'cache_provider_versions';
-}
-
-/// Cache metadata for tracking sync state
-class CacheMetadata {
-  final DateTime lastSyncAt;
-  final DateTime lastWriteAt;
-  final int version;
-  final String? syncError;
-  final int syncAttempts;
-
-  const CacheMetadata({
-    required this.lastSyncAt,
-    required this.lastWriteAt,
-    this.version = 1,
-    this.syncError,
-    this.syncAttempts = 0,
-  });
-
-  factory CacheMetadata.fromMap(Map<String, dynamic> map) {
-    return CacheMetadata(
-      lastSyncAt: DateTime.parse(map['lastSyncAt']),
-      lastWriteAt: DateTime.parse(map['lastWriteAt']),
-      version: map['version'] ?? 1,
-      syncError: map['syncError'],
-      syncAttempts: map['syncAttempts'] ?? 0,
-    );
-  }
-
-  Map<String, dynamic> toMap() => {
-    'lastSyncAt': lastSyncAt.toIso8601String(),
-    'lastWriteAt': lastWriteAt.toIso8601String(),
-    'version': version,
-    'syncError': syncError,
-    'syncAttempts': syncAttempts,
-  };
-
-  CacheMetadata copyWith({
-    DateTime? lastSyncAt,
-    DateTime? lastWriteAt,
-    int? version,
-    String? syncError,
-    int? syncAttempts,
-  }) => CacheMetadata(
-    lastSyncAt: lastSyncAt ?? this.lastSyncAt,
-    lastWriteAt: lastWriteAt ?? this.lastWriteAt,
-    version: version ?? this.version,
-    syncError: syncError,
-    syncAttempts: syncAttempts ?? this.syncAttempts,
-  );
-}
-
-// ============================================
-// CACHE MANAGER
-// ============================================
-
-/// Centralized cache manager for SharedPreferences operations
-class CacheManager {
-  static SharedPreferences? _prefs;
-  static final Map<String, CacheMetadata> _metadataCache = {};
-  static final _metadataController = StreamController<String>.broadcast();
-
-  static Stream<String> get metadataStream => _metadataController.stream;
-
-  /// Initialize the cache manager
-  static Future<void> initialize() async {
-    _prefs ??= await SharedPreferences.getInstance();
-    await _loadMetadataCache();
-  }
-
-  /// Load metadata cache into memory
-  static Future<void> _loadMetadataCache() async {
-    final metadataJson = _prefs?.getString(CacheKeys.cacheMetadata);
-    if (metadataJson != null) {
-      try {
-        final Map<String, dynamic> data = jsonDecode(metadataJson);
-        for (final entry in data.entries) {
-          _metadataCache[entry.key] = CacheMetadata.fromMap(entry.value);
-        }
-      } catch (e) {
-        debugPrint('[CacheManager] Error loading metadata: $e');
-      }
-    }
-  }
-
-  /// Persist metadata cache
-  static Future<void> _saveMetadataCache() async {
-    final data = <String, dynamic>{
-      for (final entry in _metadataCache.entries)
-        entry.key: entry.value.toMap(),
-    };
-    await _prefs?.setString(CacheKeys.cacheMetadata, jsonEncode(data));
-  }
-
-  /// Get metadata for a specific key
-  static CacheMetadata? getMetadata(String key) => _metadataCache[key];
-
-  /// Update metadata for a specific key
-  static Future<void> updateMetadata(
-    String key, {
-    DateTime? lastSyncAt,
-    String? syncError,
-    bool incrementVersion = false,
-    bool incrementAttempts = false,
-    bool clearAttempts = false,
-  }) async {
-    final existing = _metadataCache[key];
-    final now = DateTime.now();
-
-    _metadataCache[key] = CacheMetadata(
-      lastSyncAt: lastSyncAt ?? existing?.lastSyncAt ?? now,
-      lastWriteAt: now,
-      version: incrementVersion
-          ? (existing?.version ?? 0) + 1
-          : (existing?.version ?? 1),
-      syncError: syncError,
-      syncAttempts: clearAttempts
-          ? 0
-          : incrementAttempts
-          ? (existing?.syncAttempts ?? 0) + 1
-          : existing?.syncAttempts ?? 0,
-    );
-
-    await _saveMetadataCache();
-    _metadataController.add(key);
-  }
-
-  /// Generic method to get cached data
-  static T? get<T>(String key, T Function(dynamic) fromJson) {
-    final json = _prefs?.getString(key);
-    if (json == null) return null;
-    try {
-      return fromJson(jsonDecode(json));
-    } catch (e) {
-      debugPrint('[CacheManager] Error parsing cache for $key: $e');
-      return null;
-    }
-  }
-
-  /// Generic method to cache data
-  static Future<bool> set<T>(
-    String key,
-    T data,
-    dynamic Function(T) toJson,
-  ) async {
-    try {
-      final json = jsonEncode(toJson(data));
-      final result = await _prefs?.setString(key, json) ?? false;
-      if (result) {
-        await updateMetadata(key);
-      }
-      return result;
-    } catch (e) {
-      debugPrint('[CacheManager] Error caching data for $key: $e');
-      return false;
-    }
-  }
-
-  /// Cache a list of items
-  static Future<bool> setList<T>(
-    String key,
-    List<T> items,
-    dynamic Function(T) toJson,
-  ) => set<List<T>>(key, items, (list) => list.map(toJson).toList());
-
-  /// Get a cached list
-  static List<T>? getList<T>(String key, T Function(dynamic) fromJson) {
-    final data = get<List<dynamic>>(key, (json) => json);
-    if (data == null) return null;
-    try {
-      return data.map((item) => fromJson(item)).toList();
-    } catch (e) {
-      debugPrint('[CacheManager] Error parsing list cache for $key: $e');
-      return null;
-    }
-  }
-
-  /// Cache a map
-  static Future<bool> setMap<K, V>(
-    String key,
-    Map<K, V> map,
-    dynamic Function(V) valueToJson,
-  ) => set<Map<K, V>>(
-    key,
-    map,
-    (m) => m.map((k, v) => MapEntry(k.toString(), valueToJson(v))),
-  );
-
-  /// Get a cached map
-  static Map<K, V>? getMap<K, V>(
-    String key,
-    K Function(String) keyFromString,
-    V Function(dynamic) valueFromJson,
-  ) {
-    final data = get<Map<String, dynamic>>(key, (json) => json);
-    if (data == null) return null;
-    try {
-      return data.map((k, v) => MapEntry(keyFromString(k), valueFromJson(v)));
-    } catch (e) {
-      debugPrint('[CacheManager] Error parsing map cache for $key: $e');
-      return null;
-    }
-  }
-
-  /// Remove cached data
-  static Future<bool> remove(String key) async {
-    _metadataCache.remove(key);
-    await _saveMetadataCache();
-    return await _prefs?.remove(key) ?? false;
-  }
-
-  /// Clear all cached data
-  static Future<void> clear() async {
-    _metadataCache.clear();
-    await _prefs?.remove(CacheKeys.cacheMetadata);
-  }
-
-  /// Check if cache is stale (older than specified duration)
-  static bool isStale(String key, Duration maxAge) {
-    final metadata = _metadataCache[key];
-    if (metadata == null) return true;
-    return DateTime.now().difference(metadata.lastSyncAt) > maxAge;
-  }
-
-  /// Get cache age
-  static Duration? getCacheAge(String key) {
-    final metadata = _metadataCache[key];
-    if (metadata == null) return null;
-    return DateTime.now().difference(metadata.lastSyncAt);
-  }
-}
-
-// ============================================
-// STATE SYNCHRONIZER
-// ============================================
-
-/// Result of a synchronization operation
-class SyncResult<T> {
-  final T? data;
-  final bool fromCache;
-  final bool fromServer;
-  final String? error;
-  final DateTime? serverTimestamp;
-
-  const SyncResult({
-    this.data,
-    required this.fromCache,
-    required this.fromServer,
-    this.error,
-    this.serverTimestamp,
-  });
-
-  bool get isSuccess => error == null;
-  bool get isPartial => fromCache && !fromServer;
-}
-
-/// Handles bidirectional synchronization between cache and server
-class StateSynchronizer {
-  /// Load data with cache-first strategy
-  static Future<SyncResult<T>> loadWithCacheFirst<T>({
-    required String cacheKey,
-    required T? Function() getCached,
-    required Future<T> Function() fetchFromServer,
-    required Future<void> Function(T data) updateCache,
-    required void Function(T data) updateState,
-    Duration staleThreshold = const Duration(minutes: 5),
-    int maxRetries = 3,
-  }) async {
-    T? cachedData = getCached();
-    final isStale = CacheManager.isStale(cacheKey, staleThreshold);
-
-    // Emit cached data immediately if available
-    if (cachedData != null && !isStale) {
-      updateState(cachedData);
-      return SyncResult<T>(
-        data: cachedData,
-        fromCache: true,
-        fromServer: false,
-      );
-    }
-
-    // If stale or no cache, try server with retries
-    int attempts = 0;
-    String? lastError;
-
-    while (attempts < maxRetries) {
-      try {
-        final serverData = await fetchFromServer();
-        await updateCache(serverData);
-        await CacheManager.updateMetadata(
-          cacheKey,
-          lastSyncAt: DateTime.now(),
-          clearAttempts: true,
-        );
-        updateState(serverData);
-        return SyncResult<T>(
-          data: serverData,
-          fromCache: cachedData != null,
-          fromServer: true,
-          serverTimestamp: DateTime.now(),
-        );
-      } catch (e) {
-        lastError = e.toString();
-        attempts++;
-        await CacheManager.updateMetadata(
-          cacheKey,
-          syncError: lastError,
-          incrementAttempts: true,
-        );
-
-        if (attempts < maxRetries) {
-          await Future.delayed(Duration(milliseconds: 500 * attempts));
-        }
-      }
-    }
-
-    // All retries failed, use stale cache if available
-    if (cachedData != null) {
-      updateState(cachedData);
-      return SyncResult<T>(
-        data: cachedData,
-        fromCache: true,
-        fromServer: false,
-        error: 'Server sync failed after $maxRetries attempts: $lastError',
-      );
-    }
-
-    return SyncResult<T>(
-      fromCache: false,
-      fromServer: false,
-      error: 'No cache available and server sync failed: $lastError',
-    );
-  }
-
-  /// Merge server data with local state using version-based conflict resolution
-  static T mergeWithOptimisticLocking<T>({
-    required T localData,
-    required T serverData,
-    required int localVersion,
-    required int serverVersion,
-    required T Function(T local, T server) mergeStrategy,
-  }) {
-    // Server wins if it has a higher version
-    if (serverVersion > localVersion) {
-      return serverData;
-    }
-    // If versions are equal, apply custom merge strategy
-    if (serverVersion == localVersion) {
-      return mergeStrategy(localData, serverData);
-    }
-    // Local has higher version (shouldn't happen often)
-    return localData;
-  }
-
-  /// Smart merge for lists - adds new items, updates existing, removes deleted
-  static List<T> mergeLists<T>({
-    required List<T> local,
-    required List<T> remote,
-    required String Function(T) getId,
-    required T Function(T local, T remote) mergeItem,
-    DateTime? localTimestamp,
-    DateTime? remoteTimestamp,
-  }) {
-    final Map<String, T> merged = {};
-
-    // Add all local items
-    for (final item in local) {
-      merged[getId(item)] = item;
-    }
-
-    // Merge remote items
-    for (final remoteItem in remote) {
-      final id = getId(remoteItem);
-      if (merged.containsKey(id)) {
-        merged[id] = mergeItem(merged[id]!, remoteItem);
-      } else {
-        merged[id] = remoteItem;
-      }
-    }
-
-    return merged.values.toList();
-  }
-}
-
-// ============================================
-// BASE CACHED NOTIFIER CLASSES
-// ============================================
-
-/// Mixin for cache-enabled notifiers
-mixin CacheableNotifierMixin<T> {
-  String get cacheKey;
-  Duration get staleThreshold => const Duration(minutes: 5);
-  int get maxRetries => 3;
-
-  /// Serialize state to JSON
-  dynamic serialize(T state);
-
-  /// Deserialize state from JSON
-  T deserialize(dynamic json);
-
-  /// Save state to cache
-  Future<void> persistState(T state) async {
-    await CacheManager.set<T>(cacheKey, state, serialize);
-  }
-
-  /// Load state from cache
-  T? loadFromCache() => CacheManager.get<T>(cacheKey, deserialize);
-
-  /// Check if cache is stale
-  bool get isCacheStale => CacheManager.isStale(cacheKey, staleThreshold);
-
-  /// Get cache metadata
-  CacheMetadata? get cacheMetadata => CacheManager.getMetadata(cacheKey);
-}
-
-/// Base class for cached synchronous notifiers
-abstract class CachedNotifier<T> extends Notifier<T>
-    with CacheableNotifierMixin<T> {
-  bool _isHydrated = false;
-
-  bool get isHydrated => _isHydrated;
-
-  @override
-  T build() {
-    _hydrateFromCache();
-    return buildInitial();
-  }
-
-  /// Build the initial state before hydration
-  T buildInitial();
-
-  /// Hydrate state from cache asynchronously
-  Future<void> _hydrateFromCache() async {
-    if (_isHydrated) return;
-
-    final cached = loadFromCache();
-    if (cached != null) {
-      state = cached;
-    }
-    _isHydrated = true;
-
-    // Trigger background sync
-    Future.microtask(() => syncWithServer());
-  }
-
-  /// Sync with server - implement in subclasses
-  Future<void> syncWithServer();
-
-  /// Update state and persist to cache
-  void setStateAndPersist(T newState) {
-    state = newState;
-    persistState(newState);
-  }
-}
-
-/// Base class for cached asynchronous notifiers
-abstract class CachedAsyncNotifier<T> extends AsyncNotifier<T>
-    with CacheableNotifierMixin<T> {
-  bool _cacheHydrated = false;
-
-  bool get cacheHydrated => _cacheHydrated;
-
-  @override
-  Future<T> build() async {
-    return await buildWithCache();
-  }
-
-  /// Build state with cache-first strategy
-  Future<T> buildWithCache() async {
-    // First try to load from cache
-    final cached = loadFromCache();
-
-    if (cached != null && !isCacheStale) {
-      _cacheHydrated = true;
-      // Return cached data immediately
-      // Background sync will happen after
-      Future.microtask(() => _backgroundSync());
-      return cached;
-    }
-
-    // Cache miss or stale - fetch from server
-    try {
-      final serverData = await fetchFromServer();
-      await persistState(serverData);
-      await CacheManager.updateMetadata(
-        cacheKey,
-        lastSyncAt: DateTime.now(),
-        clearAttempts: true,
-      );
-      _cacheHydrated = true;
-      return serverData;
-    } catch (e) {
-      // Server fetch failed - use stale cache if available
-      if (cached != null) {
-        await CacheManager.updateMetadata(
-          cacheKey,
-          syncError: e.toString(),
-          incrementAttempts: true,
-        );
-        _cacheHydrated = true;
-        return cached;
-      }
-      rethrow;
-    }
-  }
-
-  /// Fetch fresh data from server - implement in subclasses
-  Future<T> fetchFromServer();
-
-  /// Background sync to refresh stale data
-  Future<void> _backgroundSync() async {
-    if (!isCacheStale) return;
-
-    try {
-      final serverData = await fetchFromServer();
-      final currentData = state.value;
-
-      if (currentData != null) {
-        final merged = mergeWithServer(currentData, serverData);
-        state = AsyncValue.data(merged);
-        await persistState(merged);
-      } else {
-        state = AsyncValue.data(serverData);
-        await persistState(serverData);
-      }
-
-      await CacheManager.updateMetadata(
-        cacheKey,
-        lastSyncAt: DateTime.now(),
-        clearAttempts: true,
-      );
-    } catch (e) {
-      await CacheManager.updateMetadata(
-        cacheKey,
-        syncError: e.toString(),
-        incrementAttempts: true,
-      );
-    }
-  }
-
-  /// Merge local state with server data - override for custom merge logic
-  T mergeWithServer(T local, T server) => server;
-
-  /// Force a refresh from server
-  Future<void> refresh() async {
-    state = const AsyncValue.loading();
-    try {
-      final serverData = await fetchFromServer();
-      state = AsyncValue.data(serverData);
-      await persistState(serverData);
-      await CacheManager.updateMetadata(
-        cacheKey,
-        lastSyncAt: DateTime.now(),
-        clearAttempts: true,
-      );
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-}
-
-// ============================================
-// AUTHENTICATION SYSTEM
+// AUTHENTICATION SYSTEM - Only SharedPreferences usage
 // ============================================
 
 class AuthNotifier extends AsyncNotifier<User?> {
@@ -612,25 +19,30 @@ class AuthNotifier extends AsyncNotifier<User?> {
 
   @override
   Future<User?> build() async {
-    // Initialize cache manager first
-    await CacheManager.initialize();
-    return await _initAndLoadSession();
+    try {
+      return await _loadSession();
+    } catch (e, st) {
+      debugPrint('[AuthNotifier] Build error: $e');
+      debugPrint('[AuthNotifier] Stack trace: $st');
+      // Return null to show auth screen on error
+      return null;
+    }
   }
 
-  Future<User?> _initAndLoadSession() async {
-    // Try to load from SharedPreferences cache first
+  Future<User?> _loadSession() async {
+    // Only SharedPreferences usage: auth session
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString(_sessionKey);
 
     if (userJson != null) {
       try {
         final cachedUser = User.fromMap(jsonDecode(userJson));
-
         // Trigger background refresh from server
         Future.microtask(() => refreshProfile(cachedUser.id));
         return cachedUser;
       } catch (e) {
         // Invalid cached data, clear it
+        debugPrint('[AuthNotifier] Invalid session data: $e');
         await prefs.remove(_sessionKey);
       }
     }
@@ -644,19 +56,9 @@ class AuthNotifier extends AsyncNotifier<User?> {
         final serverUser = User.fromMap(jsonDecode(response.body));
         state = AsyncValue.data(serverUser);
         await _saveSession(serverUser);
-        await CacheManager.updateMetadata(
-          CacheKeys.userProfile,
-          lastSyncAt: DateTime.now(),
-          clearAttempts: true,
-        );
       }
     } catch (e) {
       debugPrint("Profile refresh failed: $e");
-      await CacheManager.updateMetadata(
-        CacheKeys.userProfile,
-        syncError: e.toString(),
-        incrementAttempts: true,
-      );
     }
   }
 
@@ -699,16 +101,37 @@ class AuthNotifier extends AsyncNotifier<User?> {
 
   Future<void> login(String email, String password) async {
     try {
+      debugPrint('[AuthNotifier] Login: Calling $apiBase/login');
+      debugPrint('[AuthNotifier] Login: Email=$email');
+
       final response = await http.post(
         Uri.parse("$apiBase/login"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"email": email, "password": password}),
       );
 
+      debugPrint(
+        '[AuthNotifier] Login: Response status=${response.statusCode}',
+      );
+      debugPrint('[AuthNotifier] Login: Response body=${response.body}');
+
       if (response.statusCode == 200) {
-        final loggedInUser = User.fromMap(jsonDecode(response.body));
+        final responseBody = jsonDecode(response.body);
+        debugPrint('[AuthNotifier] Login: Parsed JSON=$responseBody');
+        final loggedInUser = User.fromMap(responseBody);
+        debugPrint('[AuthNotifier] Login: User parsed successfully');
+        debugPrint('[AuthNotifier] Login: User ID=${loggedInUser.id}');
+        debugPrint('[AuthNotifier] Login: User Name=${loggedInUser.realName}');
+        debugPrint('[AuthNotifier] Login: User Email=${loggedInUser.email}');
+        debugPrint(
+          '[AuthNotifier] Login: User Photos=${loggedInUser.profilePhotos.length}',
+        );
+        debugPrint(
+          '[AuthNotifier] Login: User Verified=${loggedInUser.isVerified}',
+        );
         state = AsyncValue.data(loggedInUser);
         await _saveSession(loggedInUser);
+        debugPrint('[AuthNotifier] Login: Session saved');
       } else {
         String errorMsg = "Invalid credentials";
         try {
@@ -725,29 +148,127 @@ class AuthNotifier extends AsyncNotifier<User?> {
         throw Exception(errorMsg);
       }
     } catch (e) {
+      debugPrint('[AuthNotifier] Login: ERROR=$e');
       rethrow;
     }
   }
 
+  void _clearAllProviders() {
+    debugPrint('[AuthNotifier] Clearing all providers');
+    try {
+      ref.read(myPartiesProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing myParties: $e');
+    }
+    try {
+      ref.read(chatProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing chat: $e');
+    }
+    try {
+      ref.read(chatHistoryProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing chatHistory: $e');
+    }
+    try {
+      ref.read(dmHistoryProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing dmHistory: $e');
+    }
+    try {
+      ref.read(dmConversationsProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing dmConversations: $e');
+    }
+    try {
+      ref.read(notificationsProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing notifications: $e');
+    }
+    try {
+      ref.read(partyFeedProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing partyFeed: $e');
+    }
+    try {
+      ref.read(partiesAroundProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing partiesAround: $e');
+    }
+    try {
+      ref.read(matchedUsersProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing matchedUsers: $e');
+    }
+    try {
+      ref.read(blockedUsersProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing blockedUsers: $e');
+    }
+    try {
+      ref.read(partyCacheProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing partyCache: $e');
+    }
+    try {
+      ref.read(draftPartyProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing draftParty: $e');
+    }
+    try {
+      ref.read(partyApplicantsProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing partyApplicants: $e');
+    }
+    try {
+      ref.read(partyAnalyticsProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing partyAnalytics: $e');
+    }
+    try {
+      ref.read(userSearchProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing userSearch: $e');
+    }
+    try {
+      ref.read(deleteFeedbackProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing deleteFeedback: $e');
+    }
+    try {
+      ref.read(geocodeResultProvider.notifier).clear();
+    } catch (e) {
+      debugPrint('[clearProviders] Error clearing geocodeResult: $e');
+    }
+    try {
+      ref.read(navIndexProvider.notifier).setIndex(0);
+    } catch (e) {
+      debugPrint('[clearProviders] Error resetting navIndex: $e');
+    }
+    debugPrint('[AuthNotifier] All providers cleared');
+  }
+
   Future<void> logout() async {
     debugPrint('[logout] Starting logout process');
+
+    // Disconnect WebSocket first to prevent "Already connected" on next login
+    ref.read(socketServiceProvider).disconnect();
+    debugPrint('[logout] WebSocket disconnected');
+
     final prefs = await SharedPreferences.getInstance();
+
+    // Remove auth session
     await prefs.remove(_sessionKey);
     debugPrint('[logout] Session deleted from SharedPreferences');
 
-    // Clear all user-specific cached data
-    ref.read(myPartiesProvider.notifier).clear();
-    ref.read(chatProvider.notifier).clear();
-    ref.read(chatHistoryProvider.notifier).clear();
-    ref.read(dmHistoryProvider.notifier).clear();
-    ref.read(dmConversationsProvider.notifier).clear();
-    ref.read(notificationsProvider.notifier).clear();
-    ref.read(partyFeedProvider.notifier).clear();
-    ref.read(partiesAroundProvider.notifier).clear();
-    ref.read(matchedUsersProvider.notifier).clear();
-    ref.read(blockedUsersProvider.notifier).clear();
-    ref.read(partyCacheProvider.notifier).clear();
-    debugPrint('[logout] All user-specific caches cleared');
+    // Clear registration draft data
+    final regKeys = prefs.getKeys().where((k) => k.startsWith('reg_'));
+    for (var k in regKeys) {
+      await prefs.remove(k);
+    }
+    debugPrint('[logout] Registration draft cleared from SharedPreferences');
+
+    _clearAllProviders();
 
     state = const AsyncValue.data(null);
     debugPrint('[logout] Auth state set to null');
@@ -819,8 +340,17 @@ class AuthNotifier extends AsyncNotifier<User?> {
   }
 
   Future<void> updateUserProfile(User updatedUser) async {
+    debugPrint(
+      '[AuthNotifier] updateUserProfile: Updating user ${updatedUser.id}',
+    );
+    debugPrint(
+      '[AuthNotifier] updateUserProfile: Name=${updatedUser.realName}, Photos=${updatedUser.profilePhotos.length}',
+    );
     state = AsyncValue.data(updatedUser);
     await _saveSession(updatedUser);
+    debugPrint(
+      '[AuthNotifier] updateUserProfile: User updated and session saved',
+    );
   }
 }
 
@@ -829,52 +359,27 @@ final authProvider = AsyncNotifierProvider<AuthNotifier, User?>(
 );
 
 // ============================================
-// CHAT SYSTEM - With Cache
+// CHAT SYSTEM - Riverpod state only
 // ============================================
 
-class ChatNotifier extends Notifier<List<ChatRoom>>
-    with CacheableNotifierMixin<List<ChatRoom>> {
+class ChatNotifier extends Notifier<List<ChatRoom>> {
   @override
-  String get cacheKey => CacheKeys.chatRooms;
-
-  @override
-  Duration get staleThreshold => const Duration(minutes: 2);
-
-  @override
-  dynamic serialize(List<ChatRoom> state) =>
-      state.map((r) => r.toMap()).toList();
-
-  @override
-  List<ChatRoom> deserialize(dynamic json) =>
-      (json as List).map((e) => ChatRoom.fromMap(e)).toList();
-
-  @override
-  List<ChatRoom> build() {
-    _hydrate();
-    return [];
-  }
-
-  Future<void> _hydrate() async {
-    final cached = loadFromCache();
-    if (cached != null) {
-      state = cached;
-    }
-  }
-
-  Future<void> syncWithServer() async {
-    // Server sync is handled by the SocketService
-    // This is a placeholder for manual sync if needed
-  }
+  List<ChatRoom> build() => [];
 
   void setRooms(List<ChatRoom> rooms) {
+    debugPrint('[ChatNotifier] setRooms: Setting ${rooms.length} rooms');
+    for (final room in rooms) {
+      debugPrint('[ChatNotifier] setRooms: Room ${room.id} - ${room.title}');
+    }
     state = rooms;
-    persistState(rooms);
+    debugPrint(
+      '[ChatNotifier] setRooms: State updated with ${state.length} rooms',
+    );
   }
 
   void addRoom(ChatRoom room) {
     if (!state.any((r) => r.id == room.id)) {
       state = [room, ...state];
-      persistState(state);
     }
   }
 
@@ -896,17 +401,14 @@ class ChatNotifier extends Notifier<List<ChatRoom>>
       if (b.lastMessageAt == null) return -1;
       return b.lastMessageAt!.compareTo(a.lastMessageAt!);
     });
-    persistState(state);
   }
 
   void removeRoom(String id) {
     state = state.where((r) => r.id != id).toList();
-    persistState(state);
   }
 
   void clear() {
     state = [];
-    CacheManager.remove(cacheKey);
   }
 }
 
@@ -915,7 +417,7 @@ final chatProvider = NotifierProvider<ChatNotifier, List<ChatRoom>>(
 );
 
 // ============================================
-// LOCATION SYSTEM - With Cache
+// LOCATION SYSTEM - Riverpod state only
 // ============================================
 
 class UserLocation {
@@ -941,50 +443,15 @@ class UserLocation {
   );
 }
 
-class LocationNotifier extends AsyncNotifier<UserLocation?>
-    with CacheableNotifierMixin<UserLocation?> {
-  @override
-  String get cacheKey => CacheKeys.lastLocation;
-
-  @override
-  Duration get staleThreshold => const Duration(hours: 1);
-
-  @override
-  dynamic serialize(UserLocation? state) => state?.toMap();
-
-  @override
-  UserLocation? deserialize(dynamic json) =>
-      json != null ? UserLocation.fromMap(json) : null;
-
+class LocationNotifier extends AsyncNotifier<UserLocation?> {
   @override
   Future<UserLocation?> build() async {
-    // Try to load from cache first
-    final cached = loadFromCache();
-    if (cached != null && !isCacheStale) {
-      // Trigger background refresh if stale
-      if (isCacheStale) {
-        Future.microtask(() => _refreshLocation());
-      }
-      return cached;
-    }
     return null;
-  }
-
-  Future<void> _refreshLocation() async {
-    // Location is device-specific, no server fetch needed
-    // Just update the sync metadata
-    await CacheManager.updateMetadata(cacheKey, lastSyncAt: DateTime.now());
-  }
-
-  Future<UserLocation?> fetchFromServer() async {
-    // Location is device-specific, no server fetch
-    return state.value;
   }
 
   Future<void> updateLocation(double lat, double lon) async {
     final loc = UserLocation(lat: lat, lon: lon, timestamp: DateTime.now());
     state = AsyncValue.data(loc);
-    await persistState(loc);
   }
 }
 
@@ -1007,70 +474,37 @@ final navIndexProvider = NotifierProvider<NavIndexNotifier, int>(
 );
 
 // ============================================
-// PARTY FEED SYSTEM - With Cache
+// PARTY FEED SYSTEM - Riverpod state only
 // ============================================
 
-class PartyFeedNotifier extends Notifier<List<Party>>
-    with CacheableNotifierMixin<List<Party>> {
+class PartyFeedNotifier extends Notifier<List<Party>> {
   final Set<String> _swipedIds = {};
 
   @override
-  String get cacheKey => CacheKeys.partyFeed;
-
-  @override
-  Duration get staleThreshold => const Duration(minutes: 5);
-
-  @override
-  dynamic serialize(List<Party> state) => state.map((p) => p.toMap()).toList();
-
-  @override
-  List<Party> deserialize(dynamic json) =>
-      (json as List).map((e) => Party.fromMap(e)).toList();
-
-  @override
-  List<Party> build() {
-    _hydrate();
-    return [];
-  }
-
-  Future<void> _hydrate() async {
-    final cached = loadFromCache();
-    if (cached != null) {
-      state = cached.where((p) => !_swipedIds.contains(p.id)).toList();
-    }
-  }
-
-  Future<void> syncWithServer() async {
-    // Sync handled by socket service
-  }
+  List<Party> build() => [];
 
   void setParties(List<Party> parties) {
     state = parties.where((p) => !_swipedIds.contains(p.id)).toList();
-    persistState(state);
   }
 
   void addParty(Party party) {
     if (!_swipedIds.contains(party.id) && !state.any((p) => p.id == party.id)) {
       state = [...state, party];
-      persistState(state);
     }
   }
 
   void markAsSwiped(String id) {
     _swipedIds.add(id);
     state = state.where((p) => p.id != id).toList();
-    persistState(state);
   }
 
   void removeParty(String id) {
     state = state.where((p) => p.id != id).toList();
-    persistState(state);
   }
 
   void clear() {
     state = [];
     _swipedIds.clear();
-    CacheManager.remove(cacheKey);
   }
 }
 
@@ -1079,7 +513,7 @@ final partyFeedProvider = NotifierProvider<PartyFeedNotifier, List<Party>>(
 );
 
 // ============================================
-// PARTY APPLICANTS SYSTEM
+// PARTY APPLICANTS SYSTEM - Riverpod state only
 // ============================================
 
 class PartyApplicantsNotifier extends Notifier<List<PartyApplication>> {
@@ -1115,48 +549,19 @@ final partyApplicantsProvider =
     );
 
 // ============================================
-// DRAFT PARTY SYSTEM - With Cache
+// DRAFT PARTY SYSTEM - Riverpod state only
 // ============================================
 
-class DraftPartyNotifier extends Notifier<DraftParty>
-    with CacheableNotifierMixin<DraftParty> {
+class DraftPartyNotifier extends Notifier<DraftParty> {
   @override
-  String get cacheKey => CacheKeys.draftParty;
-
-  @override
-  Duration get staleThreshold => const Duration(days: 7);
-
-  @override
-  dynamic serialize(DraftParty state) => state.toMap();
-
-  @override
-  DraftParty deserialize(dynamic json) => DraftParty.fromMap(json);
-
-  @override
-  DraftParty build() {
-    _hydrate();
-    return const DraftParty();
-  }
-
-  Future<void> _hydrate() async {
-    final cached = loadFromCache();
-    if (cached != null) {
-      state = cached;
-    }
-  }
-
-  Future<void> syncWithServer() async {
-    // Draft is local-only
-  }
+  DraftParty build() => const DraftParty();
 
   void update(DraftParty draft) {
     state = draft;
-    persistState(draft);
   }
 
   void clear() {
     state = const DraftParty();
-    persistState(state);
   }
 }
 
@@ -1208,50 +613,19 @@ final partyCreationProvider =
     );
 
 // ============================================
-// PARTY CACHE SYSTEM - With Persistent Cache
+// PARTY CACHE SYSTEM - Riverpod state only
 // ============================================
 
-class PartyCacheNotifier extends Notifier<Map<String, Party>>
-    with CacheableNotifierMixin<Map<String, Party>> {
+class PartyCacheNotifier extends Notifier<Map<String, Party>> {
   @override
-  String get cacheKey => CacheKeys.partyCache;
-
-  @override
-  Duration get staleThreshold => const Duration(minutes: 10);
-
-  @override
-  dynamic serialize(Map<String, Party> state) =>
-      state.map((k, v) => MapEntry(k, v.toMap()));
-
-  @override
-  Map<String, Party> deserialize(dynamic json) => (json as Map<String, dynamic>)
-      .map((k, v) => MapEntry(k, Party.fromMap(v)));
-
-  @override
-  Map<String, Party> build() {
-    _hydrate();
-    return {};
-  }
-
-  Future<void> _hydrate() async {
-    final cached = loadFromCache();
-    if (cached != null) {
-      state = cached;
-    }
-  }
-
-  Future<void> syncWithServer() async {
-    // Individual party updates handled via socket
-  }
+  Map<String, Party> build() => {};
 
   void updateParty(Party party) {
     state = {...state, party.id: party};
-    persistState(state);
   }
 
   void updateParties(List<Party> parties) {
     state = {...state, for (final p in parties) p.id: p};
-    persistState(state);
   }
 
   void removeParty(String id) {
@@ -1259,7 +633,6 @@ class PartyCacheNotifier extends Notifier<Map<String, Party>>
       final newState = Map<String, Party>.from(state);
       newState.remove(id);
       state = newState;
-      persistState(state);
     }
   }
 
@@ -1267,7 +640,6 @@ class PartyCacheNotifier extends Notifier<Map<String, Party>>
 
   void clear() {
     state = {};
-    CacheManager.remove(cacheKey);
   }
 }
 
@@ -1277,44 +649,26 @@ final partyCacheProvider =
     );
 
 // ============================================
-// MY PARTIES SYSTEM - With Cache
+// MY PARTIES SYSTEM - Riverpod state only
 // ============================================
 
-class MyPartiesNotifier extends Notifier<List<Party>>
-    with CacheableNotifierMixin<List<Party>> {
+class MyPartiesNotifier extends Notifier<List<Party>> {
   @override
-  String get cacheKey => CacheKeys.myParties;
-
-  @override
-  Duration get staleThreshold => const Duration(minutes: 5);
-
-  @override
-  dynamic serialize(List<Party> state) => state.map((p) => p.toMap()).toList();
-
-  @override
-  List<Party> deserialize(dynamic json) =>
-      (json as List).map((e) => Party.fromMap(e)).toList();
-
-  @override
-  List<Party> build() {
-    _hydrate();
-    return [];
-  }
-
-  Future<void> _hydrate() async {
-    final cached = loadFromCache();
-    if (cached != null) {
-      state = cached;
-    }
-  }
-
-  Future<void> syncWithServer() async {
-    // Sync handled by socket service
-  }
+  List<Party> build() => [];
 
   void setParties(List<Party> parties) {
+    debugPrint(
+      '[MyPartiesNotifier] setParties: Setting ${parties.length} parties',
+    );
+    for (final party in parties) {
+      debugPrint(
+        '[MyPartiesNotifier] setParties: Party ${party.id} - ${party.title} (Host: ${party.hostId})',
+      );
+    }
     state = parties;
-    persistState(parties);
+    debugPrint(
+      '[MyPartiesNotifier] setParties: State updated with ${state.length} parties',
+    );
   }
 
   void addParty(Party party) {
@@ -1327,12 +681,10 @@ class MyPartiesNotifier extends Notifier<List<Party>>
     } else {
       state = [...state, party];
     }
-    persistState(state);
   }
 
   void removeParty(String partyId) {
     state = state.where((p) => p.id != partyId).toList();
-    persistState(state);
   }
 
   void updateParty(Party party) {
@@ -1342,13 +694,11 @@ class MyPartiesNotifier extends Notifier<List<Party>>
         for (int i = 0; i < state.length; i++)
           if (i == index) party else state[i],
       ];
-      persistState(state);
     }
   }
 
   void clear() {
     state = [];
-    CacheManager.remove(cacheKey);
   }
 }
 
@@ -1357,61 +707,29 @@ final myPartiesProvider = NotifierProvider<MyPartiesNotifier, List<Party>>(
 );
 
 // ============================================
-// PARTIES AROUND SYSTEM - With Cache
+// PARTIES AROUND SYSTEM - Riverpod state only
 // ============================================
 
-class PartiesAroundNotifier extends Notifier<List<Party>>
-    with CacheableNotifierMixin<List<Party>> {
+class PartiesAroundNotifier extends Notifier<List<Party>> {
   @override
-  String get cacheKey => CacheKeys.partiesAround;
-
-  @override
-  Duration get staleThreshold => const Duration(minutes: 3);
-
-  @override
-  dynamic serialize(List<Party> state) => state.map((p) => p.toMap()).toList();
-
-  @override
-  List<Party> deserialize(dynamic json) =>
-      (json as List).map((e) => Party.fromMap(e)).toList();
-
-  @override
-  List<Party> build() {
-    _hydrate();
-    return [];
-  }
-
-  Future<void> _hydrate() async {
-    final cached = loadFromCache();
-    if (cached != null) {
-      state = cached;
-    }
-  }
-
-  Future<void> syncWithServer() async {
-    // Sync handled by socket service
-  }
+  List<Party> build() => [];
 
   void setParties(List<Party> parties) {
     state = parties;
-    persistState(parties);
   }
 
   void addParty(Party party) {
     if (!state.any((p) => p.id == party.id)) {
       state = [...state, party];
-      persistState(state);
     }
   }
 
   void removeParty(String partyId) {
     state = state.where((p) => p.id != partyId).toList();
-    persistState(state);
   }
 
   void clear() {
     state = [];
-    CacheManager.remove(cacheKey);
   }
 }
 
@@ -1500,51 +818,20 @@ final geocodeResultProvider =
     );
 
 // ============================================
-// NOTIFICATION SYSTEM - With Cache
+// NOTIFICATION SYSTEM - Riverpod state only
 // ============================================
 
-class NotificationsNotifier extends Notifier<List<Notification>>
-    with CacheableNotifierMixin<List<Notification>> {
+class NotificationsNotifier extends Notifier<List<Notification>> {
   @override
-  String get cacheKey => CacheKeys.notifications;
-
-  @override
-  Duration get staleThreshold => const Duration(minutes: 5);
-
-  @override
-  dynamic serialize(List<Notification> state) =>
-      state.map((n) => n.toMap()).toList();
-
-  @override
-  List<Notification> deserialize(dynamic json) =>
-      (json as List).map((e) => Notification.fromMap(e)).toList();
-
-  @override
-  List<Notification> build() {
-    _hydrate();
-    return [];
-  }
-
-  Future<void> _hydrate() async {
-    final cached = loadFromCache();
-    if (cached != null) {
-      state = cached;
-    }
-  }
-
-  Future<void> syncWithServer() async {
-    // Sync handled by socket service
-  }
+  List<Notification> build() => [];
 
   void setNotifications(List<Notification> notifications) {
     state = notifications;
-    persistState(notifications);
   }
 
   void addNotification(Notification notification) {
     if (!state.any((n) => n.id == notification.id)) {
       state = [notification, ...state];
-      persistState(state);
     }
   }
 
@@ -1553,17 +840,14 @@ class NotificationsNotifier extends Notifier<List<Notification>>
       for (final n in state)
         if (n.id == notificationId) n.copyWith(isRead: true) else n,
     ];
-    persistState(state);
   }
 
   void markAllAsRead() {
     state = [for (final n in state) n.copyWith(isRead: true)];
-    persistState(state);
   }
 
   void clear() {
     state = [];
-    CacheManager.remove(cacheKey);
   }
 }
 
@@ -1573,51 +857,20 @@ final notificationsProvider =
     );
 
 // ============================================
-// DM CONVERSATIONS SYSTEM - With Cache
+// DM CONVERSATIONS SYSTEM - Riverpod state only
 // ============================================
 
-class DMConversationsNotifier extends Notifier<List<DMConversation>>
-    with CacheableNotifierMixin<List<DMConversation>> {
+class DMConversationsNotifier extends Notifier<List<DMConversation>> {
   @override
-  String get cacheKey => CacheKeys.dmConversations;
-
-  @override
-  Duration get staleThreshold => const Duration(minutes: 2);
-
-  @override
-  dynamic serialize(List<DMConversation> state) =>
-      state.map((c) => c.toMap()).toList();
-
-  @override
-  List<DMConversation> deserialize(dynamic json) =>
-      (json as List).map((e) => DMConversation.fromMap(e)).toList();
-
-  @override
-  List<DMConversation> build() {
-    _hydrate();
-    return [];
-  }
-
-  Future<void> _hydrate() async {
-    final cached = loadFromCache();
-    if (cached != null) {
-      state = cached;
-    }
-  }
-
-  Future<void> syncWithServer() async {
-    // Sync handled by socket service
-  }
+  List<DMConversation> build() => [];
 
   void setConversations(List<DMConversation> conversations) {
     state = conversations;
-    persistState(conversations);
   }
 
   void addConversation(DMConversation conversation) {
     if (!state.any((c) => c.chatId == conversation.chatId)) {
       state = [conversation, ...state];
-      persistState(state);
     }
   }
 
@@ -1626,17 +879,14 @@ class DMConversationsNotifier extends Notifier<List<DMConversation>>
       for (final c in state)
         if (c.chatId == conversation.chatId) conversation else c,
     ];
-    persistState(state);
   }
 
   void removeConversation(String chatId) {
     state = state.where((c) => c.chatId != chatId).toList();
-    persistState(state);
   }
 
   void clear() {
     state = [];
-    CacheManager.remove(cacheKey);
   }
 }
 
@@ -1668,55 +918,23 @@ final partyAnalyticsProvider =
     );
 
 // ============================================
-// MATCHED USERS SYSTEM
+// MATCHED USERS SYSTEM - Riverpod state only
 // ============================================
 
-class MatchedUsersNotifier extends Notifier<List<MatchedUser>>
-    with CacheableNotifierMixin<List<MatchedUser>> {
+class MatchedUsersNotifier extends Notifier<List<MatchedUser>> {
   @override
-  String get cacheKey => CacheKeys.matchedUsers;
-
-  @override
-  Duration get staleThreshold => const Duration(minutes: 5);
-
-  @override
-  dynamic serialize(List<MatchedUser> state) =>
-      state.map((u) => u.toMap()).toList();
-
-  @override
-  List<MatchedUser> deserialize(dynamic json) =>
-      (json as List).map((e) => MatchedUser.fromMap(e)).toList();
-
-  @override
-  List<MatchedUser> build() {
-    _hydrate();
-    return [];
-  }
-
-  Future<void> _hydrate() async {
-    final cached = loadFromCache();
-    if (cached != null) {
-      state = cached;
-    }
-  }
-
-  Future<void> syncWithServer() async {
-    // Sync handled by socket service
-  }
+  List<MatchedUser> build() => [];
 
   void setMatchedUsers(List<MatchedUser> users) {
     state = users;
-    persistState(users);
   }
 
   void removeUser(String userId) {
     state = state.where((u) => u.userId != userId).toList();
-    persistState(state);
   }
 
   void clear() {
     state = [];
-    CacheManager.remove(cacheKey);
   }
 }
 
@@ -1726,62 +944,31 @@ final matchedUsersProvider =
     );
 
 // ============================================
-// BLOCKED USERS SYSTEM - With Cache
+// BLOCKED USERS SYSTEM - Riverpod state only
 // ============================================
 
-class BlockedUsersNotifier extends Notifier<List<String>>
-    with CacheableNotifierMixin<List<String>> {
+class BlockedUsersNotifier extends Notifier<List<String>> {
   @override
-  String get cacheKey => CacheKeys.blockedUsers;
-
-  @override
-  Duration get staleThreshold => const Duration(minutes: 10);
-
-  @override
-  dynamic serialize(List<String> state) => state;
-
-  @override
-  List<String> deserialize(dynamic json) => List<String>.from(json);
-
-  @override
-  List<String> build() {
-    _hydrate();
-    return [];
-  }
-
-  Future<void> _hydrate() async {
-    final cached = loadFromCache();
-    if (cached != null) {
-      state = cached;
-    }
-  }
-
-  Future<void> syncWithServer() async {
-    // Sync handled by socket service
-  }
+  List<String> build() => [];
 
   void setBlockedUsers(List<String> userIds) {
     state = userIds;
-    persistState(userIds);
   }
 
   void addBlockedUser(String userId) {
     if (!state.contains(userId)) {
       state = [...state, userId];
-      persistState(state);
     }
   }
 
   void removeBlockedUser(String userId) {
     state = state.where((id) => id != userId).toList();
-    persistState(state);
   }
 
   bool isBlocked(String userId) => state.contains(userId);
 
   void clear() {
     state = [];
-    CacheManager.remove(cacheKey);
   }
 }
 
@@ -1812,50 +999,15 @@ final userSearchProvider = NotifierProvider<UserSearchNotifier, List<User>>(
 );
 
 // ============================================
-// CHAT HISTORY SYSTEM
+// CHAT HISTORY SYSTEM - Riverpod state only
 // ============================================
 
-class ChatHistoryNotifier extends Notifier<Map<String, List<ChatMessage>>>
-    with CacheableNotifierMixin<Map<String, List<ChatMessage>>> {
+class ChatHistoryNotifier extends Notifier<Map<String, List<ChatMessage>>> {
   @override
-  String get cacheKey => CacheKeys.chatHistory;
-
-  @override
-  Duration get staleThreshold => const Duration(minutes: 2);
-
-  @override
-  dynamic serialize(Map<String, List<ChatMessage>> state) =>
-      state.map((k, v) => MapEntry(k, v.map((m) => m.toMap()).toList()));
-
-  @override
-  Map<String, List<ChatMessage>> deserialize(dynamic json) =>
-      (json as Map<String, dynamic>).map(
-        (k, v) => MapEntry(
-          k,
-          (v as List).map((e) => ChatMessage.fromMap(e)).toList(),
-        ),
-      );
-
-  @override
-  Map<String, List<ChatMessage>> build() {
-    _hydrate();
-    return {};
-  }
-
-  Future<void> _hydrate() async {
-    final cached = loadFromCache();
-    if (cached != null) {
-      state = cached;
-    }
-  }
-
-  Future<void> syncWithServer() async {
-    // Sync handled by socket service
-  }
+  Map<String, List<ChatMessage>> build() => {};
 
   void setMessages(String chatId, List<ChatMessage> messages) {
     state = {...state, chatId: messages};
-    persistState(state);
   }
 
   void addMessage(String chatId, ChatMessage message) {
@@ -1864,7 +1016,6 @@ class ChatHistoryNotifier extends Notifier<Map<String, List<ChatMessage>>>
       ...state,
       chatId: [...currentMessages, message],
     };
-    persistState(state);
   }
 
   void removeMessage(String chatId, String messageId) {
@@ -1873,12 +1024,10 @@ class ChatHistoryNotifier extends Notifier<Map<String, List<ChatMessage>>>
       ...state,
       chatId: currentMessages.where((m) => m.id != messageId).toList(),
     };
-    persistState(state);
   }
 
   void clear() {
     state = {};
-    CacheManager.remove(cacheKey);
   }
 }
 
@@ -1888,50 +1037,15 @@ final chatHistoryProvider =
     );
 
 // ============================================
-// DM HISTORY SYSTEM
+// DM HISTORY SYSTEM - Riverpod state only
 // ============================================
 
-class DMHistoryNotifier extends Notifier<Map<String, List<ChatMessage>>>
-    with CacheableNotifierMixin<Map<String, List<ChatMessage>>> {
+class DMHistoryNotifier extends Notifier<Map<String, List<ChatMessage>>> {
   @override
-  String get cacheKey => CacheKeys.dmHistory;
-
-  @override
-  Duration get staleThreshold => const Duration(minutes: 2);
-
-  @override
-  dynamic serialize(Map<String, List<ChatMessage>> state) =>
-      state.map((k, v) => MapEntry(k, v.map((m) => m.toMap()).toList()));
-
-  @override
-  Map<String, List<ChatMessage>> deserialize(dynamic json) =>
-      (json as Map<String, dynamic>).map(
-        (k, v) => MapEntry(
-          k,
-          (v as List).map((e) => ChatMessage.fromMap(e)).toList(),
-        ),
-      );
-
-  @override
-  Map<String, List<ChatMessage>> build() {
-    _hydrate();
-    return {};
-  }
-
-  Future<void> _hydrate() async {
-    final cached = loadFromCache();
-    if (cached != null) {
-      state = cached;
-    }
-  }
-
-  Future<void> syncWithServer() async {
-    // Sync handled by socket service
-  }
+  Map<String, List<ChatMessage>> build() => {};
 
   void setMessages(String otherUserId, List<ChatMessage> messages) {
     state = {...state, otherUserId: messages};
-    persistState(state);
   }
 
   void addMessage(String otherUserId, ChatMessage message) {
@@ -1940,12 +1054,10 @@ class DMHistoryNotifier extends Notifier<Map<String, List<ChatMessage>>>
       ...state,
       otherUserId: [...currentMessages, message],
     };
-    persistState(state);
   }
 
   void clear() {
     state = {};
-    CacheManager.remove(cacheKey);
   }
 }
 
@@ -1992,19 +1104,3 @@ extension ChatMessageSerialization on ChatMessage {
     'CreatedAt': createdAt.toIso8601String(),
   };
 }
-
-// ============================================
-// PROVIDER INITIALIZATION
-// ============================================
-
-/// Initialize all providers on app startup
-Future<void> initializeProviders() async {
-  await CacheManager.initialize();
-  debugPrint('[Providers] Cache manager initialized');
-}
-
-/// Provider to track cache initialization state
-final cacheInitializedProvider = Provider<bool>((ref) {
-  // This provider is used to ensure cache is ready before other operations
-  return true;
-});

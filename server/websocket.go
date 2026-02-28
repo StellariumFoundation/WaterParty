@@ -556,8 +556,10 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 				},
 			})
 			c.send <- errorMsg
+
 			return
 		}
+		log.Printf("Update Profile DB: %v", u)
 
 		// Optional: broadcast update or send confirmation back to client
 		response, _ := json.Marshal(WSMessage{
@@ -567,6 +569,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		c.send <- response
 
 	case "GET_USER":
+		log.Printf("GET_USER received from user: %s", c.UID)
 		u, err := GetUser(c.UID)
 		if err != nil {
 			log.Printf("Get User DB Error: %v", err)
@@ -584,6 +587,7 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 			Payload: u,
 		})
 		c.send <- response
+		log.Printf("GET_USER: returning user %v", u)
 
 	case "REVERSE_GEOCODE":
 		// Payload: {"lat": 40.7128, "lon": -74.0060}
@@ -1925,6 +1929,7 @@ func ReverseGeocode(lat, lon float64) (string, string, error) {
 	if city == "" {
 		city = result.Address.Suburb
 	}
+	log.Printf("ReverseGeocode result: %s, %s", result.DisplayName, city)
 
 	return result.DisplayName, city, nil
 }

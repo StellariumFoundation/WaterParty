@@ -173,7 +173,6 @@ func TestUserSerialization(t *testing.T) {
 		Gender:          "Male",
 		DrinkingPref:    "Socially",
 		SmokingPref:     "Never",
-		TopArtists:      []string{"Artist1", "Artist2"},
 		JobTitle:        "Developer",
 		Company:         "Tech Corp",
 		School:          "MIT",
@@ -604,7 +603,6 @@ func TestEmptyArraysSerialization(t *testing.T) {
 	user := User{
 		ID:            "test-id",
 		ProfilePhotos: []string{},
-		TopArtists:    []string{},
 	}
 
 	data, err := json.Marshal(user)
@@ -620,9 +618,6 @@ func TestEmptyArraysSerialization(t *testing.T) {
 
 	if unmarshaled.ProfilePhotos == nil {
 		t.Error("ProfilePhotos should be empty array, not nil")
-	}
-	if unmarshaled.TopArtists == nil {
-		t.Error("TopArtists should be empty array, not nil")
 	}
 }
 

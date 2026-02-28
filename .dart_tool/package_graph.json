@@ -5,7 +5,7 @@
   "packages": [
     {
       "name": "water_party",
-      "version": "0.8.3",
+      "version": "0.8.4",
       "dependencies": [
         "cached_network_image",
         "flutter",
@@ -21,9 +21,8 @@
         "intl",
         "latlong2",
         "lucide_icons",
-        "path",
         "shared_preferences",
-        "sqflite",
+        "shimmer",
         "url_launcher",
         "uuid",
         "web_socket_channel"
@@ -73,6 +72,13 @@
       ]
     },
     {
+      "name": "shimmer",
+      "version": "3.0.0",
+      "dependencies": [
+        "flutter"
+      ]
+    },
+    {
       "name": "url_launcher",
       "version": "6.3.2",
       "dependencies": [
@@ -110,23 +116,6 @@
         "path_provider",
         "proj4dart",
         "uuid"
-      ]
-    },
-    {
-      "name": "path",
-      "version": "1.9.1",
-      "dependencies": []
-    },
-    {
-      "name": "sqflite",
-      "version": "2.4.2",
-      "dependencies": [
-        "flutter",
-        "path",
-        "sqflite_android",
-        "sqflite_common",
-        "sqflite_darwin",
-        "sqflite_platform_interface"
       ]
     },
     {
@@ -288,6 +277,11 @@
         "source_span",
         "string_scanner"
       ]
+    },
+    {
+      "name": "path",
+      "version": "1.9.1",
+      "dependencies": []
     },
     {
       "name": "json_annotation",
@@ -516,47 +510,6 @@
       "dependencies": [
         "collection",
         "meta"
-      ]
-    },
-    {
-      "name": "sqflite_common",
-      "version": "2.5.6",
-      "dependencies": [
-        "meta",
-        "path",
-        "synchronized"
-      ]
-    },
-    {
-      "name": "sqflite_platform_interface",
-      "version": "2.4.0",
-      "dependencies": [
-        "flutter",
-        "meta",
-        "platform",
-        "plugin_platform_interface",
-        "sqflite_common"
-      ]
-    },
-    {
-      "name": "sqflite_darwin",
-      "version": "2.4.2",
-      "dependencies": [
-        "flutter",
-        "meta",
-        "path",
-        "sqflite_common",
-        "sqflite_platform_interface"
-      ]
-    },
-    {
-      "name": "sqflite_android",
-      "version": "2.4.2+2",
-      "dependencies": [
-        "flutter",
-        "path",
-        "sqflite_common",
-        "sqflite_platform_interface"
       ]
     },
     {
@@ -992,16 +945,6 @@
       ]
     },
     {
-      "name": "synchronized",
-      "version": "3.4.0",
-      "dependencies": []
-    },
-    {
-      "name": "platform",
-      "version": "3.1.6",
-      "dependencies": []
-    },
-    {
       "name": "file",
       "version": "7.0.1",
       "dependencies": [
@@ -1109,6 +1052,18 @@
       ]
     },
     {
+      "name": "sqflite",
+      "version": "2.4.2",
+      "dependencies": [
+        "flutter",
+        "path",
+        "sqflite_android",
+        "sqflite_common",
+        "sqflite_darwin",
+        "sqflite_platform_interface"
+      ]
+    },
+    {
       "name": "rxdart",
       "version": "0.28.0",
       "dependencies": []
@@ -1179,6 +1134,11 @@
       "dependencies": []
     },
     {
+      "name": "platform",
+      "version": "3.1.6",
+      "dependencies": []
+    },
+    {
       "name": "xdg_directories",
       "version": "1.1.0",
       "dependencies": [
@@ -1213,6 +1173,47 @@
         "flutter",
         "meta",
         "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "sqflite_common",
+      "version": "2.5.6",
+      "dependencies": [
+        "meta",
+        "path",
+        "synchronized"
+      ]
+    },
+    {
+      "name": "sqflite_platform_interface",
+      "version": "2.4.0",
+      "dependencies": [
+        "flutter",
+        "meta",
+        "platform",
+        "plugin_platform_interface",
+        "sqflite_common"
+      ]
+    },
+    {
+      "name": "sqflite_darwin",
+      "version": "2.4.2",
+      "dependencies": [
+        "flutter",
+        "meta",
+        "path",
+        "sqflite_common",
+        "sqflite_platform_interface"
+      ]
+    },
+    {
+      "name": "sqflite_android",
+      "version": "2.4.2+2",
+      "dependencies": [
+        "flutter",
+        "path",
+        "sqflite_common",
+        "sqflite_platform_interface"
       ]
     },
     {
@@ -1411,6 +1412,11 @@
         "collection",
         "hooks"
       ]
+    },
+    {
+      "name": "synchronized",
+      "version": "3.4.0",
+      "dependencies": []
     },
     {
       "name": "source_maps",
