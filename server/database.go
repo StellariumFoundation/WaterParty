@@ -524,11 +524,11 @@ func GetApplicantsForParty(partyID string) ([]map[string]interface{}, error) {
 		}
 
 		// Build complete User object with all fields (no NULL handling needed)
+		// Email is excluded from public API responses for privacy
 		userMap := map[string]interface{}{
 			"ID":              id,
 			"RealName":        realName,
 			"PhoneNumber":     phoneNumber,
-			"Email":           email,
 			"ProfilePhotos":   profilePhotos,
 			"Age":             age,
 			"DateOfBirth":     dateOfBirth,
@@ -577,9 +577,14 @@ func GetApplicantsForParty(partyID string) ([]map[string]interface{}, error) {
 }
 
 // GetAcceptedApplicants returns users who have been accepted to a party
+// Includes all profile fields for complete UI display
 func GetAcceptedApplicants(partyID string) ([]map[string]interface{}, error) {
 	query := `SELECT pa.party_id, pa.user_id, pa.status, pa.applied_at,
-		u.real_name, u.profile_photos, u.age, u.elo_score, u.bio, u.trust_score, u.thumbnail
+		-- Complete User profile fields
+		u.id, u.real_name, u.profile_photos, u.age, u.height_cm, u.gender,
+		u.drinking_pref, u.smoking_pref, u.job_title, u.company, u.school, u.degree,
+		u.instagram_handle, u.linkedin_handle, u.x_handle, u.tiktok_handle,
+		u.is_verified, u.trust_score, u.elo_score, u.bio, u.thumbnail
 		FROM party_applications pa
 		JOIN users u ON pa.user_id = u.id
 		WHERE pa.party_id = $1 AND pa.status = 'ACCEPTED'
@@ -593,32 +598,59 @@ func GetAcceptedApplicants(partyID string) ([]map[string]interface{}, error) {
 
 	var apps []map[string]interface{}
 	for rows.Next() {
-		var appID, userID, status, realName, bio string
+		// Application fields
+		var partyID, userID, status string
 		var appliedAt time.Time
-		var profilePhotos []string
-		var age int
-		var eloScore, trustScore float64
-		var thumbnail string
 
-		err := rows.Scan(&appID, &userID, &status, &appliedAt, &realName, &profilePhotos, &age, &eloScore, &bio, &trustScore, &thumbnail)
+		// User fields
+		var id, realName string
+		var profilePhotos []string
+		var age, heightCm int
+		var gender, drinkingPref, smokingPref string
+		var jobTitle, company, school, degree string
+		var instagramHandle, linkedinHandle, xHandle, tiktokHandle string
+		var isVerified bool
+		var trustScore, eloScore float64
+		var bio, thumbnail string
+
+		err := rows.Scan(
+			&partyID, &userID, &status, &appliedAt,
+			&id, &realName, &profilePhotos, &age, &heightCm, &gender,
+			&drinkingPref, &smokingPref, &jobTitle, &company, &school, &degree,
+			&instagramHandle, &linkedinHandle, &xHandle, &tiktokHandle,
+			&isVerified, &trustScore, &eloScore, &bio, &thumbnail,
+		)
 		if err != nil {
 			return nil, err
 		}
 
 		apps = append(apps, map[string]interface{}{
-			"PartyID":   appID,
+			"PartyID":   partyID,
 			"UserID":    userID,
 			"Status":    status,
 			"AppliedAt": appliedAt,
 			"User": map[string]interface{}{
-				"ID":            userID,
-				"RealName":      realName,
-				"ProfilePhotos": profilePhotos,
-				"Age":           age,
-				"EloScore":      eloScore,
-				"Bio":           bio,
-				"TrustScore":    trustScore,
-				"Thumbnail":     thumbnail,
+				"ID":              id,
+				"RealName":        realName,
+				"ProfilePhotos":   profilePhotos,
+				"Age":             age,
+				"HeightCm":        heightCm,
+				"Gender":          gender,
+				"DrinkingPref":    drinkingPref,
+				"SmokingPref":     smokingPref,
+				"JobTitle":        jobTitle,
+				"Company":         company,
+				"School":          school,
+				"Degree":          degree,
+				"InstagramHandle": instagramHandle,
+				"LinkedinHandle":  linkedinHandle,
+				"XHandle":         xHandle,
+				"TikTokHandle":    tiktokHandle,
+				"IsVerified":      isVerified,
+				"TrustScore":      trustScore,
+				"EloScore":        eloScore,
+				"Bio":             bio,
+				"Thumbnail":       thumbnail,
 			},
 		})
 	}

@@ -56,7 +56,7 @@ type User struct {
 	ID              string     `json:"ID" db:"id"`
 	RealName        string     `json:"RealName" db:"real_name"`
 	PhoneNumber     string     `json:"PhoneNumber" db:"phone_number"`
-	Email           string     `json:"Email" db:"email"`
+	Email           string     `json:"-" db:"email"` // Email excluded from JSON for privacy
 	PasswordHash    string     `json:"-" db:"password_hash"`
 	ProfilePhotos   []string   `json:"ProfilePhotos" db:"profile_photos"` // Stores hashes
 	Age             int        `json:"Age" db:"age"`

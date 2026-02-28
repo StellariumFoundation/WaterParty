@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
@@ -1049,21 +1051,37 @@ class ExternalProfileScreen extends ConsumerWidget {
                       ]),
                       const SizedBox(height: 20),
                       _buildDetailSection("CONTACT", [
-                        if (user.email.isNotEmpty)
-                          _buildDetailRow("Email", user.email),
+                        // Email removed for privacy - only visible to hosts/matches
                         if (user.phoneNumber.isNotEmpty)
                           _buildDetailRow("Phone", user.phoneNumber),
                         if (user.instagramHandle.isNotEmpty)
-                          _buildDetailRow(
+                          _buildSocialLink(
                             "Instagram",
                             "@${user.instagramHandle}",
+                            "https://instagram.com/${user.instagramHandle}",
+                            FontAwesomeIcons.instagram,
                           ),
                         if (user.xHandle.isNotEmpty)
-                          _buildDetailRow("X (Twitter)", "@${user.xHandle}"),
+                          _buildSocialLink(
+                            "X (Twitter)",
+                            "@${user.xHandle}",
+                            "https://x.com/${user.xHandle}",
+                            FontAwesomeIcons.xTwitter,
+                          ),
                         if (user.tiktokHandle.isNotEmpty)
-                          _buildDetailRow("TikTok", "@${user.tiktokHandle}"),
+                          _buildSocialLink(
+                            "TikTok",
+                            "@${user.tiktokHandle}",
+                            "https://tiktok.com/@${user.tiktokHandle}",
+                            FontAwesomeIcons.tiktok,
+                          ),
                         if (user.linkedinHandle.isNotEmpty)
-                          _buildDetailRow("LinkedIn", user.linkedinHandle),
+                          _buildSocialLink(
+                            "LinkedIn",
+                            user.linkedinHandle,
+                            "https://linkedin.com/in/${user.linkedinHandle}",
+                            FontAwesomeIcons.linkedin,
+                          ),
                       ]),
                       const SizedBox(height: 20),
                       _buildDetailSection("WORK & EDUCATION", [
@@ -1201,7 +1219,14 @@ class ExternalProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildPhotoCarousel(User user) {
+    // Debug logging for photo loading
+    debugPrint('[ExternalProfileScreen] Building photo carousel:');
+    debugPrint('  - User: ${user.realName} (id: ${user.id})');
+    debugPrint('  - Profile photos count: ${user.profilePhotos.length}');
+    debugPrint('  - Profile photos: ${user.profilePhotos}');
+
     if (user.profilePhotos.isEmpty) {
+      debugPrint('[ExternalProfileScreen] No profile photos available');
       return Container(
         color: Colors.grey[900],
         child: const Center(
@@ -1213,8 +1238,11 @@ class ExternalProfileScreen extends ConsumerWidget {
     return PageView.builder(
       itemCount: user.profilePhotos.length,
       itemBuilder: (context, index) {
+        final photoUrl = AppConstants.assetUrl(user.profilePhotos[index]);
+        debugPrint('[ExternalProfileScreen] Loading photo $index: $photoUrl');
+
         return CachedNetworkImage(
-          imageUrl: AppConstants.assetUrl(user.profilePhotos[index]),
+          imageUrl: photoUrl,
           fit: BoxFit.cover,
           placeholder: (context, url) => Container(
             color: Colors.grey[900],
@@ -1222,12 +1250,26 @@ class ExternalProfileScreen extends ConsumerWidget {
               child: CircularProgressIndicator(color: AppColors.textCyan),
             ),
           ),
-          errorWidget: (context, url, error) => Container(
-            color: Colors.grey[900],
-            child: const Center(
-              child: Icon(Icons.error, color: Colors.white24),
-            ),
-          ),
+          errorWidget: (context, url, error) {
+            debugPrint('[ExternalProfileScreen] Error loading photo: $url');
+            debugPrint('[ExternalProfileScreen] Error details: $error');
+            return Container(
+              color: Colors.grey[900],
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error, color: Colors.white24, size: 50),
+                    SizedBox(height: 8),
+                    Text(
+                      'Failed to load image',
+                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -1332,6 +1374,50 @@ class ExternalProfileScreen extends ConsumerWidget {
     );
   }
 
+  /// Builds a tappable social media link that opens in native apps using universal links
+  Widget _buildSocialLink(
+    String label,
+    String displayText,
+    String url,
+    IconData icon,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: () => _launchSocialMediaUrl(label, displayText, url),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: AppFontSizes.md,
+                color: Colors.white.withValues(alpha: 0.6),
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  displayText,
+                  style: const TextStyle(
+                    fontSize: AppFontSizes.md,
+                    color: AppColors.textCyan,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(icon, size: 18, color: AppColors.textCyan),
+                const SizedBox(width: 4),
+                const Icon(Icons.open_in_new, size: 14, color: Colors.white54),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTag(String text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1347,6 +1433,85 @@ class ExternalProfileScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Launches social media URLs with native app support using universal links
+  /// Tries native app URL schemes first, then falls back to web URLs
+  Future<void> _launchSocialMediaUrl(
+    String label,
+    String displayText,
+    String webUrl,
+  ) async {
+    // Extract username/handle from the web URL
+    String? username;
+    final uri = Uri.parse(webUrl);
+
+    if (webUrl.contains('instagram.com')) {
+      username = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : null;
+    } else if (webUrl.contains('x.com') || webUrl.contains('twitter.com')) {
+      username = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : null;
+    } else if (webUrl.contains('tiktok.com')) {
+      username = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : null;
+      if (username != null && username.startsWith('@')) {
+        username = username.substring(1);
+      }
+    } else if (webUrl.contains('linkedin.com')) {
+      username = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : null;
+    }
+
+    // Build native app URL schemes
+    List<String> urlsToTry = [];
+
+    if (username != null) {
+      if (webUrl.contains('instagram.com')) {
+        // Instagram native app URLs
+        urlsToTry.add('instagram://user?username=$username');
+        urlsToTry.add('instagram://user?username=$username');
+      } else if (webUrl.contains('x.com') || webUrl.contains('twitter.com')) {
+        // X (Twitter) native app URLs
+        urlsToTry.add('twitter://user?screen_name=$username');
+        urlsToTry.add('x://user?screen_name=$username');
+      } else if (webUrl.contains('tiktok.com')) {
+        // TikTok native app URLs
+        urlsToTry.add('tiktok://user?username=$username');
+        urlsToTry.add('snssdk1233://user?username=$username');
+      } else if (webUrl.contains('linkedin.com')) {
+        // LinkedIn native app URLs
+        urlsToTry.add('linkedin://profile/$username');
+        urlsToTry.add('linkedin://in/$username');
+      }
+    }
+
+    // Always add the web URL as fallback
+    urlsToTry.add(webUrl);
+
+    // Try each URL in order
+    for (final urlString in urlsToTry) {
+      try {
+        final url = Uri.parse(urlString);
+        final canLaunch = await canLaunchUrl(url);
+
+        if (canLaunch) {
+          final launched = await launchUrl(
+            url,
+            mode: LaunchMode.externalApplication,
+          );
+          if (launched) {
+            debugPrint('[ExternalProfileScreen] Launched: $urlString');
+            return; // Successfully launched
+          }
+        }
+      } catch (e) {
+        debugPrint('[ExternalProfileScreen] Error trying $urlString: $e');
+      }
+    }
+
+    // Final fallback: try web URL with in-app web view
+    try {
+      await launchUrl(Uri.parse(webUrl), mode: LaunchMode.inAppWebView);
+    } catch (e) {
+      debugPrint('[ExternalProfileScreen] Failed to launch web URL: $e');
+    }
   }
 
   /// Formats user name with age, handling missing data gracefully

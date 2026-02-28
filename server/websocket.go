@@ -6,12 +6,21 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5"
 )
+
+// generateDMChatId creates a deterministic DM chat ID using lexicographic sorting
+// This must match the Flutter client's ChatRoom.generateDMChatId exactly
+func generateDMChatId(userId1, userId2 string) string {
+	ids := []string{userId1, userId2}
+	sort.Strings(ids)
+	return ids[0] + "_" + ids[1]
+}
 
 const (
 	writeWait      = 10 * time.Second
@@ -259,11 +268,8 @@ func (c *Client) handleIncomingMessage(raw []byte) {
 		}
 
 		// Create a synthetic ChatID for the DM (deterministic pair-wise ID)
-		u1, u2 := c.UID, dmReq.RecipientID
-		if u1 > u2 {
-			u1, u2 = u2, u1
-		}
-		dmChatID := u1 + "_" + u2
+		// Use lexicographic sorting to match Flutter client's generateDMChatId
+		dmChatID := generateDMChatId(c.UID, dmReq.RecipientID)
 
 		msg := ChatMessage{
 			ChatID:    dmChatID,

@@ -78,22 +78,49 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           return;
         }
 
-        // Find recipient ID
-        final recipientId = widget.room.participantIds.firstWhere(
-          (id) => id != myId,
-          orElse: () => '',
-        );
+        // Find recipient ID with case-insensitive matching
+        debugPrint('[ChatScreen] Finding recipient:');
+        debugPrint('  - Room participantIds: ${widget.room.participantIds}');
+        debugPrint('  - Current user ID (myId): $myId');
 
-        if (recipientId.isEmpty) {
-          debugPrint('[ChatScreen] ERROR: recipientId is empty!');
+        // Try exact match first, then case-insensitive
+        String? recipientId;
+        try {
+          recipientId = widget.room.participantIds.firstWhere(
+            (id) => id.toLowerCase() != myId.toLowerCase(),
+          );
+        } catch (e) {
+          // No match found
+          recipientId = null;
+        }
+
+        if (recipientId == null || recipientId.isEmpty) {
+          debugPrint('[ChatScreen] ERROR: recipientId not found!');
           debugPrint('[ChatScreen] Room ID: ${widget.room.id}');
           debugPrint(
             '[ChatScreen] Room participantIds: ${widget.room.participantIds}',
           );
           debugPrint('[ChatScreen] Current user ID: $myId');
+
+          // Additional diagnostic info
+          if (widget.room.participantIds.isEmpty) {
+            debugPrint('[ChatScreen] DIAGNOSTIC: participantIds is empty!');
+          } else if (widget.room.participantIds.length == 1) {
+            debugPrint('[ChatScreen] DIAGNOSTIC: Only one participant in room');
+            debugPrint(
+              '[ChatScreen] DIAGNOSTIC: Single participant: ${widget.room.participantIds[0]}',
+            );
+            debugPrint('[ChatScreen] DIAGNOSTIC: Current user: $myId');
+            debugPrint(
+              '[ChatScreen] DIAGNOSTIC: Match check: ${widget.room.participantIds[0].toLowerCase() == myId.toLowerCase()}',
+            );
+          }
+
           _showErrorSnackBar('Cannot find recipient. Please try again.');
           return;
         }
+
+        debugPrint('[ChatScreen] Found recipient: $recipientId');
 
         debugPrint('[ChatScreen] Sending DM:');
         debugPrint('  - From: $myId');
@@ -733,18 +760,43 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
 
     // CRITICAL FIX: Handle null user with proper error UI instead of just returning SizedBox
     if (user == null) {
+      debugPrint(
+        '[UserManagementScreen] ERROR: User is null for applicant ${app.userId}',
+      );
       return _buildErrorUserCard('User data unavailable');
     }
 
     // Validate essential user fields
     if (user.id.isEmpty) {
+      debugPrint('[UserManagementScreen] ERROR: User ID is empty');
       return _buildErrorUserCard('Invalid user ID');
     }
+
+    // Debug logging for user data
+    debugPrint('[UserManagementScreen] Building card for user:');
+    debugPrint('  - ID: ${user.id}');
+    debugPrint('  - Name: ${user.realName}');
+    debugPrint('  - Photos: ${user.profilePhotos.length}');
+    debugPrint('  - Thumbnail: ${user.thumbnail.isNotEmpty ? "yes" : "no"}');
+    debugPrint('  - Job: ${user.jobTitle}');
+    debugPrint('  - School: ${user.school}');
+
+    // Build image URL with fallback chain
+    String imageUrl;
+    if (user.thumbnail.isNotEmpty) {
+      imageUrl = AppConstants.assetUrl(user.thumbnail);
+    } else if (user.profilePhotos.isNotEmpty) {
+      imageUrl = AppConstants.assetUrl(user.profilePhotos.first);
+    } else {
+      imageUrl =
+          "https://images.unsplash.com/photo-1511367461989-f85a21fda167?q=80&w=1000";
+    }
+    debugPrint('[UserManagementScreen] Image URL: $imageUrl');
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: WaterGlass(
-        height: 100,
+        height: 120,
         borderRadius: 20,
         child: InkWell(
           onTap: () {
@@ -762,14 +814,29 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: CachedNetworkImage(
-                    imageUrl: user.thumbnail.isNotEmpty
-                        ? AppConstants.assetUrl(user.thumbnail)
-                        : (user.profilePhotos.isNotEmpty
-                              ? AppConstants.assetUrl(user.profilePhotos.first)
-                              : "https://images.unsplash.com/photo-1511367461989-f85a21fda167?q=80&w=1000"),
+                    imageUrl: imageUrl,
                     width: 70,
                     height: 70,
                     fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      width: 70,
+                      height: 70,
+                      color: Colors.grey[800],
+                      child: const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) {
+                      debugPrint(
+                        '[UserManagementScreen] Image load error: $url - $error',
+                      );
+                      return Container(
+                        width: 70,
+                        height: 70,
+                        color: Colors.grey[800],
+                        child: const Icon(Icons.person, color: Colors.white54),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(width: 15),
@@ -786,7 +853,29 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                           fontSize: AppFontSizes.md,
                         ),
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 4),
+                      // Show job/school info if available
+                      if (user.jobTitle.isNotEmpty)
+                        Text(
+                          "${user.jobTitle}${user.company.isNotEmpty ? ' at ${user.company}' : ''}",
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: AppFontSizes.sm,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      if (user.school.isNotEmpty)
+                        Text(
+                          "${user.school}${user.degree.isNotEmpty ? ' - ${user.degree}' : ''}",
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: AppFontSizes.sm,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      const SizedBox(height: 4),
                       Row(
                         children: [
                           const Icon(
