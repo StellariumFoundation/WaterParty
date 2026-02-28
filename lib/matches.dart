@@ -7,6 +7,7 @@ import 'models.dart';
 import 'chat.dart';
 import 'constants.dart';
 import 'match.dart';
+import 'api.dart';
 
 class MatchesScreen extends ConsumerStatefulWidget {
   const MatchesScreen({super.key});
@@ -17,6 +18,15 @@ class MatchesScreen extends ConsumerStatefulWidget {
 
 class _MatchesScreenState extends ConsumerState<MatchesScreen> {
   int _selectedTab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch DM conversations when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(socketServiceProvider).getDMs();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +45,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
       return true; // Show all parties from myPartiesProvider
     }).toList();
 
-    final directMessages = allChatRooms.where((room) => !room.isGroup).toList();
+    final dmConversations = ref.watch(dmConversationsProvider);
 
     // Handle automatic navigation to newly created party chat
     ref.listen(partyCreationProvider, (previous, next) {
@@ -101,7 +111,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
           // Content
           _selectedTab == 0
               ? _buildPartySliverList(userParties)
-              : _buildChatSliverList(directMessages),
+              : _buildDMSliverList(dmConversations),
         ],
       ),
     );
@@ -179,12 +189,12 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     );
   }
 
-  Widget _buildChatSliverList(List<ChatRoom> rooms) {
-    if (rooms.isEmpty) {
+  Widget _buildDMSliverList(List<DMConversation> conversations) {
+    if (conversations.isEmpty) {
       return SliverFillRemaining(
         child: _buildEmptyState(
           "No direct messages yet",
-          "Match with people to start chatting!",
+          "Visit someone's profile to start chatting!",
         ),
       );
     }
@@ -193,8 +203,8 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
-          (context, index) => _buildChatCard(rooms[index]),
-          childCount: rooms.length,
+          (context, index) => _buildDMConversationCard(conversations[index]),
+          childCount: conversations.length,
         ),
       ),
     );
@@ -517,9 +527,173 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
   }
 
   // ============================================
+  // DM CONVERSATION CARD
+  // ============================================
+  Widget _buildDMConversationCard(DMConversation conversation) {
+    final currentUser = ref.watch(authProvider).value;
+
+    // Format thumbnail URL
+    String? thumbnailUrl;
+    if (conversation.otherUserThumbnail.isNotEmpty) {
+      thumbnailUrl = conversation.otherUserThumbnail.startsWith("http")
+          ? conversation.otherUserThumbnail
+          : AppConstants.assetUrl(conversation.otherUserThumbnail);
+    }
+
+    // Format last message time
+    String timeText = "";
+    if (conversation.lastMessageAt != null) {
+      final now = DateTime.now();
+      final diff = now.difference(conversation.lastMessageAt!);
+      if (diff.inDays > 0) {
+        timeText = "${diff.inDays}d ago";
+      } else if (diff.inHours > 0) {
+        timeText = "${diff.inHours}h ago";
+      } else if (diff.inMinutes > 0) {
+        timeText = "${diff.inMinutes}m ago";
+      } else {
+        timeText = "Just now";
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: _buildGlassCard(
+        child: InkWell(
+          onTap: () {
+            // CRITICAL FIX: Use deterministic DM room ID generation
+            if (currentUser != null) {
+              final dmRoom = ChatRoom.dmRoom(
+                currentUserId: currentUser.id,
+                otherUserId: conversation.otherUserId,
+                otherUserName: conversation.otherUserName.isNotEmpty
+                    ? conversation.otherUserName
+                    : 'Unknown User',
+                otherUserThumbnail: conversation.otherUserThumbnail,
+              );
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => ChatScreen(room: dmRoom),
+                ),
+              );
+            }
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Thumbnail
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.textCyan, AppColors.electricPurple],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: thumbnailUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: thumbnailUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              color: Colors.black26,
+                              child: const Icon(
+                                Icons.person,
+                                color: Colors.white54,
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              color: Colors.black26,
+                              child: const Icon(
+                                Icons.person,
+                                color: Colors.white54,
+                              ),
+                            ),
+                          )
+                        : Container(
+                            color: Colors.black26,
+                            child: const Icon(
+                              Icons.person,
+                              color: Colors.white54,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              conversation.otherUserName.isEmpty
+                                  ? "Unknown User"
+                                  : conversation.otherUserName,
+                              style: const TextStyle(
+                                fontSize: AppFontSizes.md,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          if (timeText.isNotEmpty)
+                            Text(
+                              timeText,
+                              style: TextStyle(
+                                fontSize: AppFontSizes.xs,
+                                color: Colors.white.withValues(alpha: 0.5),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              conversation.lastMessage.isEmpty
+                                  ? "No messages yet"
+                                  : conversation.lastMessage,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: AppFontSizes.sm,
+                                color: conversation.lastMessage.isEmpty
+                                    ? Colors.white.withValues(alpha: 0.4)
+                                    : Colors.white.withValues(alpha: 0.6),
+                                fontStyle: conversation.lastMessage.isEmpty
+                                    ? FontStyle.italic
+                                    : FontStyle.normal,
+                              ),
+                            ),
+                          ),
+                          if (conversation.unreadCount > 0) ...[
+                            const SizedBox(width: 8),
+                            _buildUnreadBadge(conversation.unreadCount),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================
   // UI COMPONENTS
   // ============================================
-
   Widget _buildGlassCard({required Widget child}) {
     return Container(
       decoration: BoxDecoration(
@@ -792,6 +966,11 @@ class ExternalProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Validate user data
+    if (user.id.isEmpty) {
+      return _buildErrorScreen(context, 'Invalid user data');
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -812,8 +991,9 @@ class ExternalProfileScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Use null-safe string interpolation
                       Text(
-                        "${user.realName}, ${user.age}",
+                        _formatUserName(user),
                         style: const TextStyle(
                           fontSize: AppFontSizes.display,
                           fontWeight: FontWeight.w900,
@@ -860,6 +1040,32 @@ class ExternalProfileScreen extends ConsumerWidget {
                         _buildDetailRow("Smoking", user.smokingPref),
                       ]),
                       const SizedBox(height: 20),
+                      _buildDetailSection("LOCATION", [
+                        if (user.locationLat != 0 && user.locationLon != 0)
+                          _buildDetailRow(
+                            "Coordinates",
+                            "${user.locationLat.toStringAsFixed(4)}, ${user.locationLon.toStringAsFixed(4)}",
+                          ),
+                      ]),
+                      const SizedBox(height: 20),
+                      _buildDetailSection("CONTACT", [
+                        if (user.email.isNotEmpty)
+                          _buildDetailRow("Email", user.email),
+                        if (user.phoneNumber.isNotEmpty)
+                          _buildDetailRow("Phone", user.phoneNumber),
+                        if (user.instagramHandle.isNotEmpty)
+                          _buildDetailRow(
+                            "Instagram",
+                            "@${user.instagramHandle}",
+                          ),
+                        if (user.xHandle.isNotEmpty)
+                          _buildDetailRow("X (Twitter)", "@${user.xHandle}"),
+                        if (user.tiktokHandle.isNotEmpty)
+                          _buildDetailRow("TikTok", "@${user.tiktokHandle}"),
+                        if (user.linkedinHandle.isNotEmpty)
+                          _buildDetailRow("LinkedIn", user.linkedinHandle),
+                      ]),
+                      const SizedBox(height: 20),
                       _buildDetailSection("WORK & EDUCATION", [
                         if (user.jobTitle.isNotEmpty)
                           _buildDetailRow(
@@ -873,27 +1079,6 @@ class ExternalProfileScreen extends ConsumerWidget {
                           ),
                       ]),
                       const SizedBox(height: 20),
-                      if (user.topArtists.isNotEmpty) ...[
-                        Text(
-                          "TOP ARTISTS",
-                          style: TextStyle(
-                            fontSize: AppFontSizes.xs,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white.withValues(alpha: 0.5),
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: user.topArtists
-                              .take(5)
-                              .map((artist) => _buildTag(artist))
-                              .toList(),
-                        ),
-                        const SizedBox(height: 25),
-                      ],
                       const SizedBox(height: 80),
                     ],
                   ),
@@ -940,21 +1125,52 @@ class ExternalProfileScreen extends ConsumerWidget {
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          // Implement message action - open DM with this user
+                          // CRITICAL FIX: Use deterministic DM room ID generation
+                          // that matches the server's algorithm
                           final currentUser = ref.read(authProvider).value;
                           if (currentUser != null) {
-                            // Create a DM room with the other user
-                            final dmRoom = ChatRoom(
-                              id: '', // Will be assigned by server
-                              partyId: '',
-                              hostId: currentUser.id,
-                              isGroup: false,
-                              participantIds: [currentUser.id, user.id],
-                              title: user.realName,
-                              imageUrl: user.profilePhotos.isNotEmpty
-                                  ? user.profilePhotos.first
-                                  : '',
+                            // Validate user.id before creating DM room
+                            if (user.id.isEmpty) {
+                              debugPrint(
+                                '[ExternalProfileScreen] ERROR: Cannot create DM - user.id is empty!',
+                              );
+                              debugPrint(
+                                '[ExternalProfileScreen] User data: id=${user.id}, name=${user.realName}',
+                              );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Cannot start chat: Invalid user data',
+                                  ),
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                              );
+                              return;
+                            }
+
+                            final dmRoom = ChatRoom.dmRoom(
+                              currentUserId: currentUser.id,
+                              otherUserId: user.id,
+                              otherUserName: user.realName.isNotEmpty
+                                  ? user.realName
+                                  : 'Unknown User',
+                              otherUserThumbnail: user.thumbnail.isNotEmpty
+                                  ? user.thumbnail
+                                  : (user.profilePhotos.isNotEmpty
+                                        ? user.profilePhotos.first
+                                        : ''),
                             );
+
+                            debugPrint(
+                              '[ExternalProfileScreen] Creating DM room:',
+                            );
+                            debugPrint('  - Current User: ${currentUser.id}');
+                            debugPrint('  - Other User: ${user.id}');
+                            debugPrint('  - Chat ID: ${dmRoom.id}');
+                            debugPrint(
+                              '  - Participant IDs: ${dmRoom.participantIds}',
+                            );
+
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (context) => ChatScreen(room: dmRoom),
@@ -1128,6 +1344,47 @@ class ExternalProfileScreen extends ConsumerWidget {
         style: const TextStyle(
           fontSize: AppFontSizes.sm,
           color: Colors.white70,
+        ),
+      ),
+    );
+  }
+
+  /// Formats user name with age, handling missing data gracefully
+  String _formatUserName(User user) {
+    final name = user.realName.isNotEmpty ? user.realName : 'Unknown User';
+    final age = user.age > 0 ? ', ${user.age}' : '';
+    return '$name$age';
+  }
+
+  /// Builds an error screen when user data is invalid
+  Widget _buildErrorScreen(BuildContext context, String message) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.redAccent, size: 64),
+            const SizedBox(height: 24),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: AppFontSizes.lg,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('GO BACK'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.textCyan,
+                foregroundColor: Colors.black,
+              ),
+            ),
+          ],
         ),
       ),
     );

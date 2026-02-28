@@ -49,7 +49,6 @@ class User {
   final String gender;
   final String drinkingPref;
   final String smokingPref;
-  final List<String> topArtists;
   final String jobTitle;
   final String company;
   final String school;
@@ -83,7 +82,6 @@ class User {
     required this.gender,
     required this.drinkingPref,
     required this.smokingPref,
-    required this.topArtists,
     required this.jobTitle,
     required this.company,
     required this.school,
@@ -107,54 +105,157 @@ class User {
   });
 
   factory User.fromMap(Map<String, dynamic> map) {
-    return User(
-      id: map['ID'] ?? map['id'] ?? '',
-      realName: map['RealName'] ?? map['real_name'] ?? '',
-      phoneNumber: map['PhoneNumber'] ?? map['phone_number'] ?? '',
-      email: map['Email'] ?? map['email'] ?? '',
-      profilePhotos: List<String>.from(
-        map['ProfilePhotos'] ?? map['profile_photos'] ?? [],
-      ),
-      age: map['Age'] ?? map['age'] ?? 0,
-      dateOfBirth: (map['DateOfBirth'] ?? map['date_of_birth']) != null
-          ? DateTime.parse(map['DateOfBirth'] ?? map['date_of_birth'])
-          : null,
-      heightCm: map['HeightCm'] ?? map['height_cm'] ?? 0,
-      gender: map['Gender'] ?? map['gender'] ?? '',
-      drinkingPref: map['DrinkingPref'] ?? map['drinking_pref'] ?? '',
-      smokingPref: map['SmokingPref'] ?? map['smoking_pref'] ?? '',
-      topArtists: List<String>.from(
-        map['TopArtists'] ?? map['top_artists'] ?? [],
-      ),
-      jobTitle: map['JobTitle'] ?? map['job_title'] ?? '',
-      company: map['Company'] ?? map['company'] ?? '',
-      school: map['School'] ?? map['school'] ?? '',
-      degree: map['Degree'] ?? map['degree'] ?? '',
-      instagramHandle: map['InstagramHandle'] ?? map['instagram_handle'] ?? '',
-      linkedinHandle: map['LinkedinHandle'] ?? map['linkedin_handle'] ?? '',
-      xHandle: map['XHandle'] ?? map['x_handle'] ?? '',
-      tiktokHandle: map['TikTokHandle'] ?? map['tiktok_handle'] ?? '',
-      isVerified: map['IsVerified'] ?? map['is_verified'] ?? false,
-      trustScore: (map['TrustScore'] ?? map['trust_score'] ?? 0.0).toDouble(),
-      eloScore: (map['EloScore'] ?? map['elo_score'] ?? 0.0).toDouble(),
-      partiesHosted: map['PartiesHosted'] ?? map['parties_hosted'] ?? 0,
-      flakeCount: map['FlakeCount'] ?? map['flake_count'] ?? 0,
-      walletData: (map['WalletData'] ?? map['wallet_data']) != null
-          ? WalletInfo.fromMap(map['WalletData'] ?? map['wallet_data'])
-          : const WalletInfo(),
-      locationLat: (map['LocationLat'] ?? map['location_lat'] ?? 0.0)
-          .toDouble(),
-      locationLon: (map['LocationLon'] ?? map['location_lon'] ?? 0.0)
-          .toDouble(),
-      lastActiveAt: (map['LastActiveAt'] ?? map['last_active_at']) != null
-          ? DateTime.parse(map['LastActiveAt'] ?? map['last_active_at'])
-          : null,
-      createdAt: (map['CreatedAt'] ?? map['created_at']) != null
-          ? DateTime.parse(map['CreatedAt'] ?? map['created_at'])
-          : null,
-      bio: map['Bio'] ?? map['bio'] ?? '',
-      thumbnail: map['Thumbnail'] ?? map['thumbnail'] ?? '',
-    );
+    try {
+      // Helper function to safely parse DateTime
+      DateTime? parseDateTime(dynamic value) {
+        if (value == null) return null;
+        if (value is DateTime) return value;
+        try {
+          return DateTime.parse(value.toString());
+        } catch (e) {
+          debugPrint('[User.fromMap] Error parsing date: $value - $e');
+          return null;
+        }
+      }
+
+      // Helper function to safely parse double
+      double parseDouble(dynamic value, [double defaultValue = 0.0]) {
+        if (value == null) return defaultValue;
+        if (value is double) return value;
+        if (value is int) return value.toDouble();
+        try {
+          return double.parse(value.toString());
+        } catch (e) {
+          return defaultValue;
+        }
+      }
+
+      // Helper function to safely parse int
+      int parseInt(dynamic value, [int defaultValue = 0]) {
+        if (value == null) return defaultValue;
+        if (value is int) return value;
+        if (value is double) return value.toInt();
+        try {
+          return int.parse(value.toString());
+        } catch (e) {
+          return defaultValue;
+        }
+      }
+
+      // Helper function to safely get string
+      String parseString(dynamic value, [String defaultValue = '']) {
+        if (value == null) return defaultValue;
+        return value.toString();
+      }
+
+      // Helper function to safely parse list
+      List<String> parseStringList(dynamic value) {
+        if (value == null) return const [];
+        if (value is List) {
+          return value.whereType<String>().toList();
+        }
+        return const [];
+      }
+
+      // CRITICAL: Ensure ID is never empty - use fallback if necessary
+      String userId = parseString(map['ID'] ?? map['id'], '');
+      if (userId.isEmpty) {
+        debugPrint('[User.fromMap] WARNING: User ID is empty in map: $map');
+        // Try to find any field that might contain an ID
+        for (final key in map.keys) {
+          final value = map[key];
+          if (value is String &&
+              value.isNotEmpty &&
+              (key.toLowerCase().contains('id') || key == 'user_id')) {
+            debugPrint(
+              '[User.fromMap] Found potential ID in field "$key": $value',
+            );
+            userId = value;
+            break;
+          }
+        }
+      }
+
+      return User(
+        id: userId,
+        realName: parseString(map['RealName'] ?? map['real_name']),
+        phoneNumber: parseString(map['PhoneNumber'] ?? map['phone_number']),
+        email: parseString(map['Email'] ?? map['email']),
+        profilePhotos: parseStringList(
+          map['ProfilePhotos'] ?? map['profile_photos'],
+        ),
+        age: parseInt(map['Age'] ?? map['age']),
+        dateOfBirth: parseDateTime(map['DateOfBirth'] ?? map['date_of_birth']),
+        heightCm: parseInt(map['HeightCm'] ?? map['height_cm']),
+        gender: parseString(map['Gender'] ?? map['gender']),
+        drinkingPref: parseString(map['DrinkingPref'] ?? map['drinking_pref']),
+        smokingPref: parseString(map['SmokingPref'] ?? map['smoking_pref']),
+        jobTitle: parseString(map['JobTitle'] ?? map['job_title']),
+        company: parseString(map['Company'] ?? map['company']),
+        school: parseString(map['School'] ?? map['school']),
+        degree: parseString(map['Degree'] ?? map['degree']),
+        instagramHandle: parseString(
+          map['InstagramHandle'] ?? map['instagram_handle'],
+        ),
+        linkedinHandle: parseString(
+          map['LinkedinHandle'] ?? map['linkedin_handle'],
+        ),
+        xHandle: parseString(map['XHandle'] ?? map['x_handle']),
+        tiktokHandle: parseString(map['TikTokHandle'] ?? map['tiktok_handle']),
+        isVerified: map['IsVerified'] ?? map['is_verified'] ?? false,
+        trustScore: parseDouble(map['TrustScore'] ?? map['trust_score']),
+        eloScore: parseDouble(map['EloScore'] ?? map['elo_score']),
+        partiesHosted: parseInt(map['PartiesHosted'] ?? map['parties_hosted']),
+        flakeCount: parseInt(map['FlakeCount'] ?? map['flake_count']),
+        walletData: (map['WalletData'] ?? map['wallet_data']) != null
+            ? WalletInfo.fromMap(map['WalletData'] ?? map['wallet_data'])
+            : const WalletInfo(),
+        locationLat: parseDouble(map['LocationLat'] ?? map['location_lat']),
+        locationLon: parseDouble(map['LocationLon'] ?? map['location_lon']),
+        lastActiveAt: parseDateTime(
+          map['LastActiveAt'] ?? map['last_active_at'],
+        ),
+        createdAt: parseDateTime(map['CreatedAt'] ?? map['created_at']),
+        bio: parseString(map['Bio'] ?? map['bio']),
+        thumbnail: parseString(map['Thumbnail'] ?? map['thumbnail']),
+      );
+    } catch (e, stackTrace) {
+      debugPrint('[User.fromMap] CRITICAL ERROR: $e');
+      debugPrint('[User.fromMap] Stack trace: $stackTrace');
+      debugPrint('[User.fromMap] Input map: $map');
+
+      // Return a safe default User object to prevent UI crashes
+      return User(
+        id: map['ID']?.toString() ?? map['id']?.toString() ?? 'unknown',
+        realName: 'Unknown User',
+        phoneNumber: '',
+        email: '',
+        profilePhotos: const [],
+        age: 0,
+        heightCm: 0,
+        gender: '',
+        drinkingPref: '',
+        smokingPref: '',
+        jobTitle: '',
+        company: '',
+        school: '',
+        degree: '',
+        instagramHandle: '',
+        linkedinHandle: '',
+        xHandle: '',
+        tiktokHandle: '',
+        isVerified: false,
+        trustScore: 0.0,
+        eloScore: 0.0,
+        partiesHosted: 0,
+        flakeCount: 0,
+        walletData: const WalletInfo(),
+        locationLat: 0.0,
+        locationLon: 0.0,
+        bio: '',
+        thumbnail: '',
+      );
+    }
   }
 
   User copyWith({
@@ -176,7 +277,6 @@ class User {
     String? company,
     String? school,
     String? degree,
-    List<String>? topArtists,
     String? thumbnail,
   }) {
     return User(
@@ -191,7 +291,6 @@ class User {
       gender: gender ?? this.gender,
       drinkingPref: drinkingPref ?? this.drinkingPref,
       smokingPref: smokingPref ?? this.smokingPref,
-      topArtists: topArtists ?? this.topArtists,
       jobTitle: jobTitle ?? this.jobTitle,
       company: company ?? this.company,
       school: school ?? this.school,
@@ -228,7 +327,6 @@ class User {
       'Gender': gender,
       'DrinkingPref': drinkingPref,
       'SmokingPref': smokingPref,
-      'TopArtists': topArtists,
       'JobTitle': jobTitle,
       'Company': company,
       'School': school,
@@ -408,6 +506,48 @@ class ChatRoom {
   });
 
   final DateTime? startTime;
+
+  /// Generates a deterministic DM chat ID that matches the server's algorithm
+  /// Server algorithm: sort u1, u2 lexicographically, join with "_"
+  static String generateDMChatId(String userId1, String userId2) {
+    final ids = [userId1, userId2]..sort();
+    return '${ids[0]}_${ids[1]}';
+  }
+
+  /// Creates a DM ChatRoom with proper ID generation
+  factory ChatRoom.dmRoom({
+    required String currentUserId,
+    required String otherUserId,
+    required String otherUserName,
+    String otherUserThumbnail = '',
+  }) {
+    // CRITICAL: Validate that neither ID is empty
+    if (currentUserId.isEmpty) {
+      debugPrint('[ChatRoom.dmRoom] ERROR: currentUserId is empty!');
+      throw ArgumentError('currentUserId cannot be empty');
+    }
+    if (otherUserId.isEmpty) {
+      debugPrint('[ChatRoom.dmRoom] ERROR: otherUserId is empty!');
+      throw ArgumentError('otherUserId cannot be empty');
+    }
+
+    final dmChatId = generateDMChatId(currentUserId, otherUserId);
+    debugPrint('[ChatRoom.dmRoom] Creating DM room:');
+    debugPrint('  - currentUserId: $currentUserId');
+    debugPrint('  - otherUserId: $otherUserId');
+    debugPrint('  - dmChatId: $dmChatId');
+    debugPrint('  - participantIds: [$currentUserId, $otherUserId]');
+
+    return ChatRoom(
+      id: dmChatId,
+      partyId: '',
+      hostId: currentUserId,
+      isGroup: false,
+      participantIds: [currentUserId, otherUserId],
+      title: otherUserName.isNotEmpty ? otherUserName : 'Unknown User',
+      imageUrl: otherUserThumbnail,
+    );
+  }
 
   ChatRoom copyWith({
     String? lastMessageContent,
@@ -616,15 +756,71 @@ class PartyApplication {
   });
 
   factory PartyApplication.fromMap(Map<String, dynamic> map) {
-    return PartyApplication(
-      partyId: map['PartyID'] ?? '',
-      userId: map['UserID'] ?? '',
-      status: ApplicantStatus.values.firstWhere(
-        (e) => e.toString().split('.').last == map['Status'],
-        orElse: () => ApplicantStatus.PENDING,
-      ),
-      appliedAt: DateTime.parse(map['AppliedAt']),
-      user: map['User'] != null ? User.fromMap(map['User']) : null,
+    try {
+      // Extract User data from nested structure (as returned by server)
+      User? user;
+      if (map['User'] != null && map['User'] is Map<String, dynamic>) {
+        try {
+          final userMap = map['User'] as Map<String, dynamic>;
+          debugPrint(
+            '[PartyApplication.fromMap] Parsing User from map with keys: ${userMap.keys.toList()}',
+          );
+          user = User.fromMap(userMap);
+          debugPrint(
+            '[PartyApplication.fromMap] Successfully parsed User: id=${user.id}, name=${user.realName}',
+          );
+        } catch (e, stackTrace) {
+          debugPrint('[PartyApplication.fromMap] Error parsing User: $e');
+          debugPrint('[PartyApplication.fromMap] Stack trace: $stackTrace');
+          user = null;
+        }
+      } else {
+        debugPrint(
+          '[PartyApplication.fromMap] No User data found in map. Keys: ${map.keys.toList()}',
+        );
+      }
+
+      // Parse AppliedAt with error handling
+      DateTime appliedAt;
+      try {
+        appliedAt = DateTime.parse(
+          map['AppliedAt'] ?? DateTime.now().toIso8601String(),
+        );
+      } catch (e) {
+        debugPrint('[PartyApplication.fromMap] Error parsing AppliedAt: $e');
+        appliedAt = DateTime.now();
+      }
+
+      return PartyApplication(
+        partyId:
+            map['PartyID']?.toString() ?? map['party_id']?.toString() ?? '',
+        userId: map['UserID']?.toString() ?? map['user_id']?.toString() ?? '',
+        status: _parseApplicantStatus(map['Status'] ?? map['status']),
+        appliedAt: appliedAt,
+        user: user,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('[PartyApplication.fromMap] CRITICAL ERROR: $e');
+      debugPrint('[PartyApplication.fromMap] Stack trace: $stackTrace');
+      debugPrint('[PartyApplication.fromMap] Input map: $map');
+
+      // Return a safe default object to prevent UI crashes
+      return PartyApplication(
+        partyId: map['PartyID']?.toString() ?? 'unknown',
+        userId: map['UserID']?.toString() ?? 'unknown',
+        status: ApplicantStatus.PENDING,
+        appliedAt: DateTime.now(),
+        user: null,
+      );
+    }
+  }
+
+  static ApplicantStatus _parseApplicantStatus(dynamic status) {
+    if (status == null) return ApplicantStatus.PENDING;
+    final statusStr = status.toString().toUpperCase();
+    return ApplicantStatus.values.firstWhere(
+      (e) => e.toString().split('.').last.toUpperCase() == statusStr,
+      orElse: () => ApplicantStatus.PENDING,
     );
   }
 }

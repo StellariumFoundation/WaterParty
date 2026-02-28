@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:shimmer/shimmer.dart';
 import 'theme.dart';
 import 'providers.dart';
 import 'models.dart';
@@ -55,27 +56,84 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _sendMessage() {
-    if (_msgCtrl.text.isEmpty) return;
+    final messageText = _msgCtrl.text.trim();
+    if (messageText.isEmpty) return;
 
-    if (widget.room.isGroup) {
-      ref.read(socketServiceProvider).sendMessage('SEND_MESSAGE', {
-        'ChatID': widget.room.id,
-        'Content': _msgCtrl.text,
-        'Type': 'TEXT',
-      });
-    } else {
-      // Logic for DM
-      final myId = ref.read(authProvider).value?.id;
-      final recipientId = widget.room.participantIds.firstWhere(
-        (id) => id != myId,
-      );
-      ref.read(socketServiceProvider).sendMessage('SEND_DM', {
-        'RecipientID': recipientId,
-        'Content': _msgCtrl.text,
-      });
+    // Store message locally for potential retry
+    final pendingMessage = messageText;
+
+    try {
+      if (widget.room.isGroup) {
+        // Group message
+        ref.read(socketServiceProvider).sendMessage('SEND_MESSAGE', {
+          'ChatID': widget.room.id,
+          'Content': pendingMessage,
+          'Type': 'TEXT',
+        });
+      } else {
+        // DM message with error handling
+        final myId = ref.read(authProvider).value?.id;
+        if (myId == null) {
+          _showErrorSnackBar('Authentication error. Please log in again.');
+          return;
+        }
+
+        // Find recipient ID
+        final recipientId = widget.room.participantIds.firstWhere(
+          (id) => id != myId,
+          orElse: () => '',
+        );
+
+        if (recipientId.isEmpty) {
+          debugPrint('[ChatScreen] ERROR: recipientId is empty!');
+          debugPrint('[ChatScreen] Room ID: ${widget.room.id}');
+          debugPrint(
+            '[ChatScreen] Room participantIds: ${widget.room.participantIds}',
+          );
+          debugPrint('[ChatScreen] Current user ID: $myId');
+          _showErrorSnackBar('Cannot find recipient. Please try again.');
+          return;
+        }
+
+        debugPrint('[ChatScreen] Sending DM:');
+        debugPrint('  - From: $myId');
+        debugPrint('  - To: $recipientId');
+        debugPrint('  - Chat ID: ${widget.room.id}');
+
+        debugPrint('[ChatScreen] Sending DM to $recipientId: $pendingMessage');
+
+        ref.read(socketServiceProvider).sendMessage('SEND_DM', {
+          'RecipientID': recipientId,
+          'Content': pendingMessage,
+        });
+      }
+
+      _msgCtrl.clear();
+    } catch (e, stackTrace) {
+      debugPrint('[ChatScreen] ERROR sending message: $e');
+      debugPrint('[ChatScreen] Stack trace: $stackTrace');
+      _showErrorSnackBar('Failed to send message. Please try again.');
+
+      // Restore message text for retry
+      _msgCtrl.text = pendingMessage;
     }
+  }
 
-    _msgCtrl.clear();
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'RETRY',
+            textColor: Colors.white,
+            onPressed: _sendMessage,
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -389,15 +447,42 @@ class UserManagementScreen extends ConsumerStatefulWidget {
 
 class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
   int _selectedTab = 0; // 0 for GOING, 1 for APPLICANTS
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchApplicants();
+    });
+  }
+
+  Future<void> _fetchApplicants() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
       ref.read(socketServiceProvider).sendMessage('GET_APPLICANTS', {
         'PartyID': widget.room.partyId,
       });
-    });
+
+      // Wait for response with timeout
+      await Future.delayed(const Duration(seconds: 2));
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load applicants. Pull down to retry.';
+        });
+      }
+    }
   }
 
   @override
@@ -533,30 +618,79 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                 textAlign: TextAlign.center,
               ),
             ),
-          Expanded(
-            child: currentList.isEmpty
-                ? Center(
-                    child: Text(
-                      _selectedTab == 0
-                          ? "NO ONE GOING YET"
-                          : "NO PENDING APPLICATIONS",
-                      style: const TextStyle(
-                        color: Colors.white10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(20),
-                    itemCount: currentList.length,
-                    itemBuilder: (context, index) {
-                      final app = currentList[index];
-                      return _buildUserCard(app, isFull && _selectedTab == 1);
-                    },
-                  ),
-          ),
+          Expanded(child: _buildBodyContent(currentList, isFull)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBodyContent(List<PartyApplication> currentList, bool isFull) {
+    // Show shimmer loading state
+    if (_isLoading) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(20),
+        itemCount: 5, // Show 5 shimmer placeholders
+        itemBuilder: (context, index) => _buildShimmerUserCard(),
+      );
+    }
+
+    // Show error state
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage!,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: AppFontSizes.md,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _fetchApplicants,
+              icon: const Icon(Icons.refresh),
+              label: const Text('RETRY'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.textCyan,
+                foregroundColor: Colors.black,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Show empty state
+    if (currentList.isEmpty) {
+      return Center(
+        child: Text(
+          _selectedTab == 0 ? "NO ONE GOING YET" : "NO PENDING APPLICATIONS",
+          style: const TextStyle(
+            color: Colors.white10,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2,
+          ),
+        ),
+      );
+    }
+
+    // Show list of applicants
+    return RefreshIndicator(
+      onRefresh: _fetchApplicants,
+      color: AppColors.textCyan,
+      backgroundColor: Colors.black,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(20),
+        itemCount: currentList.length,
+        itemBuilder: (context, index) {
+          final app = currentList[index];
+          return _buildUserCard(app, isFull && _selectedTab == 1);
+        },
       ),
     );
   }
@@ -596,7 +730,16 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
 
   Widget _buildUserCard(PartyApplication app, bool disableAction) {
     final user = app.user;
-    if (user == null) return const SizedBox();
+
+    // CRITICAL FIX: Handle null user with proper error UI instead of just returning SizedBox
+    if (user == null) {
+      return _buildErrorUserCard('User data unavailable');
+    }
+
+    // Validate essential user fields
+    if (user.id.isEmpty) {
+      return _buildErrorUserCard('Invalid user ID');
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
@@ -708,6 +851,117 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
       'UserID': app.userId,
       'Status': 'ACCEPTED',
     });
+  }
+
+  /// Builds a shimmer loading placeholder for user cards
+  Widget _buildShimmerUserCard() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 15),
+      child: Shimmer.fromColors(
+        baseColor: Colors.white.withOpacity(0.1),
+        highlightColor: Colors.white.withOpacity(0.2),
+        child: Container(
+          height: 100,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(15),
+            child: Row(
+              children: [
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 150,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        width: 100,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Builds an error card when user data is unavailable
+  Widget _buildErrorUserCard(String errorMessage) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 15),
+      child: WaterGlass(
+        height: 80,
+        borderRadius: 20,
+        child: Padding(
+          padding: const EdgeInsets.all(15),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.error_outline, color: Colors.redAccent),
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'User Data Error',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: AppFontSizes.md,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      errorMessage,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: AppFontSizes.sm,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

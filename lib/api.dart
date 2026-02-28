@@ -346,15 +346,56 @@ class SocketService {
         // Logic for location reveal
         break;
       case SocketServerEvents.applicantsList:
-        print('[WebSocket] APPLICANTS_LIST payload: $payload');
+        print('[WebSocket] APPLICANTS_LIST received');
+        print('[WebSocket] Payload type: ${payload.runtimeType}');
+
         final applicantsData = payload['Applicants'];
         if (applicantsData == null) {
           print('[WebSocket] Applicants is null, setting empty list');
           ref.read(partyApplicantsProvider.notifier).setApplicants([]);
           break;
         }
+
+        print(
+          '[WebSocket] Applicants count: ${(applicantsData as List).length}',
+        );
+
+        // Debug: Print first applicant structure if available
+        if ((applicantsData).isNotEmpty) {
+          final firstApp = applicantsData[0] as Map<String, dynamic>;
+          print('[WebSocket] First applicant keys: ${firstApp.keys.toList()}');
+          if (firstApp['User'] != null) {
+            final userData = firstApp['User'] as Map<String, dynamic>;
+            print(
+              '[WebSocket] First applicant User keys: ${userData.keys.toList()}',
+            );
+            print('[WebSocket] First applicant User ID: ${userData['ID']}');
+            print(
+              '[WebSocket] First applicant ProfilePhotos: ${userData['ProfilePhotos']}',
+            );
+          }
+        }
+
         final List<dynamic> appsRaw = applicantsData;
-        final apps = appsRaw.map((a) => PartyApplication.fromMap(a)).toList();
+        final apps = appsRaw.map((a) {
+          try {
+            return PartyApplication.fromMap(a as Map<String, dynamic>);
+          } catch (e, stackTrace) {
+            print('[WebSocket] ERROR parsing PartyApplication: $e');
+            print('[WebSocket] Stack trace: $stackTrace');
+            print('[WebSocket] Problematic data: $a');
+            // Return a placeholder to avoid crashing
+            return PartyApplication(
+              partyId: 'error',
+              userId: 'error',
+              status: ApplicantStatus.PENDING,
+              appliedAt: DateTime.now(),
+              user: null,
+            );
+          }
+        }).toList();
+
+        print('[WebSocket] Successfully parsed ${apps.length} applications');
         ref.read(partyApplicantsProvider.notifier).setApplicants(apps);
         break;
       case SocketServerEvents.applicationUpdated:

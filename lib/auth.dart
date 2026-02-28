@@ -320,7 +320,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
           gender: _selectedGender,
           drinkingPref: '',
           smokingPref: '',
-          topArtists: const [],
           bio: _bioCtrl.text,
           jobTitle: _jobCtrl.text,
           company: _compCtrl.text,
